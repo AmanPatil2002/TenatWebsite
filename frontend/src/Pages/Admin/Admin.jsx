@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import {
   Box,
   Drawer,
@@ -11,66 +12,44 @@ import {
   ListItemIcon,
   ListItemText,
   Tooltip,
+  IconButton,
   useMediaQuery,
   useTheme,
   Stack,
-  Button,
 } from "@mui/material";
 
-import { Outlet, useLocation, useNavigate, useOutlet } from "react-router-dom";
+import { useLocation, useNavigate, useOutlet } from "react-router-dom";
 
+import MenuIcon from "@mui/icons-material/Menu";
+import MenuOpenIcon from "@mui/icons-material/MenuOpen";
 import DashboardIcon from "@mui/icons-material/Dashboard";
-import SendIcon from "@mui/icons-material/Send";
-import PersonIcon from "@mui/icons-material/Person";
-import WorkIcon from "@mui/icons-material/Work";
-import AssignmentIcon from "@mui/icons-material/Assignment";
+import CategoryIcon from "@mui/icons-material/Category";
+import ViewQuiltIcon from "@mui/icons-material/ViewQuilt";
+import PaletteIcon from "@mui/icons-material/Palette";
+import NoteAddIcon from "@mui/icons-material/NoteAdd";
+import FolderOpenIcon from "@mui/icons-material/FolderOpen";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutlined";
+import ContactMailIcon from "@mui/icons-material/ContactMail";
+import PeopleIcon from "@mui/icons-material/People";
+import RateReviewIcon from "@mui/icons-material/RateReview";
 import LogoutIcon from "@mui/icons-material/Logout";
-import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import AdminDashboard from "../../Mycomponent/AdminDashboard";
 
 const FULL_WIDTH = 250;
 const MINI_WIDTH = 72;
+
 const menuItems = [
-  {
-    text: "Dashboard",
-    icon: <DashboardIcon />,
-    path: "/admin/admindashboard",
-  },
-  {
-    text: "Add Category",
-    icon: <WorkIcon />,
-    path: "/admin/category",
-  },
-  {
-    text: "Add Templates",
-    icon: <WorkIcon />,
-    path: "/admin/templates",
-  },
-  {
-    text: "Add Theme",
-    icon: <WorkIcon />,
-    path: "/admin/theme",
-  },
-  {
-    text: "Add Pages",
-    icon: <WorkIcon />,
-    path: "/admin/pages",
-  },
-  {
-    text: "View Project",
-    icon: <WorkIcon />,
-    path: "/admin/projects",
-  },
-  {
-    text: "View Users",
-    icon: <PersonIcon />,
-    path: "/admin/users",
-  },
-  {
-    text: "View Review",
-    icon: <AssignmentIcon />,
-    path: "/admin/usereview",
-  },
+  { text: "Dashboard", icon: <DashboardIcon />, path: "/admin/admindashboard" },
+  { text: "Add Category", icon: <CategoryIcon />, path: "/admin/category" },
+  { text: "Add Templates", icon: <ViewQuiltIcon />, path: "/admin/templates" },
+  { text: "Add Theme", icon: <PaletteIcon />, path: "/admin/theme" },
+  { text: "Add Pages", icon: <NoteAddIcon />, path: "/admin/pages" },
+  { text: "View Project", icon: <FolderOpenIcon />, path: "/admin/projects" },
+  { text: "FAQ", icon: <HelpOutlineIcon />, path: "/admin/faq" },
+  { text: "Contact", icon: <ContactMailIcon />, path: "/admin/contact" },
+  { text: "View Users", icon: <PeopleIcon />, path: "/admin/users" },
+  { text: "View Review", icon: <RateReviewIcon />, path: "/admin/usereview" },
 ];
 
 export default function Admin() {
@@ -79,230 +58,218 @@ export default function Admin() {
   const outlet = useOutlet();
   const theme = useTheme();
 
-  const role = localStorage.getItem("role");
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down("md"));
 
-  const compact = useMediaQuery(theme.breakpoints.down("md"));
-  const drawerWidth = compact ? MINI_WIDTH : FULL_WIDTH;
+  // true = collapsed (icons only). Starts collapsed on small screens.
+  const [collapsed, setCollapsed] = useState(isSmallScreen);
+
+  // Auto-collapse when the screen shrinks, auto-expand when it grows
+  useEffect(() => {
+    setCollapsed(isSmallScreen);
+  }, [isSmallScreen]);
+
+  const drawerWidth = collapsed ? MINI_WIDTH : FULL_WIDTH;
   const email = localStorage.getItem("email");
-  const Id = localStorage.getItem("Id");
+
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("username");
     localStorage.removeItem("role");
-
+    localStorage.removeItem("email");
+    localStorage.removeItem("Id");
     navigate("/login");
   };
 
   return (
-    <Box
-      sx={{
-        display: "flex",
-        minHeight: "100vh",
-        bgcolor: "#f5f7fb",
-      }}
-    >
-      
-        <>
-          <AppBar
-            position="fixed"
-            sx={{
-              width: `calc(100% - ${drawerWidth}px)`,
-              ml: `${drawerWidth}px`,
-              boxShadow: 1,
-            }}
+    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#f5f7fb" }}>
+      <AppBar
+        position="fixed"
+        sx={{
+          width: `calc(100% - ${drawerWidth}px)`,
+          ml: `${drawerWidth}px`,
+          boxShadow: 1,
+          transition: theme.transitions.create(["width", "margin"], {
+            duration: theme.transitions.duration.shorter,
+          }),
+        }}
+      >
+        <Toolbar>
+          <IconButton
+            color="inherit"
+            edge="start"
+            onClick={() => setCollapsed((prev) => !prev)}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            sx={{ mr: 2 }}
           >
-            <Toolbar>
-              <Typography
-                variant="h6"
-                fontWeight="bold"
-                noWrap
-                sx={{ flexGrow: 1 }}
-              >
-                Admin Dashboard
-              </Typography>
+            {collapsed ? <MenuIcon /> : <MenuOpenIcon />}
+          </IconButton>
 
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Typography
-                  variant="h6"
-                  fontWeight="bold"
-                  noWrap
-                  sx={{
-                    flexGrow: 1,
-                    border: "1px solid white",
-                    padding: "4px 8px",
-                    borderRadius: "4px",
-                  }}
-                >
-                  {email}
-                </Typography>
-              </Stack>
-            </Toolbar>
-          </AppBar>
+          <Typography variant="h6" fontWeight="bold" noWrap sx={{ flexGrow: 1 }}>
+            Admin Dashboard
+          </Typography>
 
-          <Drawer
-            variant="permanent"
-            sx={{
-              width: drawerWidth,
-              flexShrink: 0,
-
-              "& .MuiDrawer-paper": {
-                width: drawerWidth,
-                boxSizing: "border-box",
-                overflowX: "hidden",
-
-                transition: theme.transitions.create("width", {
-                  duration: theme.transitions.duration.shorter,
-                }),
-              },
-            }}
-          >
-            <Box
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography
+              variant="h6"
+              fontWeight="bold"
+              noWrap
               sx={{
-                height: "100%",
-                display: "flex",
-                flexDirection: "column",
+                border: "1px solid white",
+                padding: "4px 8px",
+                borderRadius: "4px",
+                display: { xs: "none", sm: "block" },
               }}
             >
-              <Box
-                sx={{
-                  p: compact ? 2 : 3,
-                  textAlign: compact ? "center" : "left",
-                }}
-              >
-                <Typography
-                  variant={compact ? "h6" : "h5"}
-                  fontWeight="bold"
-                  color="primary"
+              {email}
+            </Typography>
+          </Stack>
+        </Toolbar>
+      </AppBar>
+
+      <Drawer
+        variant="permanent"
+        sx={{
+          width: drawerWidth,
+          flexShrink: 0,
+          transition: theme.transitions.create("width", {
+            duration: theme.transitions.duration.shorter,
+          }),
+          "& .MuiDrawer-paper": {
+            width: drawerWidth,
+            boxSizing: "border-box",
+            overflowX: "hidden",
+            transition: theme.transitions.create("width", {
+              duration: theme.transitions.duration.shorter,
+            }),
+          },
+        }}
+      >
+        <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+          <Box
+            sx={{
+              p: collapsed ? 2 : 3,
+              textAlign: collapsed ? "center" : "left",
+            }}
+          >
+            <Typography
+              variant={collapsed ? "h6" : "h5"}
+              fontWeight="bold"
+              color="primary"
+              noWrap
+            >
+              {collapsed ? <AdminPanelSettingsIcon /> : "Admin Panel"}
+            </Typography>
+          </Box>
+
+          <Divider />
+
+          <List sx={{ px: 1, flexGrow: 1, overflowY: "auto" }}>
+            {menuItems.map((item) => {
+              const isActive = location.pathname === item.path;
+
+              return (
+                <ListItem
+                  key={item.text}
+                  disablePadding
+                  sx={{ display: "block", mb: 0.5 }}
                 >
-                  {compact ? <AdminPanelSettingsIcon/> : "Admin Panel"}
-                </Typography>
-              </Box>
-
-              <Divider />
-
-              <List sx={{ px: 1, flexGrow: 1 }}>
-                {menuItems.map((item) => {
-                  const isActive = location.pathname === item.path;
-
-                  return (
-                    <ListItem
-                      key={item.text}
-                      disablePadding
-                      sx={{
-                        display: "block",
-                        mb: 0.5,
-                      }}
-                    >
-                      <Tooltip
-                        title={compact ? item.text : ""}
-                        placement="right"
-                      >
-                        <ListItemButton
-                          selected={isActive}
-                          onClick={() => navigate(item.path)}
-                          sx={{
-                            borderRadius: 2,
-
-                            justifyContent: compact ? "center" : "flex-start",
-
-                            px: compact ? 1 : 2,
-
-                            "&.Mui-selected": {
-                              backgroundColor: "primary.main",
-                              color: "white",
-
-                              "& .MuiListItemIcon-root": {
-                                color: "white",
-                              },
-                            },
-
-                            "&.Mui-selected:hover": {
-                              backgroundColor: "primary.dark",
-                            },
-
-                            "&:hover": {
-                              backgroundColor: "primary.light",
-                              color: "white",
-
-                              "& .MuiListItemIcon-root": {
-                                color: "white",
-                              },
-                            },
-                          }}
-                        >
-                          <ListItemIcon
-                            sx={{
-                              minWidth: 0,
-                              mr: compact ? 0 : 2,
-                              justifyContent: "center",
-                            }}
-                          >
-                            {item.icon}
-                          </ListItemIcon>
-
-                          {!compact && <ListItemText primary={item.text} />}
-                        </ListItemButton>
-                      </Tooltip>
-                    </ListItem>
-                  );
-                })}
-              </List>
-              <Divider />
-
-              <List sx={{ px: 1, py: 1 }}>
-                <ListItem disablePadding>
-                  <Tooltip title={compact ? "Logout" : ""} placement="right">
+                  <Tooltip title={collapsed ? item.text : ""} placement="right">
                     <ListItemButton
-                      onClick={handleLogout}
+                      selected={isActive}
+                      onClick={() => navigate(item.path)}
                       sx={{
                         borderRadius: 2,
-                        color: "error.main",
+                        justifyContent: collapsed ? "center" : "flex-start",
+                        px: collapsed ? 1 : 2,
 
-                        justifyContent: compact ? "center" : "flex-start",
-
-                        px: compact ? 1 : 2,
+                        "&.Mui-selected": {
+                          backgroundColor: "primary.main",
+                          color: "white",
+                          "& .MuiListItemIcon-root": { color: "white" },
+                        },
+                        "&.Mui-selected:hover": {
+                          backgroundColor: "primary.dark",
+                        },
+                        "&:hover": {
+                          backgroundColor: "primary.light",
+                          color: "white",
+                          "& .MuiListItemIcon-root": { color: "white" },
+                        },
                       }}
                     >
                       <ListItemIcon
                         sx={{
                           minWidth: 0,
-                          mr: compact ? 0 : 2,
+                          mr: collapsed ? 0 : 2,
                           justifyContent: "center",
-                          color: "error.main",
                         }}
                       >
-                        <LogoutIcon />
+                        {item.icon}
                       </ListItemIcon>
 
-                      {!compact && <ListItemText primary="Logout" />}
+                      {!collapsed && <ListItemText primary={item.text} />}
                     </ListItemButton>
                   </Tooltip>
                 </ListItem>
-              </List>
-            </Box>
-          </Drawer>
-          <Box
-            component="main"
-            sx={{
-              flexGrow: 1,
-              minWidth: 0,
-              p: { xs: 2, sm: 3, md: 4 },
-              mt: 8,
-            }}
-          >
-            {outlet ?? (
-              <Box>
-                <Typography variant="h5" component="h1" fontWeight="bold">
-                  {location.pathname === "/admin"
-                    ? <AdminDashboard/>
-                    : menuItems.find((item) => item.path === location.pathname)
-                        ?.text ?? "Admin Dashboard"}
-                </Typography>
-              </Box>
+              );
+            })}
+          </List>
+
+          <Divider />
+
+          <List sx={{ px: 1, py: 1 }}>
+            <ListItem disablePadding>
+              <Tooltip title={collapsed ? "Logout" : ""} placement="right">
+                <ListItemButton
+                  onClick={handleLogout}
+                  sx={{
+                    borderRadius: 2,
+                    color: "error.main",
+                    justifyContent: collapsed ? "center" : "flex-start",
+                    px: collapsed ? 1 : 2,
+                  }}
+                >
+                  <ListItemIcon
+                    sx={{
+                      minWidth: 0,
+                      mr: collapsed ? 0 : 2,
+                      justifyContent: "center",
+                      color: "error.main",
+                    }}
+                  >
+                    <LogoutIcon />
+                  </ListItemIcon>
+
+                  {!collapsed && <ListItemText primary="Logout" />}
+                </ListItemButton>
+              </Tooltip>
+            </ListItem>
+          </List>
+        </Box>
+      </Drawer>
+
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          minWidth: 0,
+          p: { xs: 2, sm: 3, md: 4 },
+          mt: 8,
+        }}
+      >
+        {outlet ?? (
+          <Box>
+            {location.pathname === "/admin" ? (
+              <AdminDashboard />
+            ) : (
+              <Typography variant="h5" component="h1" fontWeight="bold">
+                {menuItems.find((item) => item.path === location.pathname)
+                  ?.text ?? "Admin Dashboard"}
+              </Typography>
             )}
           </Box>
-        </>
-      
+        )}
+      </Box>
     </Box>
   );
 }

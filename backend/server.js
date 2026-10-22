@@ -12,6 +12,8 @@ const siteRoute = require("./route/siteRoute");
 const pageRoute = require("./route/pageRoute");
 const themeRoute = require("./route/themeRoute");
 const publicRoute = require("./route/publicRoute");
+const faqRoute = require("./route/faqRoute");
+const acontactRoute = require("./route/acontactRoute")
 
 const app = express();
 app.use(cors());
@@ -29,6 +31,8 @@ app.use("/site", siteRoute);
 app.use("/site", pageRoute);
 app.use("/site", themeRoute);
 app.use("/public", publicRoute);
+app.use("/faq" ,faqRoute);
+app.use("/contact", acontactRoute);
 
 app.get("/health", (req, res) => res.json({ ok: true }));
 

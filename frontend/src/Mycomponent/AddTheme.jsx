@@ -74,7 +74,11 @@ function ThemeForm({
       errs.settings = "Theme settings are required";
     } else {
       try {
-        JSON.parse(settingsText);
+        const parsed = JSON.parse(settingsText);
+        // FIX: "5", "null" or "[1,2]" are valid JSON but not valid theme settings
+        if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+          errs.settings = "Settings must be a JSON object, e.g. { \"primary\": \"#1976d2\" }";
+        }
       } catch {
         errs.settings = "Enter valid JSON";
       }
@@ -92,15 +96,18 @@ function ThemeForm({
     setErrors((previous) => ({ ...previous, [name]: undefined }));
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     if (!validate()) return;
 
-    onSubmit({
+    const ok = await onSubmit({
       name: formData.name.trim(),
       settings: JSON.parse(formData.settings),
       type: formData.type.trim(),
     });
+
+    // FIX: clear the form after a successful create (previously it kept the old values)
+    if (ok && !editing) setFormData(getInitialForm());
   };
 
   return (
@@ -130,6 +137,7 @@ function ThemeForm({
             onChange={handleChange}
             error={!!errors.settings}
             helperText={errors.settings || "Enter valid JSON settings"}
+            slotProps={{ input: { sx: { fontFamily: "monospace", fontSize: "0.85rem" } } }}
           />
         </Grid>
         <Grid size={12}>
@@ -141,7 +149,7 @@ function ThemeForm({
             value={formData.type}
             onChange={handleChange}
             error={!!errors.type}
-            helperText={errors.type}
+            helperText={errors.type || (editing ? "Type cannot be changed" : undefined)}
             disabled={editing}
           />
         </Grid>
@@ -273,16 +281,17 @@ export default function AddTheme() {
       });
       setThemes(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
-      showSnack(
-        error.response?.data?.message || fallbackMessage,
-        "error",
-      );
+      showSnack(error.response?.data?.message || fallbackMessage, "error");
     }
   };
 
+  // Create/update return true on success so the form knows whether to reset
   const handleCreate = async (values) => {
     const token = localStorage.getItem("token");
-    if (!token) return showSnack("Please log in first.", "error");
+    if (!token) {
+      showSnack("Please log in first.", "error");
+      return false;
+    }
 
     try {
       setSubmitting(true);
@@ -291,11 +300,10 @@ export default function AddTheme() {
       });
       showSnack("Theme added successfully!");
       await refreshThemes(token, "Theme added, but themes could not be refreshed.");
+      return true;
     } catch (error) {
-      showSnack(
-        error.response?.data?.message || "Failed to add theme.",
-        "error",
-      );
+      showSnack(error.response?.data?.message || "Failed to add theme.", "error");
+      return false;
     } finally {
       setSubmitting(false);
     }
@@ -303,7 +311,10 @@ export default function AddTheme() {
 
   const handleUpdate = async (values) => {
     const token = localStorage.getItem("token");
-    if (!token) return showSnack("Please log in first.", "error");
+    if (!token) {
+      showSnack("Please log in first.", "error");
+      return false;
+    }
 
     try {
       setSubmitting(true);
@@ -314,15 +325,11 @@ export default function AddTheme() {
       );
       showSnack("Theme updated successfully!");
       setEditingId(null);
-      await refreshThemes(
-        token,
-        "Theme updated, but themes could not be refreshed.",
-      );
+      await refreshThemes(token, "Theme updated, but themes could not be refreshed.");
+      return true;
     } catch (error) {
-      showSnack(
-        error.response?.data?.message || "Failed to update theme.",
-        "error",
-      );
+      showSnack(error.response?.data?.message || "Failed to update theme.", "error");
+      return false;
     } finally {
       setSubmitting(false);
     }
@@ -340,24 +347,16 @@ export default function AddTheme() {
         { headers: { Authorization: `Bearer ${token}` } },
       );
       showSnack("Theme activated.");
-      await refreshThemes(
-        token,
-        "Theme activated, but themes could not be refreshed.",
-      );
+      await refreshThemes(token, "Theme activated, but themes could not be refreshed.");
     } catch (error) {
-      showSnack(
-        error.response?.data?.message || "Failed to activate theme.",
-        "error",
-      );
+      showSnack(error.response?.data?.message || "Failed to activate theme.", "error");
     } finally {
       setActiveId(null);
     }
   };
 
   const editingTheme =
-    editingId != null
-      ? themes.find((theme) => theme.id === editingId)
-      : null;
+    editingId != null ? themes.find((theme) => theme.id === editingId) : null;
 
   return (
     <Box
@@ -433,9 +432,7 @@ export default function AddTheme() {
                   }
                   submitLabel={editingTheme ? "Save changes" : "Add theme"}
                   onSubmit={editingTheme ? handleUpdate : handleCreate}
-                  onCancel={
-                    editingTheme ? () => setEditingId(null) : undefined
-                  }
+                  onCancel={editingTheme ? () => setEditingId(null) : undefined}
                   submitting={submitting}
                   editing={!!editingTheme}
                 />
@@ -485,6 +482,8 @@ export default function AddTheme() {
                                   component="pre"
                                   sx={{
                                     m: 0,
+                                    maxHeight: 160, // FIX: long settings no longer stretch the row
+                                    overflow: "auto",
                                     whiteSpace: "pre-wrap",
                                     overflowWrap: "anywhere",
                                     fontFamily: "monospace",
@@ -494,36 +493,26 @@ export default function AddTheme() {
                                   {formatSettings(theme.settings)}
                                 </Box>
                               </TableCell>
-                              <TableCell>
-                                {isActive ? "Active" : "Inactive"}
-                              </TableCell>
-                              <TableCell align="right">
+                              <TableCell>{isActive ? "Active" : "Inactive"}</TableCell>
+                              <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
                                 <Tooltip title="Edit">
                                   <span>
                                     <IconButton
                                       size="small"
                                       onClick={() => setEditingId(theme.id)}
-                                      disabled={
-                                        submitting || activeId === theme.id
-                                      }
+                                      disabled={submitting || activeId === theme.id}
                                     >
                                       <EditIcon fontSize="small" />
                                     </IconButton>
                                   </span>
                                 </Tooltip>
-                                <Tooltip
-                                  title={isActive ? "Active theme" : "Activate"}
-                                >
+                                <Tooltip title={isActive ? "Active theme" : "Activate"}>
                                   <span>
                                     <IconButton
                                       size="small"
                                       color="primary"
                                       onClick={() => handleActivate(theme)}
-                                      disabled={
-                                        isActive ||
-                                        submitting ||
-                                        activeId === theme.id
-                                      }
+                                      disabled={isActive || submitting || activeId === theme.id}
                                     >
                                       {activeId === theme.id ? (
                                         <CircularProgress size={16} />

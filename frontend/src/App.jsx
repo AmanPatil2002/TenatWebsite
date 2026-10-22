@@ -20,6 +20,8 @@ import AddPages from "./Mycomponent/AddPages";
 import Payment from "./Mycomponent/Payment";
 import Template from "./Pages/Client/Template";
 import ViewPayment from "./Mycomponent/ViewPayment";
+import AddContact from "./Mycomponent/AddContact";
+import AddFaq from "./Mycomponent/AddFaq";
 
 function App() {
   return (
@@ -50,7 +52,9 @@ function App() {
             <Route path="users" element={<ViewUser />} />
             <Route path="usereview" element={<ViewReview />} />
             <Route path="admindashboard" element={<AdminDashboard />} />
-            <Route path="/invoice" element={<ViewPayment />} />
+            <Route path="invoice" element={<ViewPayment />} />
+            <Route path="faq" element={<AddFaq />} />
+            <Route path="contact" element={<AddContact />} />
           </Route>
         </Route>
       </Routes>
