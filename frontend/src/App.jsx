@@ -10,6 +10,8 @@ import ViewUser from "./Mycomponent/ViewUser";
 import ViewReview from "./Mycomponent/ViewReview";
 import Myaccount from "./Pages/Client/Myaccount";
 import Contact from "./Pages/Client/Contact";
+import MySite from "./Pages/Client/MySite";
+import TempDetail from "./Pages/Client/TempDetail";
 import Review from "./Pages/Client/Review";
 import AdminDashboard from "./Mycomponent/AdminDashboard";
 import AddTemplate from "./Mycomponent/AddTemplate";
@@ -39,6 +41,8 @@ function App() {
             <Route path="/myaccount" element={<Myaccount />} />
             <Route path="/viewtemp" element={<Template />}/>
             <Route path="/payment" element={<Payment />} />
+            <Route path="/mysite" element={<MySite/>} />
+            <Route path="/detail" element={<TempDetail/>}/>
           </Route>
         </Route>
 

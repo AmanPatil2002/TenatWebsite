@@ -1,23 +1,56 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
-  Box, Container, Grid, Typography, TextField, InputAdornment, MenuItem,
-  List, ListItemButton, ListItemText, Card, CardActionArea, CardMedia,
-  CardContent, Chip, Rating, Skeleton, Dialog, DialogTitle, DialogContent,
-  DialogActions, Button, IconButton, Stack, Divider, Alert,
+  Box,
+  Container,
+  Grid,
+  Typography,
+  TextField,
+  InputAdornment,
+  MenuItem,
+  List,
+  ListItemButton,
+  ListItemText,
+  Card,
+  CardActionArea,
+  CardMedia,
+  CardContent,
+  Skeleton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  Button,
+  Tabs,
+  Tab,
+  Stack,
+  Divider,
+  Alert,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
-import CloseIcon from "@mui/icons-material/Close";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+const PLACEHOLDER_IMG = "https://placehold.co/600x340?text=No+Preview";
+
+// Preview widths for the Desktop / Tablet / Mobile tabs
+const PREVIEW_WIDTHS = ["100%", 768, 390];
 
 const formatPrice = (price, currency = "INR") =>
   new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency,
     maximumFractionDigits: 0,
-  }).format(price);
+  }).format(Number(price));
+
+const formatDate = (d) =>
+  d
+    ? new Date(d).toLocaleDateString(undefined, {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : "-";
 
 export default function Template() {
   const navigate = useNavigate();
@@ -29,27 +62,27 @@ export default function Template() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // detail dialog
+  const [tabIndex, setTabIndex] = useState(0);
+  const handleTabChange = (event, newValue) => setTabIndex(newValue);
+
   const [selected, setSelected] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
-  // categories (once)
   useEffect(() => {
     axios
       .get(`${API}/categories`)
-      .then((res) => setCategories(res.data))
+      .then((res) => setCategories(Array.isArray(res.data) ? res.data : []))
       .catch(() => setCategories([]));
   }, []);
 
-  // templates (refetch on category change)
   useEffect(() => {
     setLoading(true);
     setError("");
     axios
       .get(`${API}/templates`, { params: categoryId ? { categoryId } : {} })
-      .then((res) => setTemplates(res.data))
+      .then((res) => setTemplates(Array.isArray(res.data) ? res.data : []))
       .catch((err) =>
-        setError(err.response?.data?.message || "Failed to load templates")
+        setError(err.response?.data?.message || "Failed to load templates"),
       )
       .finally(() => setLoading(false));
   }, [categoryId]);
@@ -60,18 +93,25 @@ export default function Template() {
       (t) =>
         !q ||
         t.name?.toLowerCase().includes(q) ||
-        t.shortDescription?.toLowerCase().includes(q)
+        t.shortDescription?.toLowerCase().includes(q),
     );
-    if (sort === "priceLow") list = [...list].sort((a, b) => a.price - b.price);
-    if (sort === "priceHigh") list = [...list].sort((a, b) => b.price - a.price);
+    if (sort === "priceLow")
+      list = [...list].sort((a, b) => Number(a.price) - Number(b.price));
+    if (sort === "priceHigh")
+      list = [...list].sort((a, b) => Number(b.price) - Number(a.price));
     if (sort === "rating")
-      list = [...list].sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0));
-    return list; // "newest" = server order (createdAt DESC)
+      list = [...list].sort(
+        (a, b) => Number(b.avgRating || 0) - Number(a.avgRating || 0),
+      );
+    return list;
   }, [templates, search, sort]);
 
   const openDetail = async (id) => {
     setDetailLoading(true);
-    setSelected({ templateId: id });
+    setError("");
+    setSelected({ templateId: id, name: "", shortDescription: "" });
+    setTabIndex(0);
+
     try {
       const res = await axios.get(`${API}/templates/${id}`);
       setSelected(res.data);
@@ -84,6 +124,7 @@ export default function Template() {
   };
 
   const activeCategory = categories.find((c) => c.categoryId === categoryId);
+  const detailReady = !!selected && !detailLoading && !!selected.name;
 
   return (
     <Box sx={{ bgcolor: "#f7f7f8", minHeight: "100vh", pb: 8 }}>
@@ -104,12 +145,14 @@ export default function Template() {
               placeholder="Search templates"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                ),
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon />
+                    </InputAdornment>
+                  ),
+                },
               }}
             />
             <TextField
@@ -131,8 +174,8 @@ export default function Template() {
 
       <Container maxWidth="lg" sx={{ mt: 4 }}>
         <Grid container spacing={4}>
-          {/* Category sidebar */}
-          <Grid item xs={12} md={3}>
+          {/* Categories */}
+          <Grid size={{ xs: 12, md: 3 }}>
             <Typography variant="overline" color="text.secondary">
               Categories
             </Typography>
@@ -157,34 +200,43 @@ export default function Template() {
             </List>
           </Grid>
 
-          {/* Grid */}
-          <Grid item xs={12} md={9}>
+          {/* Template grid */}
+          <Grid size={{ xs: 12, md: 9 }}>
             {error && (
-              <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>
+              <Alert
+                severity="error"
+                sx={{ mb: 2 }}
+                onClose={() => setError("")}
+              >
                 {error}
               </Alert>
             )}
 
             <Typography color="text.secondary" sx={{ mb: 2 }}>
-              {loading ? "Loading…" : `${visible.length} template${visible.length === 1 ? "" : "s"}`}
+              {loading
+                ? "Loading…"
+                : `${visible.length} template${visible.length === 1 ? "" : "s"}`}
             </Typography>
 
             <Grid container spacing={3}>
               {loading
                 ? Array.from({ length: 6 }).map((_, i) => (
-                    <Grid item xs={12} sm={6} lg={4} key={i}>
+                    <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={i}>
                       <Skeleton variant="rounded" height={260} />
                     </Grid>
                   ))
                 : visible.map((t) => (
-                    <Grid item xs={12} sm={6} lg={4} key={t.templateId}>
+                    <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={t.templateId}>
                       <Card
                         variant="outlined"
                         sx={{
                           height: "100%",
                           borderRadius: 2,
                           transition: "box-shadow .2s, transform .2s",
-                          "&:hover": { boxShadow: 6, transform: "translateY(-2px)" },
+                          "&:hover": {
+                            boxShadow: 6,
+                            transform: "translateY(-2px)",
+                          },
                         }}
                       >
                         <CardActionArea
@@ -193,11 +245,8 @@ export default function Template() {
                         >
                           <CardMedia
                             component="img"
-                            height="170"
-                            image={
-                              t.thumbnailUrl ||
-                              "https://placehold.co/600x340?text=No+Preview"
-                            }
+                            height="200"
+                            image={t.thumbnailUrl || PLACEHOLDER_IMG}
                             alt={t.name}
                             sx={{ objectFit: "cover", bgcolor: "#eee" }}
                           />
@@ -206,16 +255,17 @@ export default function Template() {
                               direction="row"
                               justifyContent="space-between"
                               alignItems="center"
+                              spacing={1}
                               mb={0.5}
                             >
-                              <Chip size="small" label={t.categoryName} />
-                              <Typography fontWeight={700}>
+                              <Typography variant="h6" noWrap>
+                                {t.name}
+                              </Typography>
+                              <Typography fontWeight={700} sx={{ flexShrink: 0 }}>
                                 {formatPrice(t.price, t.currency)}
                               </Typography>
                             </Stack>
-                            <Typography variant="h6" noWrap>
-                              {t.name}
-                            </Typography>
+
                             <Typography
                               variant="body2"
                               color="text.secondary"
@@ -229,17 +279,6 @@ export default function Template() {
                             >
                               {t.shortDescription}
                             </Typography>
-                            <Stack direction="row" alignItems="center" spacing={1} mt={1}>
-                              <Rating
-                                size="small"
-                                precision={0.5}
-                                readOnly
-                                value={Number(t.avgRating) || 0}
-                              />
-                              <Typography variant="caption" color="text.secondary">
-                                {t.validityDays} days
-                              </Typography>
-                            </Stack>
                           </CardContent>
                         </CardActionArea>
                       </Card>
@@ -260,85 +299,154 @@ export default function Template() {
       </Container>
 
       {/* Detail dialog */}
-      <Dialog open={!!selected} onClose={() => setSelected(null)} maxWidth="md" fullWidth>
+      <Dialog fullScreen open={!!selected} onClose={() => setSelected(null)}>
         {selected && (
           <>
-            <DialogTitle sx={{ pr: 6 }}>
-              {selected.name || "Loading…"}
-              <IconButton
-                onClick={() => setSelected(null)}
-                sx={{ position: "absolute", right: 8, top: 8 }}
+            <DialogTitle component="div" sx={{ pb: 0 }}>
+              <Stack
+                direction="row"
+                spacing={1.5}
+                alignItems="center"
+                flexWrap="wrap"
+                useFlexGap
               >
-                <CloseIcon />
-              </IconButton>
+                <Button onClick={() => setSelected(null)}>Close</Button>
+                <Typography variant="h6" component="span" sx={{ flexGrow: 1 }}>
+                  {selected.name}
+                </Typography>
+
+                {selected.demoUrl && (
+                  <Button
+                    variant="outlined"
+                    href={selected.demoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Live preview
+                  </Button>
+                )}
+                <Button
+                  variant="contained"
+                  disabled={!detailReady}
+                  onClick={() =>
+                    navigate("/payment", {
+                      state: {
+                        templateId: selected.templateId,
+                        template: selected,
+                      },
+                    })
+                  }
+                >
+                  {detailReady
+                    ? `Buy ${formatPrice(selected.price, selected.currency)}`
+                    : "Buy"}
+                </Button>
+              </Stack>
+
+              <Tabs
+                onChange={handleTabChange}
+                value={tabIndex}
+                sx={{ mt: 1 }}
+              >
+                <Tab label="Desktop" />
+                <Tab label="Tablet" />
+                <Tab label="Mobile" />
+              </Tabs>
             </DialogTitle>
+
             <DialogContent dividers>
-              {detailLoading || !selected.name ? (
+              {!detailReady ? (
                 <Skeleton variant="rounded" height={300} />
               ) : (
-                <>
+                <Stack spacing={3}>
+                  {/* Device preview */}
                   <Box
-                    component="img"
-                    src={
-                      selected.thumbnailUrl ||
-                      "https://placehold.co/900x400?text=No+Preview"
-                    }
-                    alt={selected.name}
-                    sx={{ width: "100%", maxHeight: 360, objectFit: "cover", borderRadius: 1 }}
-                  />
-                  <Stack direction="row" spacing={1} my={2} flexWrap="wrap">
-                    {selected.language && <Chip label={selected.language} />}
-                    <Chip label={`${selected.validityDays} days validity`} />
-                    <Chip label={`${selected.pages?.length || 0} pages`} />
-                    <Chip label={`${selected.themes?.length || 0} themes`} />
-                  </Stack>
-                  <Typography sx={{ whiteSpace: "pre-line" }}>
-                    {selected.description || selected.shortDescription}
-                  </Typography>
+                    sx={{
+                      display: "flex",
+                      justifyContent: "center",
+                      bgcolor: "#eee",
+                      borderRadius: 1,
+                      p: 1,
+                    }}
+                  >
+                    {selected.demoUrl ? (
+                      <Box
+                        component="iframe"
+                        src={selected.demoUrl}
+                        title={`${selected.name} preview`}
+                        sx={{
+                          width: PREVIEW_WIDTHS[tabIndex],
+                          maxWidth: "100%",
+                          height: "60vh",
+                          border: 0,
+                          bgcolor: "#fff",
+                          borderRadius: 1,
+                        }}
+                      />
+                    ) : (
+                      <Box
+                        component="img"
+                        src={selected.thumbnailUrl || PLACEHOLDER_IMG}
+                        alt={selected.name}
+                        sx={{
+                          width: PREVIEW_WIDTHS[tabIndex],
+                          maxWidth: "100%",
+                          maxHeight: 360,
+                          objectFit: "cover",
+                          borderRadius: 1,
+                        }}
+                      />
+                    )}
+                  </Box>
 
-                  {selected.pages?.some((p) => p.showInMenu) && (
-                    <>
-                      <Divider sx={{ my: 2 }} />
-                      <Typography variant="subtitle2" gutterBottom>
-                        Included pages
-                      </Typography>
-                      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                        {selected.pages
-                          .filter((p) => p.showInMenu)
-                          .map((p) => (
-                            <Chip key={p.id} size="small" variant="outlined" label={p.title} />
-                          ))}
+                  {/* Details */}
+                  <Grid container spacing={3}>
+                    <Grid size={{ xs: 12, md: 7 }}>
+                      <Stack spacing={1}>
+                        <Typography variant="h4">{selected.name}</Typography>
+                        <Typography variant="h6" color="text.secondary">
+                          {selected.shortDescription}
+                        </Typography>
+                        <Divider />
+                        <Typography variant="h6">Description</Typography>
+                        <Typography sx={{ whiteSpace: "pre-line" }}>
+                          {selected.description}
+                        </Typography>
                       </Stack>
-                    </>
-                  )}
-                </>
+                    </Grid>
+
+                    <Grid size={{ xs: 12, md: 5 }}>
+                      <Stack spacing={1.5}>
+                        <Box>
+                          <Typography variant="overline" color="text.secondary">
+                            Languages / frameworks
+                          </Typography>
+                          <Typography>{selected.language || "-"}</Typography>
+                        </Box>
+                        <Box>
+                          <Typography variant="overline" color="text.secondary">
+                            Validity
+                          </Typography>
+                          <Typography>{selected.validityDays} days</Typography>
+                        </Box>
+                        <Box>
+                          <Typography variant="overline" color="text.secondary">
+                            Posted on
+                          </Typography>
+                          <Typography>{formatDate(selected.createdAt)}</Typography>
+                        </Box>
+                        <Box>
+                          <Typography variant="overline" color="text.secondary">
+                            Last updated
+                          </Typography>
+                          <Typography>{formatDate(selected.updatedAt)}</Typography>
+                        </Box>
+                      </Stack>
+                    </Grid>
+                  </Grid>
+                </Stack>
               )}
             </DialogContent>
-            {selected.name && (
-              <DialogActions sx={{ px: 3, py: 2, justifyContent: "space-between" }}>
-                <Typography variant="h6">
-                  {formatPrice(selected.price, selected.currency)}
-                </Typography>
-                <Stack direction="row" spacing={1}>
-                  {selected.demoUrl && (
-                    <Button
-                      variant="outlined"
-                      href={selected.demoUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Live preview
-                    </Button>
-                  )}
-                  <Button
-                    variant="contained"
-                    onClick={() => navigate("/payment", { state: { template: selected } })}
-                  >
-                    Buy template
-                  </Button>
-                </Stack>
-              </DialogActions>
-            )}
           </>
         )}
       </Dialog>

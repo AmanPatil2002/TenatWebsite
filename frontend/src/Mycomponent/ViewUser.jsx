@@ -181,19 +181,11 @@ export default function ViewUser() {
         <Table sx={{ minWidth: 500 }} aria-label="users table">
           <TableHead>
             <TableRow sx={{ bgcolor: "primary.main" }}>
-              {[
-                "No.",
-                "User",
-                "Role",
-                "Contact",
-                "Address",
-                "Status",
-                "Created At",
-              ].map((h) => (
-                <TableCell key={h} sx={{ color: "white", fontWeight: "bold" }}>
-                  {h}
-                </TableCell>
-              ))}
+              {["No.", "User", "Role", "Contact & Address", "Action", "Created At"].map((h) => (
+  <TableCell key={h} sx={{ color: "white", fontWeight: "bold" }}>
+    {h}
+  </TableCell>
+))}
             </TableRow>
           </TableHead>
 
@@ -230,29 +222,34 @@ export default function ViewUser() {
                     </Grid>
                   </TableCell>
                   <TableCell>
-                    <Chip label={user.role} size="small" variant="outlined" />
-                  </TableCell>
-                  <TableCell>{user.phone || "-"}</TableCell>
-                  <TableCell>{user.address || "-"}</TableCell>
-                  <TableCell>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <Chip
-                        label={user.status}
-                        size="small"
-                        color={user.status === "active" ? "success" : "error"}
-                      />
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={() => toggleUserStatus(user.userId, user.status)}
-                        color={user.status === "active" ? "error" : "success"}
-                        sx={{ textTransform: "none" }}
-                      >
-                        {user.status === "active" ? "Deactivate" : "Activate"}
-                      </Button>
-                    </Stack>
-                  </TableCell>
-                  <TableCell>{formatDate(user.createdAt)}</TableCell>
+  <Chip
+    label={user.role}
+    size="small"
+    variant="container"
+    color={user.status === "active" ? "success" : "error"}
+  />
+</TableCell>
+
+<TableCell>
+  <Typography variant="body2">{user.phone || "-"}</Typography>
+  <Typography variant="body2" color="text.secondary">
+    {user.address || "-"}
+  </Typography>
+</TableCell>
+
+<TableCell>
+  <Button
+    size="small"
+    variant="outlined"
+    onClick={() => toggleUserStatus(user.userId, user.status)}
+    color={user.status === "active" ? "error" : "success"}
+    sx={{ textTransform: "none" }}
+  >
+    {user.status === "active" ? "Deactivate" : "Activate"}
+  </Button>
+</TableCell>
+
+<TableCell>{formatDate(user.createdAt)}</TableCell>
                 </TableRow>
               ))
             )}

@@ -12,7 +12,6 @@ import TableFooter from "@mui/material/TableFooter";
 import TablePagination from "@mui/material/TablePagination";
 import TableRow from "@mui/material/TableRow";
 import Paper from "@mui/material/Paper";
-import Rating from "@mui/material/Rating";
 import CircularProgress from "@mui/material/CircularProgress";
 import Alert from "@mui/material/Alert";
 import TextField from "@mui/material/TextField";
@@ -29,32 +28,41 @@ const formatDate = (d) =>
       })
     : "-";
 
+const formatPrice = (price, currency = "INR") => {
+  if (price == null || price === "") return "-";
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 2,
+  }).format(Number(price));
+};
+
 function filterTemplate(templates, query) {
   const q = query.trim().toLowerCase();
-  return templates.filter((project) => {
-    if (!q) return true;
-    return [
-      project.categoryId,
-      project.name,
-      project.language,
-      project.shortDescription,
-      project.description,
-      project.thumbnailUrl,
-      project.demoUrl,
-      project.demoDomain,
-      project.price,
-      project.validityDays,
-      project.status,
+  if (!q) return templates;
+  return templates.filter((t) =>
+    [
+      t.name,
+      t.categoryName,
+      t.language,
+      t.shortDescription,
+      t.description,
+      t.demoUrl,
+      t.demoDomain,
+      t.price,
+      t.validityDays,
+      t.status,
+      t.createdBy,
     ].some((field) =>
       String(field ?? "")
         .toLowerCase()
         .includes(q),
-    );
-  });
+    ),
+  );
 }
 
 export default function ViewProject() {
-  const [temp, setTemp] = useState([]);
+  const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [page, setPage] = useState(0);
@@ -62,52 +70,69 @@ export default function ViewProject() {
   const [query, setQuery] = useState("");
 
   useEffect(() => {
-    const fetchTemp = async () => {
+    let cancelled = false;
+
+    const fetchTemplates = async () => {
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch(`${API_URL}/templates`, {
+        if (!token) throw new Error("You are not logged in");
+
+        // Admin endpoint: returns every status (draft, published, archived)
+        const res = await fetch(`${API_URL}/templates/admin/all`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || "Failed to load Project");
-        if (!Array.isArray(data)) throw new Error("Invalid reviews response");
-        setTemp(data);
+        const data = await res.json().catch(() => null);
+
+        if (!res.ok) {
+          if (res.status === 401)
+            throw new Error("Your session has expired. Please log in again.");
+          if (res.status === 403)
+            throw new Error("You don't have permission to view templates.");
+          throw new Error(data?.message || "Failed to load projects");
+        }
+        if (!Array.isArray(data))
+          throw new Error("Invalid templates response");
+
+        if (!cancelled) setTemplates(data);
       } catch (err) {
-        setError(err.message);
+        if (!cancelled) setError(err.message);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    fetchTemp();
+    fetchTemplates();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const searching = Boolean(query.trim());
-  const filteredTemp = filterTemplate(temp, query);
-
+  const filteredTemplates = filterTemplate(templates, query);
 
   const handleSearch = (e) => {
     setQuery(e.target.value);
     setPage(0);
   };
 
-  const emptyRows =
-    page > 0
-      ? Math.max(0, (1 + page) * rowsPerPage - filteredTemp.length)
-      : 0;
   const handleChangePage = (event, newPage) => setPage(newPage);
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
 
+  const emptyRows =
+    page > 0 && rowsPerPage > 0
+      ? Math.max(0, (1 + page) * rowsPerPage - filteredTemplates.length)
+      : 0;
+
   const visibleRows =
     rowsPerPage > 0
-      ? filteredTemp.slice(
+      ? filteredTemplates.slice(
           page * rowsPerPage,
           page * rowsPerPage + rowsPerPage,
         )
-      : filteredTemp;
+      : filteredTemplates;
 
   return (
     <Box>
@@ -129,7 +154,7 @@ export default function ViewProject() {
         <TextField
           size="small"
           fullWidth
-          label="Search by user, target, rating or review text"
+          label="Search by name, language, status or price"
           value={query}
           onChange={handleSearch}
           sx={{ bgcolor: "background.paper" }}
@@ -155,9 +180,8 @@ export default function ViewProject() {
           sx={{ mb: 1 }}
         >
           <Typography variant="body2" color="text.secondary">
-            {filteredTemp.length}
-            {"     "}
-            {filteredTemp.length === 1 ? "Project" : "Projects"}
+            {filteredTemplates.length}{" "}
+            {filteredTemplates.length === 1 ? "Project" : "Projects"}
             {searching ? " match your search" : ""}
           </Typography>
         </Stack>
@@ -167,19 +191,16 @@ export default function ViewProject() {
         <Table sx={{ minWidth: 500 }} aria-label="project table">
           <TableHead>
             <TableRow sx={{ bgcolor: "primary.main" }}>
-              {[
-                "No.",
-                "Name",
-                "Language",
-                "Details",
-                "Url",
-                "Review",
-                "Created At",
-              ].map((h) => (
-                <TableCell key={h} sx={{ color: "white", fontWeight: "bold" }}>
-                  {h}
-                </TableCell>
-              ))}
+              {["No.", "Name", "Details", "Url", "Status", "Created At"].map(
+                (h) => (
+                  <TableCell
+                    key={h}
+                    sx={{ color: "white", fontWeight: "bold" }}
+                  >
+                    {h}
+                  </TableCell>
+                ),
+              )}
             </TableRow>
           </TableHead>
 
@@ -194,46 +215,73 @@ export default function ViewProject() {
               <TableRow>
                 <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                   {searching
-                    ? "No project match your search"
-                    : "No project found"}
+                    ? "No projects match your search"
+                    : "No projects found"}
                 </TableCell>
               </TableRow>
             ) : (
-              visibleRows.map((temp, index) => (
-                <TableRow key={temp.templateId} hover>
+              visibleRows.map((t, index) => (
+                <TableRow key={t.templateId} hover>
                   <TableCell>
                     {rowsPerPage > 0
                       ? page * rowsPerPage + index + 1
                       : index + 1}
                   </TableCell>
+
                   <TableCell>
-                    <Typography variant="body2" fontWeight="medium">
-                      {temp.name || `Posted by ${temp.createdBy}`}
+                    <Typography variant="body1" fontWeight="medium">
+                      {t.name}
                     </Typography>
-                    {temp.email && (
-                      <Typography variant="caption" color="text.secondary">
-                        {temp.language}
-                      </Typography>
-                    )}
+                    <Typography variant="body2" color="text.secondary">
+                      {t.language}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Created by user #{t.createdBy}
+                    </Typography>
                   </TableCell>
+
+                  <TableCell sx={{ maxWidth: 320 }}>
+                    <Typography variant="body1" fontWeight="medium">
+                      {t.shortDescription} · {formatPrice(t.price, t.currency)}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{
+                        display: "-webkit-box",
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {t.description}
+                    </Typography>
+                  </TableCell>
+
+                  <TableCell sx={{ wordBreak: "break-all" }}>
+                    <Typography variant="body1" fontWeight="medium">
+                      {t.demoUrl}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {t.demoDomain}
+                    </Typography>
+                  </TableCell>
+
                   <TableCell>
-                    <Rating
-                      value={Number(temp.thumbnailUrl)}
-                      readOnly
-                      size="small"
-                    />
+                    <Typography
+                      variant="body1"
+                      fontWeight="medium"
+                      sx={{ textTransform: "capitalize" }}
+                    >
+                      {t.status}
+                    </Typography>
                   </TableCell>
+
                   <TableCell>
-                    <Rating
-                      value={Number(temp.validityDays)}
-                      readOnly
-                      size="small"
-                    />
+                    <Typography variant="body1" fontWeight="medium">
+                      {formatDate(t.createdAt)}
+                    </Typography>
                   </TableCell>
-                  <TableCell sx={{ maxWidth: 360, whiteSpace: "pre-wrap" }}>
-                    {temp.status}
-                  </TableCell>
-                  <TableCell>{formatDate(temp.createdAt)}</TableCell>
                 </TableRow>
               ))
             )}
@@ -250,7 +298,7 @@ export default function ViewProject() {
               <TablePagination
                 rowsPerPageOptions={[5, 10, 25, { label: "All", value: -1 }]}
                 colSpan={6}
-                count={filteredTemp.length}
+                count={filteredTemplates.length}
                 rowsPerPage={rowsPerPage}
                 page={page}
                 slotProps={{

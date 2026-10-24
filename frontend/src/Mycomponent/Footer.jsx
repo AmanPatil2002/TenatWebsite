@@ -15,6 +15,7 @@ import InstagramIcon from "@mui/icons-material/Instagram";
 import FacebookIcon from "@mui/icons-material/Facebook";
 
 export default function Footer() {
+  const role = localStorage.getItem("role");
   return (
     <Box
       component="footer"
@@ -155,6 +156,38 @@ export default function Footer() {
               >
                 Contact
               </Link>
+              <Link
+                href="/viewtemp"
+                underline="none"
+                sx={{
+                  color: "#b8c0cc",
+                  "&:hover": { color: "#ffffff" },
+                }}
+              >
+                Template
+              </Link>
+              <Link
+                href="/myaccount"
+                underline="none"
+                sx={{
+                  color: "#b8c0cc",
+                  "&:hover": { color: "#ffffff" },
+                }}
+              >
+                Contact
+              </Link>
+              {role === "admin" || role === "superadmin" &&
+              <Link
+                href="/admin"
+                underline="none"
+                sx={{
+                  color: "#b8c0cc",
+                  "&:hover": { color: "#ffffff" },
+                }}
+              >
+                Admin
+              </Link>
+}
             </Stack>
           </Grid>
         </Grid>

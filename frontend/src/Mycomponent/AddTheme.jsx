@@ -31,6 +31,11 @@ import axios from "axios";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
+// Keep these in sync with themeController.js
+const NAME_MIN = 2;
+const NAME_MAX = 50;
+const TYPE_MAX = 50;
+
 const getInitialForm = () => ({
   name: "",
   settings: "{\n  \n}",
@@ -64,10 +69,11 @@ function ThemeForm({
     const errs = {};
     const name = formData.name.trim();
     const settingsText = formData.settings.trim();
+    const type = formData.type.trim();
 
     if (!name) errs.name = "Theme name is required";
-    else if (name.length < 2 || name.length > 50) {
-      errs.name = "Name must be 2–50 characters";
+    else if (name.length < NAME_MIN || name.length > NAME_MAX) {
+      errs.name = `Name must be ${NAME_MIN}–${NAME_MAX} characters`;
     }
 
     if (!settingsText) {
@@ -75,16 +81,23 @@ function ThemeForm({
     } else {
       try {
         const parsed = JSON.parse(settingsText);
-        // FIX: "5", "null" or "[1,2]" are valid JSON but not valid theme settings
-        if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-          errs.settings = "Settings must be a JSON object, e.g. { \"primary\": \"#1976d2\" }";
+        // "5", "null" or "[1,2]" are valid JSON but not valid theme settings
+        if (
+          parsed === null ||
+          typeof parsed !== "object" ||
+          Array.isArray(parsed)
+        ) {
+          errs.settings =
+            'Settings must be a JSON object, e.g. { "primary": "#1976d2" }';
         }
       } catch {
         errs.settings = "Enter valid JSON";
       }
     }
 
-    if (!formData.type.trim()) errs.type = "Theme type is required";
+    if (!type) errs.type = "Theme type is required";
+    else if (type.length > TYPE_MAX)
+      errs.type = `Type must be ${TYPE_MAX} characters or fewer`;
 
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -98,6 +111,7 @@ function ThemeForm({
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    if (submitting) return;
     if (!validate()) return;
 
     const ok = await onSubmit({
@@ -106,7 +120,7 @@ function ThemeForm({
       type: formData.type.trim(),
     });
 
-    // FIX: clear the form after a successful create (previously it kept the old values)
+    // Clear the form after a successful create
     if (ok && !editing) setFormData(getInitialForm());
   };
 
@@ -137,7 +151,9 @@ function ThemeForm({
             onChange={handleChange}
             error={!!errors.settings}
             helperText={errors.settings || "Enter valid JSON settings"}
-            slotProps={{ input: { sx: { fontFamily: "monospace", fontSize: "0.85rem" } } }}
+            slotProps={{
+              input: { sx: { fontFamily: "monospace", fontSize: "0.85rem" } },
+            }}
           />
         </Grid>
         <Grid size={12}>
@@ -149,7 +165,9 @@ function ThemeForm({
             value={formData.type}
             onChange={handleChange}
             error={!!errors.type}
-            helperText={errors.type || (editing ? "Type cannot be changed" : undefined)}
+            helperText={
+              errors.type || (editing ? "Type cannot be changed" : undefined)
+            }
             disabled={editing}
           />
         </Grid>
@@ -249,10 +267,9 @@ export default function AddTheme() {
       }
 
       try {
-        const response = await axios.get(
-          `${API_URL}/site/${siteId}/themes`,
-          { headers: { Authorization: `Bearer ${token}` } },
-        );
+        const response = await axios.get(`${API_URL}/site/${siteId}/themes`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         if (!cancelled) {
           setThemes(Array.isArray(response.data) ? response.data : []);
         }
@@ -299,10 +316,16 @@ export default function AddTheme() {
         headers: { Authorization: `Bearer ${token}` },
       });
       showSnack("Theme added successfully!");
-      await refreshThemes(token, "Theme added, but themes could not be refreshed.");
+      await refreshThemes(
+        token,
+        "Theme added, but themes could not be refreshed.",
+      );
       return true;
     } catch (error) {
-      showSnack(error.response?.data?.message || "Failed to add theme.", "error");
+      showSnack(
+        error.response?.data?.message || "Failed to add theme.",
+        "error",
+      );
       return false;
     } finally {
       setSubmitting(false);
@@ -325,10 +348,16 @@ export default function AddTheme() {
       );
       showSnack("Theme updated successfully!");
       setEditingId(null);
-      await refreshThemes(token, "Theme updated, but themes could not be refreshed.");
+      await refreshThemes(
+        token,
+        "Theme updated, but themes could not be refreshed.",
+      );
       return true;
     } catch (error) {
-      showSnack(error.response?.data?.message || "Failed to update theme.", "error");
+      showSnack(
+        error.response?.data?.message || "Failed to update theme.",
+        "error",
+      );
       return false;
     } finally {
       setSubmitting(false);
@@ -336,6 +365,7 @@ export default function AddTheme() {
   };
 
   const handleActivate = async (theme) => {
+    if (activeId != null) return; // an activation is already running
     const token = localStorage.getItem("token");
     if (!token) return showSnack("Please log in first.", "error");
 
@@ -347,9 +377,15 @@ export default function AddTheme() {
         { headers: { Authorization: `Bearer ${token}` } },
       );
       showSnack("Theme activated.");
-      await refreshThemes(token, "Theme activated, but themes could not be refreshed.");
+      await refreshThemes(
+        token,
+        "Theme activated, but themes could not be refreshed.",
+      );
     } catch (error) {
-      showSnack(error.response?.data?.message || "Failed to activate theme.", "error");
+      showSnack(
+        error.response?.data?.message || "Failed to activate theme.",
+        "error",
+      );
     } finally {
       setActiveId(null);
     }
@@ -357,6 +393,8 @@ export default function AddTheme() {
 
   const editingTheme =
     editingId != null ? themes.find((theme) => theme.id === editingId) : null;
+
+  const busy = submitting || activeId != null;
 
   return (
     <Box
@@ -366,13 +404,13 @@ export default function AddTheme() {
         backgroundColor: "#f5f5f5",
       }}
     >
-      <Grid container spacing={{ xs: 2, md: 3 }} sx={{ maxWidth: 1200, mx: "auto" }}>
+      <Grid
+        container
+        spacing={{ xs: 2, md: 3 }}
+        sx={{ maxWidth: 1200, mx: "auto" }}
+      >
         <Grid size={12}>
-          <FormControl
-            fullWidth
-            size="small"
-            disabled={loadingSites || submitting || activeId != null}
-          >
+          <FormControl fullWidth size="small" disabled={loadingSites || busy}>
             <InputLabel id="theme-site-label">Site</InputLabel>
             <Select
               labelId="theme-site-label"
@@ -415,7 +453,11 @@ export default function AddTheme() {
                 >
                   {editingTheme ? "Edit theme" : "Add theme"}
                 </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 3 }}
+                >
                   Manage the themes available for this site.
                 </Typography>
 
@@ -447,11 +489,17 @@ export default function AddTheme() {
                 <Divider sx={{ mb: 2 }} />
 
                 {loadingList ? (
-                  <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+                  <Box
+                    sx={{ display: "flex", justifyContent: "center", py: 3 }}
+                  >
                     <CircularProgress size={24} />
                   </Box>
                 ) : themes.length === 0 ? (
-                  <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ py: 2 }}
+                  >
                     No themes yet. Add your first theme using the form.
                   </Typography>
                 ) : (
@@ -482,7 +530,7 @@ export default function AddTheme() {
                                   component="pre"
                                   sx={{
                                     m: 0,
-                                    maxHeight: 160, // FIX: long settings no longer stretch the row
+                                    maxHeight: 160, // long settings no longer stretch the row
                                     overflow: "auto",
                                     whiteSpace: "pre-wrap",
                                     overflowWrap: "anywhere",
@@ -493,26 +541,33 @@ export default function AddTheme() {
                                   {formatSettings(theme.settings)}
                                 </Box>
                               </TableCell>
-                              <TableCell>{isActive ? "Active" : "Inactive"}</TableCell>
-                              <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                              <TableCell>
+                                {isActive ? "Active" : "Inactive"}
+                              </TableCell>
+                              <TableCell
+                                align="right"
+                                sx={{ whiteSpace: "nowrap" }}
+                              >
                                 <Tooltip title="Edit">
                                   <span>
                                     <IconButton
                                       size="small"
                                       onClick={() => setEditingId(theme.id)}
-                                      disabled={submitting || activeId === theme.id}
+                                      disabled={busy}
                                     >
                                       <EditIcon fontSize="small" />
                                     </IconButton>
                                   </span>
                                 </Tooltip>
-                                <Tooltip title={isActive ? "Active theme" : "Activate"}>
+                                <Tooltip
+                                  title={isActive ? "Active theme" : "Activate"}
+                                >
                                   <span>
                                     <IconButton
                                       size="small"
                                       color="primary"
                                       onClick={() => handleActivate(theme)}
-                                      disabled={isActive || submitting || activeId === theme.id}
+                                      disabled={isActive || busy}
                                     >
                                       {activeId === theme.id ? (
                                         <CircularProgress size={16} />

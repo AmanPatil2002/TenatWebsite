@@ -26,7 +26,7 @@ import axios from "axios";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-// Keep these in sync with validate() in faqController.js
+
 const MIN_QUESTION = 10;
 const MIN_ANSWER = 20;
 

@@ -21,6 +21,7 @@ import axios from "axios";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const STATUSES = ["draft", "published", "archived"];
+const MAX_URL_LENGTH = 255;
 
 const getInitialForm = () => ({
   categoryId: "",
@@ -45,7 +46,23 @@ const isValidUrl = (value) => {
   }
 };
 
-const DOMAIN_RE = /^(?!-)([a-z0-9-]+\.)+[a-z]{2,}$/i;
+// Each label is 1-63 chars, no leading/trailing hyphen, TLD of letters only
+const DOMAIN_RE =
+  /^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i;
+
+const normalizeDomain = (v) =>
+  v
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/\/.*$/, "");
+
+const normalizeLanguages = (v) =>
+  v
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join(", ");
 
 export default function AddTemplate() {
   const [formData, setFormData] = useState(getInitialForm);
@@ -62,7 +79,6 @@ export default function AddTemplate() {
   const showSnack = (message, severity = "success") =>
     setSnack({ open: true, message, severity });
 
-  // Load categories for the dropdown (GET /categories is public)
   useEffect(() => {
     let cancelled = false;
     axios
@@ -85,10 +101,12 @@ export default function AddTemplate() {
     const errs = {};
     const f = formData;
     const name = f.name.trim();
-    const language = f.language.trim();
+    const language = normalizeLanguages(f.language);
     const short = f.shortDescription.trim();
     const desc = f.description.trim();
-    const domain = f.demoDomain.trim();
+    const thumbnailUrl = f.thumbnailUrl.trim();
+    const demoUrl = f.demoUrl.trim();
+    const domain = normalizeDomain(f.demoDomain);
 
     if (!f.categoryId) errs.categoryId = "Select a category";
 
@@ -108,13 +126,17 @@ export default function AddTemplate() {
     else if (desc.length < 20 || desc.length > 2000)
       errs.description = "Description must be 20–2000 characters";
 
-    if (!f.thumbnailUrl.trim()) errs.thumbnailUrl = "Thumbnail URL is required";
-    else if (!isValidUrl(f.thumbnailUrl.trim()))
+    if (!thumbnailUrl) errs.thumbnailUrl = "Thumbnail URL is required";
+    else if (!isValidUrl(thumbnailUrl))
       errs.thumbnailUrl = "Enter a valid URL starting with http:// or https://";
+    else if (thumbnailUrl.length > MAX_URL_LENGTH)
+      errs.thumbnailUrl = `URL must be ${MAX_URL_LENGTH} characters or fewer`;
 
-    if (!f.demoUrl.trim()) errs.demoUrl = "Demo URL is required";
-    else if (!isValidUrl(f.demoUrl.trim()))
+    if (!demoUrl) errs.demoUrl = "Demo URL is required";
+    else if (!isValidUrl(demoUrl))
       errs.demoUrl = "Enter a valid URL starting with http:// or https://";
+    else if (demoUrl.length > MAX_URL_LENGTH)
+      errs.demoUrl = `URL must be ${MAX_URL_LENGTH} characters or fewer`;
 
     if (!domain) errs.demoDomain = "Demo domain is required";
     else if (!DOMAIN_RE.test(domain))
@@ -123,6 +145,8 @@ export default function AddTemplate() {
     const price = Number(f.price);
     if (f.price === "" || Number.isNaN(price)) errs.price = "Enter a price";
     else if (price <= 0) errs.price = "Price must be greater than 0";
+    else if (!/^\d+(\.\d{1,2})?$/.test(String(f.price).trim()))
+      errs.price = "Use at most 2 decimal places";
 
     const days = Number(f.validityDays);
     if (!Number.isInteger(days) || days < 1)
@@ -147,6 +171,7 @@ export default function AddTemplate() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
     if (!validate()) return;
 
     const token = localStorage.getItem("token");
@@ -155,18 +180,17 @@ export default function AddTemplate() {
       return;
     }
 
-    // createdBy is set by the server from the token, so it is not sent here
     const payload = {
       categoryId: Number(formData.categoryId),
       name: formData.name.trim(),
-      language: formData.language.trim(),
+      language: normalizeLanguages(formData.language),
       shortDescription: formData.shortDescription.trim(),
       description: formData.description.trim(),
       thumbnailUrl: formData.thumbnailUrl.trim(),
       demoUrl: formData.demoUrl.trim(),
-      demoDomain: formData.demoDomain.trim(),
+      demoDomain: normalizeDomain(formData.demoDomain),
       price: Number(formData.price),
-      currency: "INR",
+      currency: "INR", // the server also forces INR
       validityDays: Number(formData.validityDays),
       status: formData.status,
     };
@@ -179,11 +203,20 @@ export default function AddTemplate() {
       showSnack("Template added successfully!");
       resetForm();
     } catch (error) {
-      showSnack(
-        error.response?.data?.message ||
-          "Failed to add template. Please try again.",
-        "error",
-      );
+      const code = error.response?.status;
+      let message = error.response?.data?.message;
+
+      if (!error.response) {
+        message = "Cannot reach the server. Check your connection.";
+      } else if (code === 401) {
+        message = "Your session has expired. Please log in again.";
+      } else if (code === 403) {
+        message = "You don't have permission to add templates.";
+      } else if (!message) {
+        message = "Failed to add template. Please try again.";
+      }
+
+      showSnack(message, "error");
     } finally {
       setSubmitting(false);
     }
@@ -208,8 +241,6 @@ export default function AddTemplate() {
     <Box
       sx={{
         p: { xs: 1.5, sm: 2, md: 3 },
-        minHeight: "100vh",
-        backgroundColor: "#f5f5f5",
         display: "flex",
         justifyContent: "center",
         alignItems: "flex-start",
@@ -221,7 +252,11 @@ export default function AddTemplate() {
       >
         <Typography
           variant="h5"
-          sx={{ fontWeight: "bold", mb: 0.5, fontSize: { xs: "1.2rem", sm: "1.5rem" } }}
+          sx={{
+            fontWeight: "bold",
+            mb: 0.5,
+            fontSize: { xs: "1.2rem", sm: "1.5rem" },
+          }}
         >
           Add template
         </Typography>
@@ -286,28 +321,38 @@ export default function AddTemplate() {
             </Grid>
 
             <Grid size={{ xs: 12, sm: 6 }}>
-              {textField("thumbnailUrl", "Thumbnail URL")}
+              {textField("thumbnailUrl", "Thumbnail URL", {
+                helper: "Direct link to an image, e.g. https://…/preview.jpg",
+              })}
             </Grid>
 
             <Grid size={{ xs: 12, sm: 6 }}>
-              {textField("demoUrl", "Demo URL")}
+              {textField("demoUrl", "Demo URL", {
+                helper: "e.g. https://demo.example.com",
+              })}
             </Grid>
 
             <Grid size={{ xs: 12, sm: 6 }}>
               {textField("demoDomain", "Demo domain", {
-                helper: errors.demoDomain ? undefined : "e.g. demo.example.com",
+                helper: "e.g. demo.example.com",
               })}
             </Grid>
 
             <Grid size={{ xs: 12, sm: 6 }}>
               {textField("price", "Price (INR)", {
-                props: { type: "number", slotProps: { htmlInput: { min: 0, step: "0.01" } } },
+                props: {
+                  type: "number",
+                  slotProps: { htmlInput: { min: 0, step: "0.01" } },
+                },
               })}
             </Grid>
 
             <Grid size={{ xs: 12, sm: 6 }}>
               {textField("validityDays", "Validity (days)", {
-                props: { type: "number", slotProps: { htmlInput: { min: 1, step: 1 } } },
+                props: {
+                  type: "number",
+                  slotProps: { htmlInput: { min: 1, step: 1 } },
+                },
               })}
             </Grid>
 
@@ -321,14 +366,21 @@ export default function AddTemplate() {
                   label="Status"
                   value={formData.status}
                   onChange={handleChange}
+                  sx={{ "& .MuiSelect-select": { textTransform: "capitalize" } }}
                 >
                   {STATUSES.map((s) => (
-                    <MenuItem key={s} value={s} sx={{ textTransform: "capitalize" }}>
+                    <MenuItem
+                      key={s}
+                      value={s}
+                      sx={{ textTransform: "capitalize" }}
+                    >
                       {s}
                     </MenuItem>
                   ))}
                 </Select>
-                {errors.status && <FormHelperText>{errors.status}</FormHelperText>}
+                {errors.status && (
+                  <FormHelperText>{errors.status}</FormHelperText>
+                )}
               </FormControl>
             </Grid>
 

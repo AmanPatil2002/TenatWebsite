@@ -232,6 +232,13 @@ function Header() {
                   </MenuItem>
                   <MenuItem
                     component={Link}
+                    to="/mysite"
+                    onClick={handleCloseUserMenu}
+                  >
+                    <Typography sx={{ textAlign: "center" }}>Purchased Templates</Typography>
+                  </MenuItem>
+                  <MenuItem
+                    component={Link}
                     to="/review"
                     onClick={handleCloseUserMenu}
                   >

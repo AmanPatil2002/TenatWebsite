@@ -175,12 +175,8 @@ export default function Payment() {
 
                     <Stack spacing={1.5}>
                       <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                        <Typography color="text.secondary">Subtotal</Typography>
+                        <Typography color="text.secondary">Price Of Template</Typography>
                         <Typography fontWeight={600}>{totalAmount}</Typography>
-                      </Box>
-                      <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                        <Typography color="text.secondary">Platform fee</Typography>
-                        <Typography>₹0</Typography>
                       </Box>
                       <Box sx={{ display: "flex", justifyContent: "space-between" }}>
                         <Typography fontWeight={700}>Total</Typography>

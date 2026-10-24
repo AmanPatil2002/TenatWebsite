@@ -1,5 +1,4 @@
-const path = require("path");
-require("dotenv").config({ path: path.resolve(__dirname, ".env") });
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 
@@ -13,10 +12,18 @@ const pageRoute = require("./route/pageRoute");
 const themeRoute = require("./route/themeRoute");
 const publicRoute = require("./route/publicRoute");
 const faqRoute = require("./route/faqRoute");
-const acontactRoute = require("./route/acontactRoute")
+const acontactRoute = require("./route/acontactRoute");
 
 const app = express();
-app.use(cors());
+
+// CLIENT_URL can be a single origin or a comma-separated list, e.g.
+// CLIENT_URL=https://myapp.com,https://admin.myapp.com
+// If it is not set (local development), all origins are allowed.
+const allowedOrigins = process.env.CLIENT_URL
+  ? process.env.CLIENT_URL.split(",").map((s) => s.trim())
+  : true;
+
+app.use(cors({ origin: allowedOrigins }));
 app.use(express.json({ limit: "5mb" }));
 
 app.use("/auth", authRoute);
@@ -31,14 +38,27 @@ app.use("/site", siteRoute);
 app.use("/site", pageRoute);
 app.use("/site", themeRoute);
 app.use("/public", publicRoute);
-app.use("/faq" ,faqRoute);
+app.use("/faq", faqRoute);
 app.use("/contact", acontactRoute);
 
-app.get("/health", (req, res) => res.json({ ok: true }));
+// 404 handler: must come after all routes
+app.use((req, res) => {
+  res.status(404).json({ message: "Route not found" });
+});
 
+// Error handler: must be last, and must have 4 arguments
+// eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
+  // Malformed JSON body
+  if (err.type === "entity.parse.failed") {
+    return res.status(400).json({ message: "Invalid JSON body" });
+  }
+  // Body larger than the 5mb limit
+  if (err.type === "entity.too.large") {
+    return res.status(413).json({ message: "Request body too large" });
+  }
   console.error(err);
-  res.status(500).json({ message: "Internal server error" });
+  res.status(500).json({ message: "Server error" });
 });
 
 const PORT = process.env.PORT || 5000;
