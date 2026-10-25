@@ -7,14 +7,12 @@ import {
   Chip,
   CircularProgress,
   Divider,
-  FormControlLabel,
   Grid,
   IconButton,
   MenuItem,
   Paper,
   Snackbar,
   Stack,
-  Switch,
   Table,
   TableBody,
   TableCell,
@@ -38,9 +36,8 @@ const getInitialForm = () => ({
   parentId: "",
   pageType: "custom",
   content: "[]",
-  showInMenu: true,
-  isPublished: false,
-  sortOrder: 0,
+  pageLink: "",
+  isPublished: true,
 });
 
 // content may come back from MySQL as a parsed JSON value or as a string
@@ -69,26 +66,21 @@ function PageForm({
     const slug = formData.slug.trim();
 
     if (!title) errs.title = "Title is required";
-    else if (title.length < 2 || title.length > 50)
-      errs.title = "Title must be 2–50 characters";
+    else if (title.length > 150)
+      errs.title = "Title must be 150 characters or fewer";
 
-    // slug is only validated on create — the API does not update it
-    if (!isEdit) {
-      if (!slug) errs.slug = "Slug is required";
-      else if (slug.length > 30)
-        errs.slug = "Slug must be 30 characters or fewer";
-      else if (!SLUG_REGEX.test(slug))
-        errs.slug = "Use lowercase letters, numbers and hyphens only";
-    }
+    if (!slug) errs.slug = "Slug is required";
+    else if (slug.length > 150) errs.slug = "Slug must be 150 characters or fewer";
+    else if (!SLUG_REGEX.test(slug)) errs.slug = "Use lowercase letters, numbers and hyphens only";
+
+    if (!formData.pageType.trim() || formData.pageType.trim().length > 60)
+      errs.pageType = "Page type must be 1–60 characters";
 
     try {
       JSON.parse(formData.content || "[]");
     } catch {
       errs.content = "Content must be valid JSON";
     }
-
-    if (Number.isNaN(Number(formData.sortOrder)))
-      errs.sortOrder = "Sort order must be a number";
 
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -100,39 +92,20 @@ function PageForm({
     setErrors((prev) => ({ ...prev, [name]: undefined }));
   };
 
-  const handleToggle = (e) => {
-    const { name, checked } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: checked }));
-  };
-
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!validate()) return;
 
     const content = JSON.parse(formData.content || "[]");
-    const sortOrder = Number(formData.sortOrder) || 0;
-
-    if (isEdit) {
-      // PUT /site/:siteId/pages/:pageId accepts only these fields
-      onSubmit({
-        title: formData.title.trim(),
-        content,
-        showInMenu: formData.showInMenu,
-        isPublished: formData.isPublished,
-        sortOrder,
-      });
-    } else {
-      // POST /site/:siteId/pages
-      onSubmit({
-        title: formData.title.trim(),
-        slug: formData.slug.trim(),
-        parentId: formData.parentId === "" ? null : formData.parentId,
-        pageType: formData.pageType.trim() || "custom",
-        content,
-        showInMenu: formData.showInMenu,
-        sortOrder,
-      });
-    }
+    onSubmit({
+      title: formData.title.trim(),
+      slug: formData.slug.trim(),
+      parentId: formData.parentId === "" ? null : formData.parentId,
+      pageType: formData.pageType.trim(),
+      content,
+      pageLink: formData.pageLink.trim() || null,
+      isPublished: formData.isPublished,
+    });
   };
 
   return (
@@ -159,12 +132,8 @@ function PageForm({
             label="Slug"
             value={formData.slug}
             onChange={handleChange}
-            disabled={isEdit}
             error={!!errors.slug}
-            helperText={
-              errors.slug ||
-              (isEdit ? "Slug can't be changed after the page is created." : "e.g. about-us")
-            }
+            helperText={errors.slug || "e.g. about-us"}
           />
         </Grid>
 
@@ -197,8 +166,8 @@ function PageForm({
             label="Page type"
             value={formData.pageType}
             onChange={handleChange}
-            disabled={isEdit}
-            helperText={isEdit ? "Type can't be changed after creation." : "home, about, contact, custom…"}
+            error={!!errors.pageType}
+            helperText={errors.pageType || "home, about, contact, custom…"}
           />
         </Grid>
 
@@ -206,42 +175,31 @@ function PageForm({
           <TextField
             fullWidth
             size="small"
-            type="number"
-            name="sortOrder"
-            label="Sort order"
-            value={formData.sortOrder}
+            name="pageLink"
+            label="Page link (optional)"
+            value={formData.pageLink}
             onChange={handleChange}
-            error={!!errors.sortOrder}
-            helperText={errors.sortOrder}
           />
         </Grid>
 
-        <Grid size={{ xs: 12, sm: 6 }}>
-          <Stack direction="row" spacing={2} sx={{ height: "100%", alignItems: "center", flexWrap: "wrap" }}>
-            <FormControlLabel
-              control={
-                <Switch
-                  size="small"
-                  name="showInMenu"
-                  checked={!!formData.showInMenu}
-                  onChange={handleToggle}
-                />
+        <Grid size={12}>
+          <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
+            <Typography variant="body2">Visibility</Typography>
+            <TextField
+              select
+              size="small"
+              name="isPublished"
+              value={formData.isPublished ? "published" : "draft"}
+              onChange={(event) =>
+                setFormData((previous) => ({
+                  ...previous,
+                  isPublished: event.target.value === "published",
+                }))
               }
-              label="Show in menu"
-            />
-            {isEdit && (
-              <FormControlLabel
-                control={
-                  <Switch
-                    size="small"
-                    name="isPublished"
-                    checked={!!formData.isPublished}
-                    onChange={handleToggle}
-                  />
-                }
-                label="Published"
-              />
-            )}
+            >
+              <MenuItem value="published">Published</MenuItem>
+              <MenuItem value="draft">Draft</MenuItem>
+            </TextField>
           </Stack>
         </Grid>
 
@@ -300,7 +258,7 @@ export default function AddPages({ siteId: siteIdProp }) {
   const [pages, setPages] = useState([]);
   const [loadingList, setLoadingList] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [editingId, setEditingId] = useState(null);
+  const [editingKey, setEditingKey] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [snack, setSnack] = useState({ open: false, message: "", severity: "success" });
 
@@ -343,7 +301,8 @@ export default function AddPages({ siteId: siteIdProp }) {
 
     try {
       setSubmitting(true);
-      await axios.post(pagesUrl, values, authHeaders());
+      const url = values.parentId ? `${API_URL}/site/${siteId}/sub-pages` : pagesUrl;
+      await axios.post(url, values, authHeaders());
       showSnack("Page added successfully!");
       fetchPages();
     } catch (error) {
@@ -358,9 +317,13 @@ export default function AddPages({ siteId: siteIdProp }) {
 
     try {
       setSubmitting(true);
-      await axios.put(`${pagesUrl}/${editingId}`, values, authHeaders());
+      const url =
+        editingPage.recordType === "subPage"
+          ? `${API_URL}/site/${siteId}/sub-pages/${editingPage.id}`
+          : `${pagesUrl}/${editingPage.id}`;
+      await axios.put(url, values, authHeaders());
       showSnack("Page updated successfully!");
-      setEditingId(null);
+      setEditingKey(null);
       fetchPages();
     } catch (error) {
       showSnack(error.response?.data?.message || "Failed to update page.", "error");
@@ -374,10 +337,15 @@ export default function AddPages({ siteId: siteIdProp }) {
     if (!getToken()) return showSnack("Please log in first.", "error");
 
     try {
-      setDeletingId(page.id);
-      await axios.delete(`${pagesUrl}/${page.id}`, authHeaders());
+      const key = `${page.recordType}:${page.id}`;
+      setDeletingId(key);
+      const url =
+        page.recordType === "subPage"
+          ? `${API_URL}/site/${siteId}/sub-pages/${page.id}`
+          : `${pagesUrl}/${page.id}`;
+      await axios.delete(url, authHeaders());
       showSnack("Page deleted.");
-      if (editingId === page.id) setEditingId(null);
+      if (editingKey === key) setEditingKey(null);
       fetchPages();
     } catch (error) {
       showSnack(error.response?.data?.message || "Failed to delete page.", "error");
@@ -386,8 +354,12 @@ export default function AddPages({ siteId: siteIdProp }) {
     }
   };
 
-  const editingPage = editingId != null ? pages.find((p) => p.id === editingId) : null;
-  const parentTitle = (id) => pages.find((p) => p.id === id)?.title || "—";
+  const editingPage =
+    editingKey != null
+      ? pages.find((page) => `${page.recordType}:${page.id}` === editingKey)
+      : null;
+  const parentTitle = (id) =>
+    pages.find((page) => page.recordType === "page" && String(page.id) === String(id))?.title || "—";
 
   if (!siteId) {
     return (
@@ -410,7 +382,7 @@ export default function AddPages({ siteId: siteIdProp }) {
               {editingPage ? "Edit page" : "Add page"}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Pages appear on your website and in its menu.
+              Add top-level pages or one-level subpages. Menu placement is stored separately.
             </Typography>
 
             <PageForm
@@ -421,19 +393,18 @@ export default function AddPages({ siteId: siteIdProp }) {
                   ? {
                       title: editingPage.title || "",
                       slug: editingPage.slug || "",
-                      parentId: editingPage.parentId ?? "",
+                      parentId: editingPage.recordType === "subPage" ? editingPage.parentId : "",
                       pageType: editingPage.pageType || "custom",
                       content: contentToText(editingPage.content),
-                      showInMenu: !!editingPage.showInMenu,
+                      pageLink: editingPage.pageLink || "",
                       isPublished: !!editingPage.isPublished,
-                      sortOrder: editingPage.sortOrder ?? 0,
                     }
                   : getInitialForm()
               }
-              parentOptions={pages.filter((p) => p.id !== editingId)}
+              parentOptions={pages.filter((page) => page.recordType === "page")}
               submitLabel={editingPage ? "Save changes" : "Add page"}
               onSubmit={editingPage ? handleUpdate : handleCreate}
-              onCancel={editingPage ? () => setEditingId(null) : undefined}
+              onCancel={editingPage ? () => setEditingKey(null) : undefined}
               submitting={submitting}
             />
           </Paper>
@@ -470,7 +441,7 @@ export default function AddPages({ siteId: siteIdProp }) {
                   </TableHead>
                   <TableBody>
                     {pages.map((p) => (
-                      <TableRow key={p.id} hover selected={editingId === p.id}>
+                      <TableRow key={`${p.recordType}:${p.id}`} hover selected={editingKey === `${p.recordType}:${p.id}`}>
                         <TableCell>{p.title}</TableCell>
                         <TableCell>{p.slug}</TableCell>
                         <TableCell>
@@ -484,7 +455,6 @@ export default function AddPages({ siteId: siteIdProp }) {
                               color={p.isPublished ? "success" : "default"}
                               label={p.isPublished ? "Published" : "Draft"}
                             />
-                            {!p.showInMenu && <Chip size="small" variant="outlined" label="Hidden" />}
                           </Stack>
                         </TableCell>
                         <TableCell align="right">
@@ -492,8 +462,8 @@ export default function AddPages({ siteId: siteIdProp }) {
                             <span>
                               <IconButton
                                 size="small"
-                                onClick={() => setEditingId(p.id)}
-                                disabled={submitting || deletingId === p.id}
+                                onClick={() => setEditingKey(`${p.recordType}:${p.id}`)}
+                                disabled={submitting || deletingId === `${p.recordType}:${p.id}`}
                               >
                                 <EditIcon fontSize="small" />
                               </IconButton>
@@ -505,7 +475,7 @@ export default function AddPages({ siteId: siteIdProp }) {
                                 size="small"
                                 color="error"
                                 onClick={() => handleDelete(p)}
-                                disabled={submitting || deletingId === p.id}
+                                disabled={submitting || deletingId === `${p.recordType}:${p.id}`}
                               >
                                 {deletingId === p.id ? (
                                   <CircularProgress size={16} />

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   Alert,
   Box,
@@ -21,7 +22,7 @@ import axios from "axios";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const STATUSES = ["draft", "published", "archived"];
-const MAX_URL_LENGTH = 255;
+const MAX_URL_LENGTH = 500;
 
 const getInitialForm = () => ({
   categoryId: "",
@@ -31,7 +32,8 @@ const getInitialForm = () => ({
   description: "",
   thumbnailUrl: "",
   demoUrl: "",
-  demoDomain: "",
+  domainLink: "",
+  currency: "INR",
   price: "",
   validityDays: "365",
   status: "draft",
@@ -46,17 +48,6 @@ const isValidUrl = (value) => {
   }
 };
 
-// Each label is 1-63 chars, no leading/trailing hyphen, TLD of letters only
-const DOMAIN_RE =
-  /^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i;
-
-const normalizeDomain = (v) =>
-  v
-    .trim()
-    .toLowerCase()
-    .replace(/^https?:\/\//, "")
-    .replace(/\/.*$/, "");
-
 const normalizeLanguages = (v) =>
   v
     .split(",")
@@ -65,9 +56,12 @@ const normalizeLanguages = (v) =>
     .join(", ");
 
 export default function AddTemplate() {
+  const navigate = useNavigate();
+  const { templateId } = useParams();
   const [formData, setFormData] = useState(getInitialForm);
   const [categories, setCategories] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
+  const [loadingTemplate, setLoadingTemplate] = useState(Boolean(templateId));
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
   const [snack, setSnack] = useState({
@@ -81,21 +75,53 @@ export default function AddTemplate() {
 
   useEffect(() => {
     let cancelled = false;
-    axios
-      .get(`${API_URL}/categories`)
-      .then((res) => {
-        if (!cancelled) setCategories(Array.isArray(res.data) ? res.data : []);
+    const token = localStorage.getItem("token");
+    Promise.all([
+      axios.get(`${API_URL}/categories`),
+      templateId
+        ? axios.get(`${API_URL}/templates/admin/${templateId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+        : Promise.resolve(null),
+    ])
+      .then(([categoryResponse, templateResponse]) => {
+        if (cancelled) return;
+        setCategories(Array.isArray(categoryResponse.data) ? categoryResponse.data : []);
+        if (templateId) {
+          const existing = templateResponse?.data;
+          if (!existing) {
+            showSnack("Template not found.", "error");
+          } else {
+            setFormData({
+              categoryId: String(existing.categoryId),
+              name: existing.name || "",
+              language: existing.language || "",
+              shortDescription: existing.shortDescription || "",
+              description: existing.description || "",
+              thumbnailUrl: existing.thumbnailUrl || "",
+              demoUrl: existing.demoUrl || "",
+              domainLink: existing.domainLink || "",
+              currency: existing.currency || "INR",
+              price: String(existing.price ?? ""),
+              validityDays: String(existing.validityDays || 365),
+              status: existing.status || "draft",
+            });
+          }
+        }
       })
-      .catch(() => {
-        if (!cancelled) showSnack("Could not load categories.", "error");
+      .catch((error) => {
+        if (!cancelled) showSnack(error.response?.data?.message || "Could not load template form data.", "error");
       })
       .finally(() => {
-        if (!cancelled) setLoadingCategories(false);
+        if (!cancelled) {
+          setLoadingCategories(false);
+          setLoadingTemplate(false);
+        }
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [templateId]);
 
   const validate = () => {
     const errs = {};
@@ -106,41 +132,34 @@ export default function AddTemplate() {
     const desc = f.description.trim();
     const thumbnailUrl = f.thumbnailUrl.trim();
     const demoUrl = f.demoUrl.trim();
-    const domain = normalizeDomain(f.demoDomain);
+    const domainLink = f.domainLink.trim();
 
     if (!f.categoryId) errs.categoryId = "Select a category";
 
     if (!name) errs.name = "Name is required";
-    else if (name.length < 3 || name.length > 100)
-      errs.name = "Name must be 3–100 characters";
+    else if (name.length > 150)
+      errs.name = "Name must be 150 characters or fewer";
 
-    if (!language) errs.language = "Add at least one language or framework";
-    else if (language.length > 100)
-      errs.language = "Keep this under 100 characters";
+    if (short.length > 300)
+      errs.shortDescription = "Short description must be 300 characters or fewer";
 
-    if (!short) errs.shortDescription = "Short description is required";
-    else if (short.length < 10 || short.length > 150)
-      errs.shortDescription = "Short description must be 10–150 characters";
-
-    if (!desc) errs.description = "Description is required";
-    else if (desc.length < 20 || desc.length > 2000)
-      errs.description = "Description must be 20–2000 characters";
-
-    if (!thumbnailUrl) errs.thumbnailUrl = "Thumbnail URL is required";
-    else if (!isValidUrl(thumbnailUrl))
+    if (thumbnailUrl && !isValidUrl(thumbnailUrl))
       errs.thumbnailUrl = "Enter a valid URL starting with http:// or https://";
-    else if (thumbnailUrl.length > MAX_URL_LENGTH)
+    else if (thumbnailUrl && thumbnailUrl.length > MAX_URL_LENGTH)
       errs.thumbnailUrl = `URL must be ${MAX_URL_LENGTH} characters or fewer`;
 
-    if (!demoUrl) errs.demoUrl = "Demo URL is required";
-    else if (!isValidUrl(demoUrl))
+    if (demoUrl && !isValidUrl(demoUrl))
       errs.demoUrl = "Enter a valid URL starting with http:// or https://";
-    else if (demoUrl.length > MAX_URL_LENGTH)
+    else if (demoUrl && demoUrl.length > MAX_URL_LENGTH)
       errs.demoUrl = `URL must be ${MAX_URL_LENGTH} characters or fewer`;
+    if (f.status === "published" && !demoUrl)
+      errs.demoUrl = "A demo URL is required to publish a template";
 
-    if (!domain) errs.demoDomain = "Demo domain is required";
-    else if (!DOMAIN_RE.test(domain))
-      errs.demoDomain = "Enter a domain like demo.example.com";
+    if (!/^[A-Za-z]{3}$/.test(f.currency.trim()))
+      errs.currency = "Enter a 3-letter currency code";
+
+    if (domainLink && domainLink.length > 255)
+      errs.domainLink = "Domain link must be 255 characters or fewer";
 
     const price = Number(f.price);
     if (f.price === "" || Number.isNaN(price)) errs.price = "Enter a price";
@@ -149,8 +168,8 @@ export default function AddTemplate() {
       errs.price = "Use at most 2 decimal places";
 
     const days = Number(f.validityDays);
-    if (!Number.isInteger(days) || days < 1)
-      errs.validityDays = "Enter a whole number of days (1 or more)";
+    if (!Number.isInteger(days) || days < 1 || days > 3650)
+      errs.validityDays = "Enter a whole number of days from 1 to 3650";
 
     if (!STATUSES.includes(f.status)) errs.status = "Select a status";
 
@@ -181,27 +200,32 @@ export default function AddTemplate() {
     }
 
     const payload = {
-      categoryId: Number(formData.categoryId),
+      categoryId: formData.categoryId,
       name: formData.name.trim(),
-      language: normalizeLanguages(formData.language),
-      shortDescription: formData.shortDescription.trim(),
-      description: formData.description.trim(),
-      thumbnailUrl: formData.thumbnailUrl.trim(),
-      demoUrl: formData.demoUrl.trim(),
-      demoDomain: normalizeDomain(formData.demoDomain),
+      language: normalizeLanguages(formData.language) || null,
+      shortDescription: formData.shortDescription.trim() || null,
+      description: formData.description.trim() || null,
+      thumbnailUrl: formData.thumbnailUrl.trim() || null,
+      demoUrl: formData.demoUrl.trim() || null,
+      domainLink: formData.domainLink.trim() || null,
       price: Number(formData.price),
-      currency: "INR", // the server also forces INR
+      currency: formData.currency.trim().toUpperCase(),
       validityDays: Number(formData.validityDays),
       status: formData.status,
     };
 
     try {
       setSubmitting(true);
-      await axios.post(`${API_URL}/templates`, payload, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      showSnack("Template added successfully!");
-      resetForm();
+      const response = templateId
+        ? await axios.put(`${API_URL}/templates/${templateId}`, payload, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+        : await axios.post(`${API_URL}/templates`, payload, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+      const savedTemplateId = templateId || response.data.templateId;
+      showSnack(templateId ? "Template updated successfully!" : "Template added successfully!");
+      navigate(`/admin/templates/${savedTemplateId}/content`);
     } catch (error) {
       const code = error.response?.status;
       let message = error.response?.data?.message;
@@ -258,11 +282,12 @@ export default function AddTemplate() {
             fontSize: { xs: "1.2rem", sm: "1.5rem" },
           }}
         >
-          Add template
+          {templateId ? "Edit template" : "Add template"}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          Fill in the details below. Only published templates appear in the
-          public listing.
+          {templateId
+            ? "Update the catalog details, then manage the pages and themes included in this template."
+            : "Add the catalog details first. You can add its themes and pages immediately after saving."}
         </Typography>
 
         <Box component="form" onSubmit={handleSubmit} noValidate>
@@ -277,7 +302,7 @@ export default function AddTemplate() {
                   label="Category"
                   value={formData.categoryId}
                   onChange={handleChange}
-                  disabled={loadingCategories}
+                  disabled={loadingCategories || loadingTemplate}
                   endAdornment={
                     loadingCategories ? (
                       <CircularProgress size={16} sx={{ mr: 3 }} />
@@ -285,7 +310,7 @@ export default function AddTemplate() {
                   }
                 >
                   {categories.map((c) => (
-                    <MenuItem key={c.categoryId} value={c.categoryId}>
+                    <MenuItem key={c.categoryId} value={String(c.categoryId)}>
                       {c.name}
                     </MenuItem>
                   ))}
@@ -309,7 +334,7 @@ export default function AddTemplate() {
             <Grid size={12}>
               {textField("shortDescription", "Short description", {
                 props: { multiline: true, rows: 2 },
-                helper: `${formData.shortDescription.trim().length}/150`,
+                helper: `${formData.shortDescription.trim().length}/300`,
               })}
             </Grid>
 
@@ -322,24 +347,30 @@ export default function AddTemplate() {
 
             <Grid size={{ xs: 12, sm: 6 }}>
               {textField("thumbnailUrl", "Thumbnail URL", {
-                helper: "Direct link to an image, e.g. https://…/preview.jpg",
+                helper: "Optional image URL (maximum 500 characters).",
               })}
             </Grid>
 
             <Grid size={{ xs: 12, sm: 6 }}>
               {textField("demoUrl", "Demo URL", {
-                helper: "e.g. https://demo.example.com",
+                helper: "Required when publishing; maximum 500 characters.",
               })}
             </Grid>
 
             <Grid size={{ xs: 12, sm: 6 }}>
-              {textField("demoDomain", "Demo domain", {
-                helper: "e.g. demo.example.com",
+              {textField("domainLink", "Domain link (optional)", {
+                helper: "Optional domain associated with this template.",
               })}
             </Grid>
 
             <Grid size={{ xs: 12, sm: 6 }}>
-              {textField("price", "Price (INR)", {
+              {textField("currency", "Currency", {
+                helper: "Three-letter code, e.g. INR or USD.",
+              })}
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 6 }}>
+              {textField("price", `Price (${formData.currency || "currency"})`, {
                 props: {
                   type: "number",
                   slotProps: { htmlInput: { min: 0, step: "0.01" } },
@@ -393,16 +424,16 @@ export default function AddTemplate() {
                   disabled={submitting}
                   sx={{ py: 1.25, fontSize: "0.95rem", fontWeight: "bold" }}
                 >
-                  {submitting ? "Saving…" : "Add template"}
+                  {submitting ? "Saving…" : templateId ? "Save template and manage content" : "Create template and add content"}
                 </Button>
                 <Button
                   variant="outlined"
                   fullWidth
                   disabled={submitting}
-                  onClick={resetForm}
+                  onClick={() => templateId ? navigate("/admin/projects") : resetForm()}
                   sx={{ py: 1.25, fontSize: "0.95rem" }}
                 >
-                  Clear form
+                  {templateId ? "Cancel" : "Clear form"}
                 </Button>
               </Stack>
             </Grid>

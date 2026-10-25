@@ -1,56 +1,56 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
+  Alert,
   Box,
-  Container,
-  Grid,
-  Typography,
-  TextField,
-  InputAdornment,
-  MenuItem,
-  List,
-  ListItemButton,
-  ListItemText,
+  Button,
   Card,
   CardActionArea,
-  CardMedia,
   CardContent,
-  Skeleton,
+  CardMedia,
+  Chip,
+  CircularProgress,
+  Container,
   Dialog,
-  DialogTitle,
   DialogContent,
-  Button,
-  Tabs,
-  Tab,
-  Stack,
+  DialogTitle,
   Divider,
-  Alert,
+  Grid,
+  InputAdornment,
+  MenuItem,
+  Paper,
+  Skeleton,
+  Stack,
+  Tab,
+  Tabs,
+  TextField,
+  Typography,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
-const PLACEHOLDER_IMG = "https://placehold.co/600x340?text=No+Preview";
-
-// Preview widths for the Desktop / Tablet / Mobile tabs
+const PLACEHOLDER_IMAGE = "https://placehold.co/900x520?text=Template+Preview";
 const PREVIEW_WIDTHS = ["100%", 768, 390];
 
 const formatPrice = (price, currency = "INR") =>
   new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency,
-    maximumFractionDigits: 0,
-  }).format(Number(price));
+    maximumFractionDigits: 2,
+  }).format(Number(price || 0));
 
-const formatDate = (d) =>
-  d
-    ? new Date(d).toLocaleDateString(undefined, {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      })
-    : "-";
+const formatJson = (value) => {
+  if (value == null) return "No content defined";
+  if (typeof value === "string") {
+    try {
+      return JSON.stringify(JSON.parse(value), null, 2);
+    } catch {
+      return value;
+    }
+  }
+  return JSON.stringify(value, null, 2);
+};
 
 export default function Template() {
   const navigate = useNavigate();
@@ -61,82 +61,88 @@ export default function Template() {
   const [sort, setSort] = useState("newest");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  const [tabIndex, setTabIndex] = useState(0);
-  const handleTabChange = (event, newValue) => setTabIndex(newValue);
-
   const [selected, setSelected] = useState(null);
+  const [content, setContent] = useState({ pages: [], themes: [], menuItems: [] });
   const [detailLoading, setDetailLoading] = useState(false);
+  const [tabIndex, setTabIndex] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
     axios
       .get(`${API}/categories`)
-      .then((res) => setCategories(Array.isArray(res.data) ? res.data : []))
-      .catch(() => setCategories([]));
+      .then((response) => {
+        if (!cancelled) setCategories(Array.isArray(response.data) ? response.data : []);
+      })
+      .catch(() => {
+        if (!cancelled) setError("Categories could not be loaded. You can still browse all templates.");
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setError("");
     axios
-      .get(`${API}/templates`, { params: categoryId ? { categoryId } : {} })
-      .then((res) => setTemplates(Array.isArray(res.data) ? res.data : []))
-      .catch((err) =>
-        setError(err.response?.data?.message || "Failed to load templates"),
-      )
-      .finally(() => setLoading(false));
-  }, [categoryId]);
+      .get(`${API}/templates`, {
+        params: {
+          ...(categoryId ? { categoryId } : {}),
+          ...(search.trim() ? { q: search.trim() } : {}),
+          sort: sort === "priceLow" ? "price_asc" : sort === "priceHigh" ? "price_desc" : "newest",
+          limit: 100,
+        },
+      })
+      .then((response) => {
+        if (!cancelled) setTemplates(Array.isArray(response.data) ? response.data : []);
+      })
+      .catch((loadError) => {
+        if (!cancelled) setError(loadError.response?.data?.message || "Could not load templates.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [categoryId, search, sort]);
 
-  const visible = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    let list = templates.filter(
-      (t) =>
-        !q ||
-        t.name?.toLowerCase().includes(q) ||
-        t.shortDescription?.toLowerCase().includes(q),
-    );
-    if (sort === "priceLow")
-      list = [...list].sort((a, b) => Number(a.price) - Number(b.price));
-    if (sort === "priceHigh")
-      list = [...list].sort((a, b) => Number(b.price) - Number(a.price));
-    if (sort === "rating")
-      list = [...list].sort(
-        (a, b) => Number(b.avgRating || 0) - Number(a.avgRating || 0),
-      );
-    return list;
-  }, [templates, search, sort]);
+  const visible = templates;
 
-  const openDetail = async (id) => {
+  const openTemplate = async (template) => {
+    setSelected(template);
     setDetailLoading(true);
-    setError("");
-    setSelected({ templateId: id, name: "", shortDescription: "" });
     setTabIndex(0);
-
+    setContent({ pages: [], themes: [], menuItems: [] });
     try {
-      const res = await axios.get(`${API}/templates/${id}`);
-      setSelected(res.data);
-    } catch {
+      const response = await axios.get(`${API}/templates/${template.templateId}/content`);
+      setContent({
+        pages: Array.isArray(response.data.pages) ? response.data.pages : [],
+        themes: Array.isArray(response.data.themes) ? response.data.themes : [],
+        menuItems: Array.isArray(response.data.menuItems) ? response.data.menuItems : [],
+      });
+    } catch (loadError) {
+      setError(loadError.response?.data?.message || "Template details could not be loaded.");
       setSelected(null);
-      setError("Could not load template details");
     } finally {
       setDetailLoading(false);
     }
   };
 
-  const activeCategory = categories.find((c) => c.categoryId === categoryId);
-  const detailReady = !!selected && !detailLoading && !!selected.name;
+  const activeCategory = categories.find(
+    (category) => String(category.categoryId) === String(categoryId),
+  );
 
   return (
-    <Box sx={{ bgcolor: "#f7f7f8", minHeight: "100vh", pb: 8 }}>
-      {/* Hero */}
-      <Box sx={{ bgcolor: "#fff", borderBottom: "1px solid #e5e5e5", py: 6 }}>
+    <Box sx={{ bgcolor: "#f7f8fb", minHeight: "100vh", pb: 8 }}>
+      <Box sx={{ bgcolor: "#fff", borderBottom: "1px solid #e5e7eb", py: { xs: 4, md: 6 } }}>
         <Container maxWidth="lg">
-          <Typography variant="h3" fontWeight={700} gutterBottom>
-            {activeCategory ? activeCategory.name : "Website Templates"}
+          <Typography variant="h3" fontWeight={750} gutterBottom>
+            {activeCategory?.name || "Website templates"}
           </Typography>
-          <Typography color="text.secondary" sx={{ maxWidth: 640, mb: 3 }}>
-            {activeCategory?.content ||
-              "Browse professionally designed templates. Pick one, preview it, and launch your site."}
+          <Typography color="text.secondary" sx={{ maxWidth: 700, mb: 3 }}>
+            {(typeof activeCategory?.content === "string" && activeCategory.content) || "Browse published templates, preview their included pages and themes, then purchase one to create your own site."}
           </Typography>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
             <TextField
@@ -144,14 +150,10 @@ export default function Template() {
               size="small"
               placeholder="Search templates"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(event) => setSearch(event.target.value)}
               slotProps={{
                 input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon />
-                    </InputAdornment>
-                  ),
+                  startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment>,
                 },
               }}
             />
@@ -160,11 +162,10 @@ export default function Template() {
               size="small"
               label="Sort by"
               value={sort}
-              onChange={(e) => setSort(e.target.value)}
-              sx={{ minWidth: 200 }}
+              onChange={(event) => setSort(event.target.value)}
+              sx={{ minWidth: 190 }}
             >
               <MenuItem value="newest">Newest</MenuItem>
-              <MenuItem value="rating">Top rated</MenuItem>
               <MenuItem value="priceLow">Price: low to high</MenuItem>
               <MenuItem value="priceHigh">Price: high to low</MenuItem>
             </TextField>
@@ -173,278 +174,155 @@ export default function Template() {
       </Box>
 
       <Container maxWidth="lg" sx={{ mt: 4 }}>
-        <Grid container spacing={4}>
-          {/* Categories */}
+        <Grid container spacing={3}>
           <Grid size={{ xs: 12, md: 3 }}>
-            <Typography variant="overline" color="text.secondary">
-              Categories
-            </Typography>
-            <List dense>
-              <ListItemButton
-                selected={categoryId === ""}
-                onClick={() => setCategoryId("")}
-                sx={{ borderRadius: 1 }}
-              >
-                <ListItemText primary="All templates" />
-              </ListItemButton>
-              {categories.map((c) => (
-                <ListItemButton
-                  key={c.categoryId}
-                  selected={categoryId === c.categoryId}
-                  onClick={() => setCategoryId(c.categoryId)}
-                  sx={{ borderRadius: 1 }}
+            <Paper variant="outlined" sx={{ p: 2 }}>
+              <Typography variant="overline" color="text.secondary">Categories</Typography>
+              <Stack spacing={0.5} sx={{ mt: 1 }}>
+                <Button
+                  variant={categoryId === "" ? "contained" : "text"}
+                  onClick={() => setCategoryId("")}
+                  sx={{ justifyContent: "flex-start" }}
                 >
-                  <ListItemText primary={c.name} />
-                </ListItemButton>
-              ))}
-            </List>
+                  All templates
+                </Button>
+                {categories.map((category) => (
+                  <Button
+                    key={category.categoryId}
+                    variant={String(categoryId) === String(category.categoryId) ? "contained" : "text"}
+                    onClick={() => setCategoryId(String(category.categoryId))}
+                    sx={{ justifyContent: "flex-start", textAlign: "left" }}
+                  >
+                    {category.name}
+                  </Button>
+                ))}
+              </Stack>
+            </Paper>
           </Grid>
 
-          {/* Template grid */}
           <Grid size={{ xs: 12, md: 9 }}>
-            {error && (
-              <Alert
-                severity="error"
-                sx={{ mb: 2 }}
-                onClose={() => setError("")}
-              >
-                {error}
-              </Alert>
-            )}
-
+            {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>{error}</Alert>}
             <Typography color="text.secondary" sx={{ mb: 2 }}>
-              {loading
-                ? "Loading…"
-                : `${visible.length} template${visible.length === 1 ? "" : "s"}`}
+              {loading ? "Loading templates…" : `${visible.length} template${visible.length === 1 ? "" : "s"}`}
             </Typography>
-
             <Grid container spacing={3}>
               {loading
-                ? Array.from({ length: 6 }).map((_, i) => (
-                    <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={i}>
-                      <Skeleton variant="rounded" height={260} />
-                    </Grid>
+                ? Array.from({ length: 6 }).map((_, index) => (
+                    <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={index}><Skeleton variant="rounded" height={300} /></Grid>
                   ))
-                : visible.map((t) => (
-                    <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={t.templateId}>
-                      <Card
-                        variant="outlined"
-                        sx={{
-                          height: "100%",
-                          borderRadius: 2,
-                          transition: "box-shadow .2s, transform .2s",
-                          "&:hover": {
-                            boxShadow: 6,
-                            transform: "translateY(-2px)",
-                          },
-                        }}
-                      >
-                        <CardActionArea
-                          onClick={() => openDetail(t.templateId)}
-                          sx={{ height: "100%" }}
-                        >
-                          <CardMedia
-                            component="img"
-                            height="200"
-                            image={t.thumbnailUrl || PLACEHOLDER_IMG}
-                            alt={t.name}
-                            sx={{ objectFit: "cover", bgcolor: "#eee" }}
-                          />
+                : visible.map((template) => (
+                    <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={template.templateId}>
+                      <Card variant="outlined" sx={{ height: "100%", borderRadius: 3, "&:hover": { boxShadow: 5, transform: "translateY(-2px)" }, transition: "all .2s" }}>
+                        <CardActionArea onClick={() => openTemplate(template)} sx={{ height: "100%" }}>
+                          <CardMedia component="img" height="190" image={template.thumbnailUrl || PLACEHOLDER_IMAGE} alt={template.name} sx={{ objectFit: "cover", bgcolor: "#eef2f7" }} />
                           <CardContent>
-                            <Stack
-                              direction="row"
-                              justifyContent="space-between"
-                              alignItems="center"
-                              spacing={1}
-                              mb={0.5}
-                            >
-                              <Typography variant="h6" noWrap>
-                                {t.name}
-                              </Typography>
-                              <Typography fontWeight={700} sx={{ flexShrink: 0 }}>
-                                {formatPrice(t.price, t.currency)}
-                              </Typography>
+                            <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
+                              <Typography variant="h6" fontWeight={700}>{template.name}</Typography>
+                              <Typography fontWeight={700} sx={{ whiteSpace: "nowrap" }}>{formatPrice(template.price, template.currency)}</Typography>
                             </Stack>
-
-                            <Typography
-                              variant="body2"
-                              color="text.secondary"
-                              sx={{
-                                display: "-webkit-box",
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: "vertical",
-                                overflow: "hidden",
-                                minHeight: 40,
-                              }}
-                            >
-                              {t.shortDescription}
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1, minHeight: 40 }}>
+                              {template.shortDescription || template.description || "Explore this website template."}
                             </Typography>
+                            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 2 }}>
+                              {template.categoryName && <Chip size="small" label={template.categoryName} />}
+                              {template.validityDays && <Chip size="small" variant="outlined" label={`${template.validityDays} days`} />}
+                            </Stack>
+                            <Button variant="text" sx={{ mt: 1, px: 0 }}>View pages, themes & preview</Button>
                           </CardContent>
                         </CardActionArea>
                       </Card>
                     </Grid>
                   ))}
             </Grid>
-
             {!loading && !visible.length && !error && (
-              <Box textAlign="center" py={8}>
+              <Paper variant="outlined" sx={{ p: 5, textAlign: "center" }}>
                 <Typography variant="h6">No templates found</Typography>
-                <Typography color="text.secondary">
-                  Try another category or search term.
-                </Typography>
-              </Box>
+                <Typography color="text.secondary">Try another search or category.</Typography>
+              </Paper>
             )}
           </Grid>
         </Grid>
       </Container>
 
-      {/* Detail dialog */}
-      <Dialog fullScreen open={!!selected} onClose={() => setSelected(null)}>
+      <Dialog fullScreen open={Boolean(selected)} onClose={() => setSelected(null)}>
         {selected && (
           <>
             <DialogTitle component="div" sx={{ pb: 0 }}>
-              <Stack
-                direction="row"
-                spacing={1.5}
-                alignItems="center"
-                flexWrap="wrap"
-                useFlexGap
-              >
-                <Button onClick={() => setSelected(null)}>Close</Button>
-                <Typography variant="h6" component="span" sx={{ flexGrow: 1 }}>
-                  {selected.name}
-                </Typography>
-
+              <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems={{ xs: "stretch", md: "center" }}>
+                <Button onClick={() => setSelected(null)} sx={{ alignSelf: "flex-start" }}>Back</Button>
+                <Typography variant="h6" fontWeight={700} sx={{ flexGrow: 1 }}>{selected.name}</Typography>
                 {selected.demoUrl && (
-                  <Button
-                    variant="outlined"
-                    href={selected.demoUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Live preview
-                  </Button>
+                  <Tabs value={tabIndex} onChange={(_, value) => setTabIndex(value)} variant="scrollable">
+                    <Tab label="Desktop" />
+                    <Tab label="Tablet" />
+                    <Tab label="Mobile" />
+                  </Tabs>
                 )}
                 <Button
                   variant="contained"
-                  disabled={!detailReady}
-                  onClick={() =>
-                    navigate("/payment", {
-                      state: {
-                        templateId: selected.templateId,
-                        template: selected,
-                      },
-                    })
-                  }
+                  disabled={detailLoading}
+                  onClick={() => navigate("/payment", { state: { template: selected } })}
                 >
-                  {detailReady
-                    ? `Buy ${formatPrice(selected.price, selected.currency)}`
-                    : "Buy"}
+                  Buy for {formatPrice(selected.price, selected.currency)}
                 </Button>
               </Stack>
-
-              <Tabs
-                onChange={handleTabChange}
-                value={tabIndex}
-                sx={{ mt: 1 }}
-              >
-                <Tab label="Desktop" />
-                <Tab label="Tablet" />
-                <Tab label="Mobile" />
-              </Tabs>
             </DialogTitle>
-
             <DialogContent dividers>
-              {!detailReady ? (
-                <Skeleton variant="rounded" height={300} />
+              {detailLoading ? (
+                <Box sx={{ display: "grid", placeItems: "center", minHeight: 280 }}><CircularProgress /></Box>
               ) : (
-                <Stack spacing={3}>
-                  {/* Device preview */}
-                  <Box
-                    sx={{
-                      display: "flex",
-                      justifyContent: "center",
-                      bgcolor: "#eee",
-                      borderRadius: 1,
-                      p: 1,
-                    }}
-                  >
-                    {selected.demoUrl ? (
-                      <Box
-                        component="iframe"
-                        src={selected.demoUrl}
-                        title={`${selected.name} preview`}
-                        sx={{
-                          width: PREVIEW_WIDTHS[tabIndex],
-                          maxWidth: "100%",
-                          height: "60vh",
-                          border: 0,
-                          bgcolor: "#fff",
-                          borderRadius: 1,
-                        }}
-                      />
-                    ) : (
-                      <Box
-                        component="img"
-                        src={selected.thumbnailUrl || PLACEHOLDER_IMG}
-                        alt={selected.name}
-                        sx={{
-                          width: PREVIEW_WIDTHS[tabIndex],
-                          maxWidth: "100%",
-                          maxHeight: 360,
-                          objectFit: "cover",
-                          borderRadius: 1,
-                        }}
-                      />
-                    )}
-                  </Box>
-
-                  {/* Details */}
+                <Container maxWidth="xl" sx={{ py: 2 }}>
                   <Grid container spacing={3}>
-                    <Grid size={{ xs: 12, md: 7 }}>
-                      <Stack spacing={1}>
-                        <Typography variant="h4">{selected.name}</Typography>
-                        <Typography variant="h6" color="text.secondary">
-                          {selected.shortDescription}
-                        </Typography>
-                        <Divider />
-                        <Typography variant="h6">Description</Typography>
-                        <Typography sx={{ whiteSpace: "pre-line" }}>
-                          {selected.description}
-                        </Typography>
-                      </Stack>
+                    <Grid size={{ xs: 12, lg: 8 }}>
+                      <Paper variant="outlined" sx={{ p: 1, bgcolor: "#eef1f5", display: "flex", justifyContent: "center", minHeight: 260 }}>
+                        {selected.demoUrl ? (
+                          <Box
+                            component="iframe"
+                            src={selected.demoUrl}
+                            title={`${selected.name} demo`}
+                            sx={{ width: PREVIEW_WIDTHS[tabIndex], maxWidth: "100%", height: { xs: "55vh", md: "68vh" }, border: 0, bgcolor: "#fff", borderRadius: 1 }}
+                          />
+                        ) : (
+                          <Box component="img" src={selected.thumbnailUrl || PLACEHOLDER_IMAGE} alt={selected.name} sx={{ maxWidth: "100%", maxHeight: "68vh", objectFit: "contain" }} />
+                        )}
+                      </Paper>
+                      <Typography variant="h5" fontWeight={700} sx={{ mt: 3 }}>{selected.name}</Typography>
+                      <Typography color="text.secondary" sx={{ mt: 1 }}>{selected.description || selected.shortDescription}</Typography>
                     </Grid>
-
-                    <Grid size={{ xs: 12, md: 5 }}>
-                      <Stack spacing={1.5}>
-                        <Box>
-                          <Typography variant="overline" color="text.secondary">
-                            Languages / frameworks
-                          </Typography>
-                          <Typography>{selected.language || "-"}</Typography>
-                        </Box>
-                        <Box>
-                          <Typography variant="overline" color="text.secondary">
-                            Validity
-                          </Typography>
-                          <Typography>{selected.validityDays} days</Typography>
-                        </Box>
-                        <Box>
-                          <Typography variant="overline" color="text.secondary">
-                            Posted on
-                          </Typography>
-                          <Typography>{formatDate(selected.createdAt)}</Typography>
-                        </Box>
-                        <Box>
-                          <Typography variant="overline" color="text.secondary">
-                            Last updated
-                          </Typography>
-                          <Typography>{formatDate(selected.updatedAt)}</Typography>
-                        </Box>
-                      </Stack>
+                    <Grid size={{ xs: 12, lg: 4 }}>
+                      <Paper variant="outlined" sx={{ p: 2.5, mb: 2 }}>
+                        <Typography variant="h6" fontWeight={700}>Included pages</Typography>
+                        <Divider sx={{ my: 1.5 }} />
+                        {content.pages.length ? content.pages.map((page) => (
+                          <Box key={page.id} sx={{ py: 1 }}>
+                            <Typography fontWeight={600}>{page.parentId ? "↳ " : ""}{page.title}</Typography>
+                            <Typography variant="body2" color="text.secondary">/{page.slug}</Typography>
+                          </Box>
+                        )) : <Typography color="text.secondary">No pages listed for this template.</Typography>}
+                      </Paper>
+                      <Paper variant="outlined" sx={{ p: 2.5 }}>
+                        <Typography variant="h6" fontWeight={700}>Available themes</Typography>
+                        <Divider sx={{ my: 1.5 }} />
+                        {content.themes.length ? (
+                          <Stack spacing={1}>
+                            {content.themes.map((theme) => (
+                              <Paper key={theme.id} variant="outlined" sx={{ p: 1.5 }}>
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                  <Typography fontWeight={600}>{theme.name}</Typography>
+                                  {Boolean(theme.isDefault) && <Chip size="small" label="Default" color="primary" />}
+                                </Stack>
+                                <Typography variant="body2" color="text.secondary" sx={{ textTransform: "capitalize" }}>{theme.type}</Typography>
+                                <Box component="pre" sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word", fontSize: 12, mb: 0 }}>
+                                  {formatJson(theme.settings)}
+                                </Box>
+                              </Paper>
+                            ))}
+                          </Stack>
+                        ) : <Typography color="text.secondary">Themes can be added after purchase.</Typography>}
+                      </Paper>
                     </Grid>
                   </Grid>
-                </Stack>
+                </Container>
               )}
             </DialogContent>
           </>

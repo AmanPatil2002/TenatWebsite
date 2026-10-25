@@ -1,26 +1,34 @@
 const db = require("../config/db");
 
-function requireSiteAccess(req, res, next) {
-  const siteId = req.params.siteId || req.body.siteId;
-  if (!siteId || !/^[1-9]\d*$/.test(String(siteId))) {
-    return res.status(400).json({ message: "siteId required" });
+const requireSiteAccess = (req, res, next) => {
+  const { siteId } = req.params;
+  if (!/^[1-9]\d*$/.test(siteId)) {
+    return res.status(400).json({ message: "Invalid site ID" });
   }
 
   db.query(
-    `SELECT a.id AS adminId, a.role AS adminRole, s.id AS siteId, s.status
+    `SELECT a.id AS adminId, a.email
        FROM admin a
        JOIN sites s ON s.id = a.siteId
        JOIN users u ON u.userId = a.userId
-      WHERE a.siteId = ? AND a.userId = ?
-        AND s.status = 'active' AND u.status = 'active'`,
+      WHERE a.siteId = ? AND a.userId = ? AND u.status = 'active'
+        AND s.status = 'active' AND s.expiresAt > NOW()`,
     [siteId, req.user.userId],
     (err, rows) => {
       if (err) return res.status(500).json({ message: err.message });
-      if (!rows.length) return res.status(403).json({ message: "No access to this site" });
-      req.siteAdmin = rows[0]; // { adminId, adminRole, siteId, status }
+      if (!rows.length) return res.status(403).json({ message: "Site access denied" });
+      req.siteAdmin = rows[0];
       next();
     }
   );
-}
+};
+
+const requirePlatformAdmin = (req, res, next) => {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+  next();
+};
 
 module.exports = requireSiteAccess;
+module.exports.requirePlatformAdmin = requirePlatformAdmin;

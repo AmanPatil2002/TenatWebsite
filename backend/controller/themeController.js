@@ -1,8 +1,8 @@
 const db = require("../config/db");
 
 const NAME_MIN = 2;
-const NAME_MAX = 50;
-const TYPE_MAX = 50; // adjust to your siteThemes.type column size
+const NAME_MAX = 100;
+const THEME_TYPES = ["default", "dark", "custom"];
 const MAX_SETTINGS_BYTES = 50 * 1024;
 
 // Log the real error, send a generic message to the client
@@ -55,10 +55,8 @@ const createTheme = (req, res) => {
   if (settingsErr) return res.status(400).json({ message: settingsErr });
 
   const cleanType = typeof type === "string" ? type.trim() : "";
-  if (!cleanType || cleanType.length > TYPE_MAX) {
-    return res
-      .status(400)
-      .json({ message: `type must be 1–${TYPE_MAX} characters` });
+  if (!THEME_TYPES.includes(cleanType)) {
+    return res.status(400).json({ message: "type must be default, dark, or custom" });
   }
 
   db.query(
@@ -121,27 +119,52 @@ const updateTheme = (req, res) => {
 // 1) make sure the theme exists for this site, 2) switch in ONE statement.
 // The old version deactivated every theme first, so a wrong themeId left the
 // site with no active theme at all.
-const activateTheme = (req, res) => {
+const activateTheme = async (req, res) => {
   const { siteId, themeId } = req.params;
+  const connection = await db.promise().getConnection();
+  try {
+    await connection.beginTransaction();
+    const [rows] = await connection.execute(
+      "SELECT id FROM siteThemes WHERE id = ? AND siteId = ?",
+      [themeId, siteId]
+    );
+    if (!rows.length) {
+      await connection.rollback();
+      return res.status(404).json({ message: "Not found" });
+    }
+    await connection.execute("UPDATE siteThemes SET isActive = 0 WHERE siteId = ?", [siteId]);
+    await connection.execute(
+      "UPDATE siteThemes SET isActive = 1 WHERE id = ? AND siteId = ?",
+      [themeId, siteId]
+    );
+    await connection.commit();
+    res.json({ ok: true });
+  } catch (error) {
+    await connection.rollback();
+    fail(res, error);
+  } finally {
+    connection.release();
+  }
+};
 
+const deleteTheme = (req, res) => {
   db.query(
-    "SELECT id FROM siteThemes WHERE id = ? AND siteId = ?",
-    [themeId, siteId],
-    (err, rows) => {
+    "DELETE FROM siteThemes WHERE id = ? AND siteId = ? AND isActive = 0",
+    [req.params.themeId, req.params.siteId],
+    (err, result) => {
       if (err) return fail(res, err);
-      if (!rows.length) return res.status(404).json({ message: "Not found" });
-
-      // (id = ?) is 1 for the chosen theme and 0 for all others
+      if (result.affectedRows) return res.json({ message: "Theme deleted" });
       db.query(
-        "UPDATE siteThemes SET isActive = (id = ?) WHERE siteId = ?",
-        [themeId, siteId],
-        (err2) => {
-          if (err2) return fail(res, err2);
-          res.json({ ok: true });
+        "SELECT id, isActive FROM siteThemes WHERE id = ? AND siteId = ?",
+        [req.params.themeId, req.params.siteId],
+        (findErr, rows) => {
+          if (findErr) return fail(res, findErr);
+          if (!rows.length) return res.status(404).json({ message: "Not found" });
+          res.status(409).json({ message: "Activate another theme before deleting this one" });
         }
       );
     }
   );
 };
 
-module.exports = { listThemes, createTheme, updateTheme, activateTheme };
+module.exports = { listThemes, createTheme, updateTheme, activateTheme, deleteTheme };

@@ -27,9 +27,51 @@ import axios from "axios";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
+// Limits mirror the backend and the categories table (VARCHAR(500)).
+const NAME_MAX = 500;
+const TAG_MAX = 500;
+
 const getInitialForm = () => ({ name: "", tag: "", content: "" });
 
+// The API returns `content` as parsed JSON (or null). Show it as editable text.
+const contentToText = (content) => {
+  if (content === null || content === undefined) return "";
+  if (typeof content === "string") return content;
+  return JSON.stringify(content, null, 2);
+};
+
+// The API only accepts a JSON object/array (or empty) for `content`.
+// Returns { value } (null when empty) or { error }.
+const parseContent = (text) => {
+  const trimmed = text.trim();
+  if (!trimmed) return { value: null };
+  let parsed;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    return { error: "Content is not valid JSON" };
+  }
+  if (parsed === null) return { value: null };
+  if (typeof parsed !== "object") {
+    return { error: "Content must be a JSON object or array" };
+  }
+  return { value: parsed };
+};
+
+const errorMessage = (error, fallback) => {
+  if (error.response?.status === 403) {
+    return "Only admins can manage categories.";
+  }
+  return error.response?.data?.message || fallback;
+};
+
+// 409 = category still has templates; a warning fits better than an error.
+const errorSeverity = (error) =>
+  error.response?.status === 409 ? "warning" : "error";
+
 // ---- Shared form (add + edit) -------------------------------------------
+// The parent gives this form a new `key` whenever the record being edited
+// changes (or after a successful add), so no reset effect is needed here.
 function CategoryForm({
   initialValues,
   submitLabel,
@@ -37,14 +79,8 @@ function CategoryForm({
   onCancel,
   submitting,
 }) {
-  const [formData, setFormData] = useState(initialValues || getInitialForm());
+  const [formData, setFormData] = useState(initialValues);
   const [errors, setErrors] = useState({});
-
-  // Reset whenever the caller swaps the record being edited
-  useEffect(() => {
-    setFormData(initialValues || getInitialForm());
-    setErrors({});
-  }, [initialValues]);
 
   const validate = () => {
     const errs = {};
@@ -52,14 +88,17 @@ function CategoryForm({
     const tag = formData.tag.trim();
 
     if (!name) errs.name = "Category name is required";
-    else if (name.length < 2 || name.length > 50)
-      errs.name = "Name must be 2–50 characters";
-    if (tag.length > 30) errs.tag = "Tag must be 30 characters or fewer";
-    if (formData.content.length > 100)
-      errs.content = "Content must be 100 characters or fewer";
+    else if (name.length > NAME_MAX)
+      errs.name = `Name must be ${NAME_MAX} characters or fewer`;
+
+    if (tag.length > TAG_MAX)
+      errs.tag = `Tag must be ${TAG_MAX} characters or fewer`;
+
+    const content = parseContent(formData.content);
+    if (content.error) errs.content = content.error;
 
     setErrors(errs);
-    return Object.keys(errs).length === 0;
+    return { ok: Object.keys(errs).length === 0, content: content.value };
   };
 
   const handleChange = (e) => {
@@ -70,11 +109,13 @@ function CategoryForm({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!validate()) return;
+    if (submitting) return;
+    const { ok, content } = validate();
+    if (!ok) return;
     onSubmit({
       name: formData.name.trim(),
-      tag: formData.tag.trim(),
-      content: formData.content.trim(),
+      tag: formData.tag.trim(), // empty string is stored as NULL by the API
+      content, // parsed JSON, or null when empty
     });
   };
 
@@ -91,6 +132,9 @@ function CategoryForm({
             onChange={handleChange}
             error={!!errors.name}
             helperText={errors.name}
+            slotProps={{ htmlInput: { maxLength: NAME_MAX } }}
+            required
+            autoFocus
           />
         </Grid>
         <Grid size={12}>
@@ -103,6 +147,7 @@ function CategoryForm({
             onChange={handleChange}
             error={!!errors.tag}
             helperText={errors.tag || "A short label, e.g. portfolio"}
+            slotProps={{ htmlInput: { maxLength: TAG_MAX } }}
           />
         </Grid>
         <Grid size={12}>
@@ -110,13 +155,22 @@ function CategoryForm({
             fullWidth
             size="small"
             name="content"
-            label="Content (optional)"
+            label="Content (optional, JSON)"
             multiline
-            rows={3}
+            minRows={4}
+            maxRows={12}
             value={formData.content}
             onChange={handleChange}
             error={!!errors.content}
-            helperText={errors.content || `${formData.content.length}/100`}
+            helperText={
+              errors.content || 'A JSON object or array, e.g. {"icon": "store"}'
+            }
+            slotProps={{
+              htmlInput: {
+                spellCheck: false,
+                style: { fontFamily: "monospace", fontSize: "0.85rem" },
+              },
+            }}
           />
         </Grid>
         <Grid size={12}>
@@ -155,10 +209,18 @@ export default function AddCategory() {
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
-  const [snack, setSnack] = useState({ open: false, message: "", severity: "success" });
+  const [createKey, setCreateKey] = useState(0); // bump to clear the add form
+  const [snack, setSnack] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
 
-  const showSnack = (message, severity = "success") =>
-    setSnack({ open: true, message, severity });
+  const showSnack = useCallback(
+    (message, severity = "success") =>
+      setSnack({ open: true, message, severity }),
+    [],
+  );
 
   const getToken = () => localStorage.getItem("token");
 
@@ -167,12 +229,12 @@ export default function AddCategory() {
       setLoadingList(true);
       const res = await axios.get(`${API_URL}/categories`);
       setCategories(Array.isArray(res.data) ? res.data : []);
-    } catch {
-      showSnack("Could not load categories.", "error");
+    } catch (error) {
+      showSnack(errorMessage(error, "Could not load categories."), "error");
     } finally {
       setLoadingList(false);
     }
-  }, []);
+  }, [showSnack]);
 
   useEffect(() => {
     fetchCategories();
@@ -188,11 +250,12 @@ export default function AddCategory() {
         headers: { Authorization: `Bearer ${token}` },
       });
       showSnack("Category added successfully!");
+      setCreateKey((k) => k + 1); // fresh, empty form
       fetchCategories();
     } catch (error) {
       showSnack(
-        error.response?.data?.message || "Failed to add category.",
-        "error",
+        errorMessage(error, "Failed to add category."),
+        errorSeverity(error),
       );
     } finally {
       setSubmitting(false);
@@ -213,8 +276,8 @@ export default function AddCategory() {
       fetchCategories();
     } catch (error) {
       showSnack(
-        error.response?.data?.message || "Failed to update category.",
-        "error",
+        errorMessage(error, "Failed to update category."),
+        errorSeverity(error),
       );
     } finally {
       setSubmitting(false);
@@ -236,9 +299,10 @@ export default function AddCategory() {
       if (editingId === category.categoryId) setEditingId(null);
       fetchCategories();
     } catch (error) {
+      // 409 message from the API: "Category has templates. Move or delete them first"
       showSnack(
-        error.response?.data?.message || "Failed to delete category.",
-        "error",
+        errorMessage(error, "Failed to delete category."),
+        errorSeverity(error),
       );
     } finally {
       setDeletingId(null);
@@ -252,13 +316,28 @@ export default function AddCategory() {
 
   return (
     <Box
-      sx={{ p: { xs: 1.5, sm: 2, md: 3 }, minHeight: "100vh", backgroundColor: "#f5f5f5" }}
+      sx={{
+        p: { xs: 1.5, sm: 2, md: 3 },
+        minHeight: "100vh",
+        backgroundColor: "#f5f5f5",
+      }}
     >
-      <Grid container spacing={{ xs: 2, md: 3 }} sx={{ maxWidth: 1200, mx: "auto" }}>
+      <Grid
+        container
+        spacing={{ xs: 2, md: 3 }}
+        sx={{ maxWidth: 1200, mx: "auto" }}
+      >
         {/* -------- Form card -------- */}
         <Grid size={{ xs: 12, md: 5 }}>
           <Paper elevation={1} sx={{ p: { xs: 2, sm: 3 } }}>
-            <Typography variant="h5" sx={{ fontWeight: "bold", mb: 0.5, fontSize: { xs: "1.2rem", sm: "1.5rem" } }}>
+            <Typography
+              variant="h5"
+              sx={{
+                fontWeight: "bold",
+                mb: 0.5,
+                fontSize: { xs: "1.2rem", sm: "1.5rem" },
+              }}
+            >
               {editingCategory ? "Edit category" : "Add category"}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
@@ -266,13 +345,17 @@ export default function AddCategory() {
             </Typography>
 
             <CategoryForm
-              key={editingCategory ? editingCategory.categoryId : "new"}
+              key={
+                editingCategory
+                  ? `edit-${editingCategory.categoryId}`
+                  : `new-${createKey}`
+              }
               initialValues={
                 editingCategory
                   ? {
                       name: editingCategory.name || "",
                       tag: editingCategory.tag || "",
-                      content: editingCategory.content || "",
+                      content: contentToText(editingCategory.content),
                     }
                   : getInitialForm()
               }
@@ -317,17 +400,22 @@ export default function AddCategory() {
                         hover
                         selected={editingId === c.categoryId}
                       >
-                        <TableCell>{c.name}</TableCell>
-                        <TableCell>
+                        <TableCell sx={{ overflowWrap: "anywhere" }}>
+                          {c.name}
+                        </TableCell>
+                        <TableCell sx={{ overflowWrap: "anywhere" }}>
                           {c.tag ? <Chip size="small" label={c.tag} /> : "—"}
                         </TableCell>
-                        <TableCell align="right">
+                        <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
                           <Tooltip title="Edit">
                             <span>
                               <IconButton
                                 size="small"
+                                aria-label={`Edit ${c.name}`}
                                 onClick={() => setEditingId(c.categoryId)}
-                                disabled={submitting || deletingId === c.categoryId}
+                                disabled={
+                                  submitting || deletingId === c.categoryId
+                                }
                               >
                                 <EditIcon fontSize="small" />
                               </IconButton>
@@ -338,8 +426,11 @@ export default function AddCategory() {
                               <IconButton
                                 size="small"
                                 color="error"
+                                aria-label={`Delete ${c.name}`}
                                 onClick={() => handleDelete(c)}
-                                disabled={submitting || deletingId === c.categoryId}
+                                disabled={
+                                  submitting || deletingId === c.categoryId
+                                }
                               >
                                 {deletingId === c.categoryId ? (
                                   <CircularProgress size={16} />
@@ -363,7 +454,10 @@ export default function AddCategory() {
       <Snackbar
         open={snack.open}
         autoHideDuration={4000}
-        onClose={() => setSnack((s) => ({ ...s, open: false }))}
+        onClose={(_, reason) => {
+          if (reason === "clickaway") return;
+          setSnack((s) => ({ ...s, open: false }));
+        }}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
         <Alert

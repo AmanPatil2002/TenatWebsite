@@ -31,10 +31,15 @@ import SaveIcon from "@mui/icons-material/Save";
 import axios from "axios";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+// Base endpoint. Item routes are `${CONTACT_URL}/:id`
+const CONTACT_URL = `${API_URL}/contact/acontact`;
 
-// Keep these in sync with backend validation
+// Keep these in sync with backend validation and the acontact table
 const MAX_EMAIL = 190;
 const MAX_ADDRESS = 100;
+
+const getToken = () => localStorage.getItem("token");
+const authHeaders = () => ({ headers: { Authorization: `Bearer ${getToken()}` } });
 
 const getInitialForm = () => ({ phone: "", email: "", address: "" });
 
@@ -64,7 +69,9 @@ const ContactForm = ({ initialValues, submitLabel, onSubmit, onCancel, submittin
   };
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name } = e.target;
+    // Phone accepts digits only
+    const value = name === "phone" ? e.target.value.replace(/\D/g, "") : e.target.value;
     setFormData((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => ({ ...prev, [name]: undefined }));
   };
@@ -98,7 +105,7 @@ const ContactForm = ({ initialValues, submitLabel, onSubmit, onCancel, submittin
             error={!!errors.phone}
             helperText={errors.phone || "e.g. 1234567890"}
             placeholder="10 digits only"
-            inputProps={{ maxLength: 10, inputMode: "numeric" }}
+            slotProps={{ htmlInput: { maxLength: 10, inputMode: "numeric" } }}
           />
         </Grid>
 
@@ -113,7 +120,7 @@ const ContactForm = ({ initialValues, submitLabel, onSubmit, onCancel, submittin
             onChange={handleChange}
             error={!!errors.email}
             helperText={errors.email}
-            inputProps={{ maxLength: MAX_EMAIL }}
+            slotProps={{ htmlInput: { maxLength: MAX_EMAIL } }}
           />
         </Grid>
 
@@ -129,8 +136,8 @@ const ContactForm = ({ initialValues, submitLabel, onSubmit, onCancel, submittin
             value={formData.address}
             onChange={handleChange}
             error={!!errors.address}
-            helperText={errors.address}
-            inputProps={{ maxLength: MAX_ADDRESS }}
+            helperText={errors.address || `${formData.address.length}/${MAX_ADDRESS}`}
+            slotProps={{ htmlInput: { maxLength: MAX_ADDRESS } }}
           />
         </Grid>
 
@@ -165,12 +172,17 @@ const ContactForm = ({ initialValues, submitLabel, onSubmit, onCancel, submittin
 };
 
 // ---- Confirmation dialog ---------------------------------------------
-const ConfirmDialog = ({ open, title, message, onConfirm, onCancel, confirming }) => {
+const ConfirmDialog = ({ open, title, message, details, onConfirm, onCancel, confirming }) => {
   return (
     <Dialog open={open} onClose={confirming ? undefined : onCancel} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ pb: 1 }}>{title}</DialogTitle>
       <DialogContent>
         <Typography variant="body1">{message}</Typography>
+        {details && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5, wordBreak: "break-word" }}>
+            {details}
+          </Typography>
+        )}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onCancel} disabled={confirming} color="inherit">
@@ -204,34 +216,23 @@ export default function AddContact() {
   const showSnack = (message, severity = "success") =>
     setSnack({ open: true, message, severity });
 
-  const getToken = () => localStorage.getItem("token");
-  const authHeaders = () => ({ headers: { Authorization: `Bearer ${getToken()}` } });
-
-  // Base endpoint. Item routes are `${contactUrl}/:id`
-  const contactUrl = `${API_URL}/contact/acontact`;
-
-  const fetchContacts = useCallback(async () => {
-    if (!localStorage.getItem("token")) {
-      setSnack({ open: true, message: "Please log in first.", severity: "error" });
+  // showSpinner is true only for the first load; later refreshes happen silently
+  const fetchContacts = useCallback(async (showSpinner = true) => {
+    if (!getToken()) {
+      showSnack("Please log in first.", "error");
       setLoadingList(false);
       return;
     }
     try {
-      setLoadingList(true);
-      const res = await axios.get(contactUrl, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
+      if (showSpinner) setLoadingList(true);
+      const res = await axios.get(CONTACT_URL, authHeaders());
       setContacts(Array.isArray(res.data) ? res.data : []);
     } catch (error) {
-      setSnack({
-        open: true,
-        message: error.response?.data?.message || "Could not load contacts.",
-        severity: "error",
-      });
+      showSnack(error.response?.data?.message || "Could not load contacts.", "error");
     } finally {
       setLoadingList(false);
     }
-  }, [contactUrl]);
+  }, []);
 
   useEffect(() => {
     fetchContacts();
@@ -245,9 +246,9 @@ export default function AddContact() {
     }
     try {
       setSubmitting(true);
-      await axios.post(contactUrl, values, authHeaders());
+      await axios.post(CONTACT_URL, values, authHeaders());
       showSnack("Contact added successfully!");
-      fetchContacts();
+      fetchContacts(false);
       return true;
     } catch (error) {
       showSnack(error.response?.data?.message || "Failed to add contact.", "error");
@@ -264,11 +265,10 @@ export default function AddContact() {
     }
     try {
       setSubmitting(true);
-      // FIX: was `${contactUrl}/acontact/${id}` which doubled "acontact" in the path
-      await axios.put(`${contactUrl}/${editingId}`, values, authHeaders());
+      await axios.put(`${CONTACT_URL}/${editingId}`, values, authHeaders());
       showSnack("Contact updated successfully!");
       setEditingId(null);
-      fetchContacts();
+      fetchContacts(false);
       return true;
     } catch (error) {
       showSnack(error.response?.data?.message || "Failed to update contact.", "error");
@@ -276,6 +276,12 @@ export default function AddContact() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleEdit = (contactId) => {
+    setEditingId(contactId);
+    // The form is above the table on small screens, so bring it into view
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleDeleteClick = (contact) => {
@@ -293,11 +299,10 @@ export default function AddContact() {
 
     try {
       setDeletingId(contact.contactId);
-      // FIX: same doubled path as update
-      await axios.delete(`${contactUrl}/${contact.contactId}`, authHeaders());
+      await axios.delete(`${CONTACT_URL}/${contact.contactId}`, authHeaders());
       showSnack("Contact deleted successfully.");
       if (editingId === contact.contactId) setEditingId(null);
-      fetchContacts();
+      fetchContacts(false);
     } catch (error) {
       showSnack(error.response?.data?.message || "Failed to delete contact.", "error");
     } finally {
@@ -310,13 +315,22 @@ export default function AddContact() {
     setDeleteDialog({ open: false, contact: null });
   };
 
+  const handleSnackClose = (_, reason) => {
+    if (reason === "clickaway") return;
+    setSnack((s) => ({ ...s, open: false }));
+  };
+
   const editingContact =
     editingId != null ? contacts.find((c) => c.contactId === editingId) : null;
 
-  const headCellSx = { fontWeight: "bold", bgcolor: "#f5f5f5" };
+  const headCellSx = { fontWeight: "bold", bgcolor: "grey.100" };
+
+  const deleteDetails = deleteDialog.contact
+    ? `${deleteDialog.contact.contact} · ${deleteDialog.contact.email}`
+    : "";
 
   return (
-    <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, minHeight: "100vh", backgroundColor: "#f5f5f5" }}>
+    <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, minHeight: "100vh", bgcolor: "grey.100" }}>
       <Grid container spacing={{ xs: 2, md: 3 }} sx={{ maxWidth: 1200, mx: "auto" }}>
         {/* -------- Form card -------- */}
         <Grid size={{ xs: 12, md: 5 }}>
@@ -406,6 +420,7 @@ export default function AddContact() {
                   <TableBody>
                     {contacts.map((c) => {
                       const isEditing = editingId === c.contactId;
+                      const busy = submitting || deletingId === c.contactId;
                       // Editing happens in the form on the left; the row is only highlighted.
                       const cellSx = {
                         verticalAlign: "top",
@@ -444,8 +459,9 @@ export default function AddContact() {
                               <span>
                                 <IconButton
                                   size="small"
-                                  onClick={() => setEditingId(c.contactId)}
-                                  disabled={submitting || deletingId === c.contactId}
+                                  aria-label="Edit contact"
+                                  onClick={() => handleEdit(c.contactId)}
+                                  disabled={busy}
                                   sx={{ color: isEditing ? "primary.main" : "inherit" }}
                                 >
                                   <EditIcon fontSize="small" />
@@ -457,8 +473,9 @@ export default function AddContact() {
                                 <IconButton
                                   size="small"
                                   color="error"
+                                  aria-label="Delete contact"
                                   onClick={() => handleDeleteClick(c)}
-                                  disabled={submitting || deletingId === c.contactId}
+                                  disabled={busy}
                                 >
                                   {deletingId === c.contactId ? (
                                     <CircularProgress size={16} />
@@ -483,11 +500,11 @@ export default function AddContact() {
       <Snackbar
         open={snack.open}
         autoHideDuration={4000}
-        onClose={() => setSnack((s) => ({ ...s, open: false }))}
+        onClose={handleSnackClose}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
         <Alert
-          onClose={() => setSnack((s) => ({ ...s, open: false }))}
+          onClose={handleSnackClose}
           severity={snack.severity}
           variant="filled"
           sx={{ width: "100%" }}
@@ -500,6 +517,7 @@ export default function AddContact() {
         open={deleteDialog.open}
         title="Confirm Delete"
         message="Are you sure you want to delete this contact? This action cannot be undone."
+        details={deleteDetails}
         onConfirm={handleDeleteConfirm}
         onCancel={handleDeleteCancel}
         confirming={deletingId !== null}

@@ -17,13 +17,14 @@ import AdminDashboard from "./Mycomponent/AdminDashboard";
 import AddTemplate from "./Mycomponent/AddTemplate";
 import AddCategory from "./Mycomponent/AddCategory";
 import ViewProject from "./Mycomponent/ViewProject";
-import AddTheme from "./Mycomponent/AddTheme";
-import AddPages from "./Mycomponent/AddPages";
 import Payment from "./Mycomponent/Payment";
 import Template from "./Pages/Client/Template";
 import ViewPayment from "./Mycomponent/ViewPayment";
 import AddContact from "./Mycomponent/AddContact";
 import AddFaq from "./Mycomponent/AddFaq";
+import Preview from "./Mycomponent/Preview";
+import TemplateContentEditor from "./Mycomponent/TemplateContentEditor";
+import SiteEditor from "./Pages/Client/SiteEditor";
 
 function App() {
   return (
@@ -31,7 +32,6 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-
         <Route element={<Layout />}>
           <Route path="/" element={<Home />} />
           <Route path="/home" element={<Home />} />
@@ -40,17 +40,20 @@ function App() {
             <Route path="/review" element={<Review />} /> 
             <Route path="/myaccount" element={<Myaccount />} />
             <Route path="/viewtemp" element={<Template />}/>
+            <Route path="/preview" element={<Preview/>}/>
             <Route path="/payment" element={<Payment />} />
             <Route path="/mysite" element={<MySite/>} />
+            <Route path="/mysite/:siteId" element={<SiteEditor />} />
             <Route path="/detail" element={<TempDetail/>}/>
+
           </Route>
         </Route>
 
-        <Route element={<ProtectedRoutes role={["admin", "superadmin"]} />}>
+        <Route element={<ProtectedRoutes role="admin" />}>
           <Route path="/admin" element={<Admin />}>
             <Route path="templates" element={<AddTemplate />} />
-            <Route path="theme" element={<AddTheme />} />
-            <Route path="pages" element={<AddPages />} />
+            <Route path="templates/:templateId/edit" element={<AddTemplate />} />
+            <Route path="templates/:templateId/content" element={<TemplateContentEditor />} />
             <Route path="category" element={<AddCategory />} />
             <Route path="projects" element={<ViewProject />} />
             <Route path="users" element={<ViewUser />} />

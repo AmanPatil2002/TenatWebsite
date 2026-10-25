@@ -31,7 +31,6 @@ import axios from "axios";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-// Keep these in sync with themeController.js
 const NAME_MIN = 2;
 const NAME_MAX = 50;
 const TYPE_MAX = 50;
@@ -81,7 +80,6 @@ function ThemeForm({
     } else {
       try {
         const parsed = JSON.parse(settingsText);
-        // "5", "null" or "[1,2]" are valid JSON but not valid theme settings
         if (
           parsed === null ||
           typeof parsed !== "object" ||
@@ -159,6 +157,7 @@ function ThemeForm({
         <Grid size={12}>
           <TextField
             fullWidth
+            select
             size="small"
             name="type"
             label="Theme type"
@@ -169,7 +168,13 @@ function ThemeForm({
               errors.type || (editing ? "Type cannot be changed" : undefined)
             }
             disabled={editing}
-          />
+          >
+            {["default", "dark", "custom"].map((value) => (
+              <MenuItem key={value} value={value}>
+                {value}
+              </MenuItem>
+            ))}
+          </TextField>
         </Grid>
         <Grid size={12}>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
@@ -202,7 +207,7 @@ function ThemeForm({
 
 export default function AddTheme() {
   const [sites, setSites] = useState([]);
-  const [siteId, setSiteId] = useState("");
+  const [themeId, setThemeId] = useState("");
   const [themes, setThemes] = useState([]);
   const [loadingSites, setLoadingSites] = useState(true);
   const [loadingList, setLoadingList] = useState(false);
@@ -219,7 +224,7 @@ export default function AddTheme() {
     setSnack({ open: true, message, severity });
   }, []);
 
-  const fetchSites = useCallback(async () => {
+  const fetchTheme = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!token) {
       showSnack("Please log in first.", "error");
@@ -233,16 +238,15 @@ export default function AddTheme() {
       });
       const siteList = Array.isArray(response.data) ? response.data : [];
       setSites(siteList);
-      setLoadingList(siteList.length > 0);
-      setSiteId((currentSiteId) => {
-        if (siteList.some((site) => String(site.id) === currentSiteId)) {
-          return currentSiteId;
+      setThemeId((currentThemeId) => {
+        if (siteList.some((site) => String(site.id) === currentThemeId)) {
+          return currentThemeId;
         }
         return siteList.length ? String(siteList[0].id) : "";
       });
     } catch (error) {
       showSnack(
-        error.response?.data?.message || "Could not load your sites.",
+        error.response?.data?.message || "Could not load your theme.",
         "error",
       );
     } finally {
@@ -251,11 +255,11 @@ export default function AddTheme() {
   }, [showSnack]);
 
   useEffect(() => {
-    void Promise.resolve().then(fetchSites);
-  }, [fetchSites]);
+    void Promise.resolve().then(fetchTheme);
+  }, [fetchTheme]);
 
   useEffect(() => {
-    if (!siteId) return undefined;
+    if (!themeId) return undefined;
 
     let cancelled = false;
     const fetchThemes = async () => {
@@ -267,7 +271,7 @@ export default function AddTheme() {
       }
 
       try {
-        const response = await axios.get(`${API_URL}/site/${siteId}/themes`, {
+        const response = await axios.get(`${API_URL}/site/${themeId}/themes`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!cancelled) {
@@ -289,11 +293,11 @@ export default function AddTheme() {
     return () => {
       cancelled = true;
     };
-  }, [siteId, showSnack]);
+  }, [themeId, showSnack]);
 
   const refreshThemes = async (token, fallbackMessage) => {
     try {
-      const response = await axios.get(`${API_URL}/site/${siteId}/themes`, {
+      const response = await axios.get(`${API_URL}/site/${themeId}/themes`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setThemes(Array.isArray(response.data) ? response.data : []);
@@ -312,7 +316,7 @@ export default function AddTheme() {
 
     try {
       setSubmitting(true);
-      await axios.post(`${API_URL}/site/${siteId}/themes`, values, {
+      await axios.post(`${API_URL}/site/${themeId}/themes`, values, {
         headers: { Authorization: `Bearer ${token}` },
       });
       showSnack("Theme added successfully!");
@@ -342,7 +346,7 @@ export default function AddTheme() {
     try {
       setSubmitting(true);
       await axios.put(
-        `${API_URL}/site/${siteId}/themes/${editingId}`,
+        `${API_URL}/site/${themeId}/themes/${editingId}`,
         { name: values.name, settings: values.settings },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -372,7 +376,7 @@ export default function AddTheme() {
     try {
       setActiveId(theme.id);
       await axios.patch(
-        `${API_URL}/site/${siteId}/themes/${theme.id}/activate`,
+        `${API_URL}/site/${themeId}/themes/${theme.id}/activate`,
         {},
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -414,18 +418,18 @@ export default function AddTheme() {
             <InputLabel id="theme-site-label">Site</InputLabel>
             <Select
               labelId="theme-site-label"
-              value={siteId}
+              value={themeId}
               label="Site"
               onChange={(event) => {
                 setThemes([]);
                 setEditingId(null);
                 setLoadingList(true);
-                setSiteId(event.target.value);
+                setThemeId(event.target.value);
               }}
             >
               {sites.map((site) => (
                 <MenuItem key={site.id} value={String(site.id)}>
-                  {site.siteName} ({site.subdomain})
+                  {site.name} ({site.subdomain || site.customDomain || "No domain"})
                 </MenuItem>
               ))}
             </Select>
@@ -439,7 +443,7 @@ export default function AddTheme() {
           </FormControl>
         </Grid>
 
-        {siteId && (
+        {themeId && (
           <>
             <Grid size={{ xs: 12, md: 5 }}>
               <Paper elevation={1} sx={{ p: { xs: 2, sm: 3 } }}>
@@ -462,7 +466,7 @@ export default function AddTheme() {
                 </Typography>
 
                 <ThemeForm
-                  key={`${siteId}-${editingTheme ? editingTheme.id : "new"}`}
+                  key={`${themeId}-${editingTheme ? editingTheme.id : "new"}`}
                   initialValues={
                     editingTheme
                       ? {

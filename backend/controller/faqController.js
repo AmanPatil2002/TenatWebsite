@@ -1,6 +1,10 @@
 const db = require("../config/db");
 
 const isAdmin = (req) => req.user?.role === "admin";
+const validId = (id) =>
+  typeof id === "string" &&
+  /^[1-9]\d*$/.test(id) &&
+  BigInt(id) <= 18446744073709551615n;
 
 // Public read (the FAQ page is shown to visitors)
 const getFaq = (req, res) => {
@@ -14,10 +18,15 @@ const getFaq = (req, res) => {
 };
 
 const validate = (question, answer) => {
-  if (typeof question !== "string" || typeof answer !== "string") {
-    return "Question and answer are required";
-  }
-  return null;
+     if (typeof question !== "string" || typeof answer !== "string") {
+       return "Question and answer are required";
+     }
+     const q = question.trim();
+     const a = answer.trim();
+     if (!q || !a) return "Question and answer are required";
+     if (q.length > 500) return "Question must be 500 characters or fewer";
+     if (a.length > 10000) return "Answer must be 10000 characters or fewer";
+     return null;
 };
 
 const postFaq = (req, res) => {
@@ -47,6 +56,7 @@ const updateFaq = (req, res) => {
 
   const { question, answer } = req.body;
   const { faqId } = req.params;
+  if (!validId(faqId)) return res.status(400).json({ message: "Invalid FAQ ID" });
   const error = validate(question, answer);
   if (error) return res.status(400).json({ message: error });
 
@@ -71,6 +81,7 @@ const deleteFaq = (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ message: "Forbidden" });
 
   const { faqId } = req.params;
+  if (!validId(faqId)) return res.status(400).json({ message: "Invalid FAQ ID" });
   db.query("DELETE FROM faq WHERE faqId = ?", [faqId], (err, result) => {
     if (err) {
       console.error("deleteFaq:", err);

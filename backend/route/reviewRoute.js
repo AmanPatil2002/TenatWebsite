@@ -1,11 +1,17 @@
 const express = require("express");
-const review = express.Router();
+const router = express.Router();
 
-const { getReview, postReview, myReview } = require("../controller/reviewController");
+const {
+  getReviews,
+  addReview,
+  updateReview,
+  deleteReview,
+} = require("../controller/reviewController");
 const authenticateToken = require("../middleware/authenticate");
 
-review.get("/getreview", authenticateToken, getReview);     
-review.post("/postreview", authenticateToken, postReview);    
-review.get("/myreview", authenticateToken, myReview);     
+router.get("/", getReviews);
+router.post("/", authenticateToken, addReview);
+router.put("/:reviewId", authenticateToken, updateReview);
+router.delete("/:reviewId", authenticateToken, deleteReview);
 
-module.exports = review;
+module.exports = router;

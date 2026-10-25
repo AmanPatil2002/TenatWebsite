@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 import Typography from "@mui/material/Typography";
 import Box from "@mui/material/Box";
@@ -48,7 +49,7 @@ function filterTemplate(templates, query) {
       t.shortDescription,
       t.description,
       t.demoUrl,
-      t.demoDomain,
+      t.domainLink,
       t.price,
       t.validityDays,
       t.status,
@@ -62,6 +63,7 @@ function filterTemplate(templates, query) {
 }
 
 export default function ViewProject() {
+  const navigate = useNavigate();
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -78,7 +80,7 @@ export default function ViewProject() {
         if (!token) throw new Error("You are not logged in");
 
         // Admin endpoint: returns every status (draft, published, archived)
-        const res = await fetch(`${API_URL}/templates/admin/all`, {
+        const res = await fetch(`${API_URL}/templates/admin/all?limit=100`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json().catch(() => null);
@@ -191,7 +193,7 @@ export default function ViewProject() {
         <Table sx={{ minWidth: 500 }} aria-label="project table">
           <TableHead>
             <TableRow sx={{ bgcolor: "primary.main" }}>
-              {["No.", "Name", "Details", "Url", "Status", "Created At"].map(
+              {["No.", "Name", "Details", "Url", "Status", "Created At", "Actions"].map(
                 (h) => (
                   <TableCell
                     key={h}
@@ -207,13 +209,13 @@ export default function ViewProject() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 5 }}>
+                <TableCell colSpan={7} align="center" sx={{ py: 5 }}>
                   <CircularProgress size={28} />
                 </TableCell>
               </TableRow>
             ) : visibleRows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                   {searching
                     ? "No projects match your search"
                     : "No projects found"}
@@ -263,7 +265,7 @@ export default function ViewProject() {
                       {t.demoUrl}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {t.demoDomain}
+                      {t.domainLink}
                     </Typography>
                   </TableCell>
 
@@ -282,13 +284,29 @@ export default function ViewProject() {
                       {formatDate(t.createdAt)}
                     </Typography>
                   </TableCell>
+                  <TableCell>
+                    <Stack spacing={1} alignItems="flex-start">
+                      <Button
+                        size="small"
+                        onClick={() => navigate(`/admin/templates/${t.templateId}/edit`)}
+                      >
+                        Edit details
+                      </Button>
+                      <Button
+                        size="small"
+                        onClick={() => navigate(`/admin/templates/${t.templateId}/content`)}
+                      >
+                        Manage pages & themes
+                      </Button>
+                    </Stack>
+                  </TableCell>
                 </TableRow>
               ))
             )}
 
             {emptyRows > 0 && (
               <TableRow style={{ height: 53 * emptyRows }}>
-                <TableCell colSpan={6} />
+                <TableCell colSpan={7} />
               </TableRow>
             )}
           </TableBody>
@@ -297,7 +315,7 @@ export default function ViewProject() {
             <TableRow>
               <TablePagination
                 rowsPerPageOptions={[5, 10, 25, { label: "All", value: -1 }]}
-                colSpan={6}
+                colSpan={7}
                 count={filteredTemplates.length}
                 rowsPerPage={rowsPerPage}
                 page={page}

@@ -1,6 +1,10 @@
 import { useState } from "react";
 import axios from "axios";
-import { useNavigate, Link as RouterLink } from "react-router-dom";
+import {
+  useNavigate,
+  useLocation,
+  Link as RouterLink,
+} from "react-router-dom";
 import {
   Alert,
   Box,
@@ -22,6 +26,9 @@ import VisibilityOff from "@mui/icons-material/VisibilityOff";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
+const EMAIL_MAX = 190; // matches users.email
+const EMAIL_RE = /^\S+@\S+\.\S+$/; // same pattern as the backend
+
 const theme = createTheme({
   palette: {
     primary: { main: "#2373F4" },
@@ -38,10 +45,13 @@ const theme = createTheme({
 
 function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [form, setForm] = useState({ email: "", password: "" });
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState("");
+  // "Account created. Please log in." is passed by the Register page.
+  const [notice, setNotice] = useState(location.state?.message || "");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -50,30 +60,30 @@ function Login() {
     setForm((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => ({ ...prev, [name]: "" }));
     setServerError("");
+    setNotice("");
   };
 
   const validate = () => {
-    const newErrors = {};
+    const next = {};
+    const email = form.email.trim();
 
-    if (!form.email.trim()) {
-      newErrors.email = "Email is required";
-    } else if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) {
-      newErrors.email = "Enter a valid email";
-    }
-    if (!form.password) {
-      newErrors.password = "Password is required";
-    }
+    if (!email) next.email = "Email is required";
+    else if (email.length > EMAIL_MAX || !EMAIL_RE.test(email))
+      next.email = "Enter a valid email";
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    if (!form.password) next.password = "Password is required";
+
+    setErrors(next);
+    return Object.keys(next).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validate()) return;
+    if (loading || !validate()) return;
 
     setLoading(true);
     setServerError("");
+    setNotice("");
     try {
       const { data } = await axios.post(`${API_URL}/auth/login`, {
         email: form.email.trim(),
@@ -83,15 +93,16 @@ function Login() {
       const { token, user } = data;
       localStorage.setItem("token", token);
       localStorage.setItem("role", user.role);
+      localStorage.setItem("username", user.name);
       localStorage.setItem("email", user.email);
       localStorage.setItem("Id", user.id);
 
-      if (user.role === "admin" || user.role === "superadmin") {
-        navigate("/admin", { replace: true });
-      } else {
-        navigate("/home", { replace: true });
-      }
+      // Same role check as the backend's isAdmin().
+      const isAdmin = ["admin", "superadmin"].includes(user.role);
+      navigate(isAdmin ? "/admin" : "/home", { replace: true });
     } catch (err) {
+      // Backend messages: "Invalid email or password" (401),
+      // "Account is not active" (403), validation errors (400).
       setServerError(
         err.response?.data?.message || "Login failed. Please try again.",
       );
@@ -125,6 +136,7 @@ function Login() {
 
               <form onSubmit={handleSubmit} noValidate>
                 <Stack spacing={2.5}>
+                  {notice && <Alert severity="success">{notice}</Alert>}
                   {serverError && <Alert severity="error">{serverError}</Alert>}
 
                   <TextField
@@ -134,10 +146,12 @@ function Login() {
                     value={form.email}
                     onChange={handleChange}
                     placeholder="Enter email"
+                    inputProps={{ maxLength: EMAIL_MAX }}
                     error={Boolean(errors.email)}
                     helperText={errors.email}
                     autoComplete="email"
                     autoFocus
+                    required
                     fullWidth
                   />
 
@@ -151,13 +165,15 @@ function Login() {
                     error={Boolean(errors.password)}
                     helperText={errors.password}
                     autoComplete="current-password"
+                    required
                     fullWidth
                     InputProps={{
                       endAdornment: (
                         <InputAdornment position="end">
                           <IconButton
-                            aria-label="toggle password visibility"
+                            aria-label={showPassword ? "Hide password" : "Show password"}
                             onClick={() => setShowPassword((s) => !s)}
+                            onMouseDown={(e) => e.preventDefault()}
                             edge="end"
                           >
                             {showPassword ? <VisibilityOff /> : <Visibility />}
@@ -175,7 +191,7 @@ function Login() {
                     disabled={loading}
                     fullWidth
                   >
-                    {loading ? "Signing In..." : "Sign In"}
+                    {loading ? "Signing in..." : "Sign in"}
                   </Button>
                 </Stack>
               </form>
@@ -184,6 +200,7 @@ function Login() {
                 color="text.secondary"
                 sx={{ mt: 3, textAlign: "center" }}
               >
+                Don't have an account?{" "}
                 <Link component={RouterLink} to="/register" fontWeight={600}>
                   Register
                 </Link>

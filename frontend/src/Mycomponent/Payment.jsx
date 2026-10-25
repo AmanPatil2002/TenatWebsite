@@ -31,11 +31,11 @@ export default function Payment() {
   const location = useLocation();
   const template = location.state?.template || null;
 
-  const [siteName, setSiteName] = useState("");
-  const [subdomain, setSubdomain] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(null);
+  const [siteName, setSiteName] = useState(template?.name || "");
+  const [subdomain, setSubdomain] = useState("");
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -62,25 +62,6 @@ export default function Payment() {
       setError("Choose a template before continuing.");
       return;
     }
-
-    const cleanSiteName = siteName.trim();
-    const cleanSubdomain = subdomain.trim().toLowerCase();
-
-    if (!cleanSiteName) {
-      setError("Please enter your website name.");
-      return;
-    }
-
-    if (!cleanSubdomain) {
-      setError("Please enter a subdomain.");
-      return;
-    }
-
-    if (!/^[a-z0-9-]{3,63}$/.test(cleanSubdomain)) {
-      setError("Subdomain must be 3-63 characters and contain only lowercase letters, numbers, or hyphens.");
-      return;
-    }
-
     setLoading(true);
     setError("");
     setSuccess(null);
@@ -91,8 +72,8 @@ export default function Payment() {
         `${API}/payments/checkout`,
         {
           templateId: template.templateId,
-          siteName: cleanSiteName,
-          subdomain: cleanSubdomain,
+          siteName: siteName.trim(),
+          subdomain: subdomain.trim() || null,
         },
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -112,7 +93,7 @@ export default function Payment() {
       <Paper elevation={0} sx={{ border: "1px solid #e5e7eb", borderRadius: 4, overflow: "hidden" }}>
         <Box sx={{ p: { xs: 3, md: 5 }, background: "linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%)" }}>
           <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
-            Checkout
+            Payment
           </Typography>
           <Typography variant="body1" color="text.secondary">
             Complete your purchase and launch your site with the selected template.
@@ -144,9 +125,14 @@ export default function Payment() {
 
                 <Divider sx={{ my: 3 }} />
 
-                <Button variant="contained" onClick={() => navigate("/viewtemp")}>
-                  Back to templates
-                </Button>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+                  <Button variant="contained" onClick={() => navigate(`/mysite/${success.siteId}`)}>
+                    Customize your site
+                  </Button>
+                  <Button variant="outlined" onClick={() => navigate("/mysite")}>
+                    My sites
+                  </Button>
+                </Stack>
               </CardContent>
             </Card>
           ) : (
@@ -202,13 +188,14 @@ export default function Payment() {
                           value={siteName}
                           onChange={(event) => setSiteName(event.target.value)}
                           placeholder="My Portfolio Site"
+                          required
                         />
 
                         <TextField
                           fullWidth
-                          label="Subdomain"
+                          label="Subdomain (optional)"
                           value={subdomain}
-                          onChange={(event) => setSubdomain(event.target.value)}
+                          onChange={(event) => setSubdomain(event.target.value.toLowerCase())}
                           placeholder="myportfolio"
                           helperText="Use only lowercase letters, numbers, and hyphens. Example: myportfolio"
                         />

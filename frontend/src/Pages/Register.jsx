@@ -22,6 +22,14 @@ import VisibilityOff from "@mui/icons-material/VisibilityOff";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
+// Limits mirror the backend (postAuth) and the users table.
+const NAME_MAX = 120;
+const EMAIL_MAX = 190;
+const PHONE_MAX = 10; // backend rejects > 10; the column allows 20, so raise both together
+const PASSWORD_MIN = 6;
+const PASSWORD_MAX = 72; // bcrypt only uses the first 72 bytes
+const EMAIL_RE = /^\S+@\S+\.\S+$/; // same pattern as the backend
+
 const theme = createTheme({
   palette: {
     primary: { main: "#2373F4" },
@@ -36,16 +44,18 @@ const theme = createTheme({
   },
 });
 
+const initialForm = {
+  name: "",
+  email: "",
+  phone: "",
+  password: "",
+  address: "",
+};
+
 function Register() {
   const navigate = useNavigate();
 
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    password: "",
-    address: "",
-  });
+  const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -59,38 +69,35 @@ function Register() {
   };
 
   const validate = () => {
-    const newErrors = {};
+    const next = {};
+    const name = form.name.trim();
+    const email = form.email.trim();
+    const phone = form.phone.trim();
 
-    if (!form.name.trim()) {
-      newErrors.name = "Name is required";
-    }
+    if (!name) next.name = "Name is required";
+    else if (name.length > NAME_MAX)
+      next.name = `Name must be ${NAME_MAX} characters or fewer`;
 
-    if (!form.email.trim()) {
-      newErrors.email = "Email is required";
-    } else if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) {
-      newErrors.email = "Enter a valid email";
-    }
+    if (!email) next.email = "Email is required";
+    else if (email.length > EMAIL_MAX || !EMAIL_RE.test(email))
+      next.email = "Enter a valid email";
 
-    if (form.name.trim().length > 120) {
-      newErrors.name = "Name must be 120 characters or fewer";
-    }
-    if (form.email.trim().length > 190) {
-      newErrors.email = "Email must be 190 characters or fewer";
-    }
-    if (form.phone.trim().length > 10) {
-      newErrors.phone = "Phone must be 10 characters or fewer";
-    }
-    if (form.password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
-    }
+    if (phone.length > PHONE_MAX)
+      next.phone = `Phone must be ${PHONE_MAX} characters or fewer`;
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    if (!form.password) next.password = "Password is required";
+    else if (form.password.length < PASSWORD_MIN)
+      next.password = `Password must be at least ${PASSWORD_MIN} characters`;
+    else if (form.password.length > PASSWORD_MAX)
+      next.password = `Password must be ${PASSWORD_MAX} characters or fewer`;
+
+    setErrors(next);
+    return Object.keys(next).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validate()) return;
+    if (loading || !validate()) return;
 
     setLoading(true);
     setServerError("");
@@ -103,17 +110,37 @@ function Register() {
         address: form.address.trim() || null,
       });
 
-      const { token, user } = data;
+      if (data.verificationRequired) {
+        navigate("/verify-email", {
+          replace: true,
+          state: { email: form.email.trim() },
+        });
+        return;
+      }
 
-      localStorage.setItem("token", token);
-      localStorage.setItem("role", user.role);
-      localStorage.setItem("username", user.name);
-      localStorage.setItem("Id", user.id);
-      navigate("/login", { replace: true });
+      // The API also returns a token, but we send the user to log in
+      // instead of starting a session here.
+      navigate("/login", {
+        replace: true,
+        state: { message: "Account created. Please log in." },
+      });
     } catch (err) {
-      setServerError(
-        err.response?.data?.message || "Register failed. Please try again.",
-      );
+      if (err.response?.data?.verificationRequired) {
+        navigate("/verify-email", {
+          replace: true,
+          state: { email: form.email.trim() },
+        });
+        return;
+      }
+      const message =
+        err.response?.data?.message || "Register failed. Please try again.";
+
+      // Show the duplicate-email error next to the email field.
+      if (err.response?.status === 400 && /email/i.test(message)) {
+        setErrors((prev) => ({ ...prev, email: message }));
+      } else {
+        setServerError(message);
+      }
     } finally {
       setLoading(false);
     }
@@ -152,14 +179,16 @@ function Register() {
                     type="text"
                     value={form.name}
                     onChange={handleChange}
-                    placeholder="Enter Name"
-                    inputProps={{ maxLength: 120 }}
+                    placeholder="Enter name"
+                    inputProps={{ maxLength: NAME_MAX }}
                     error={Boolean(errors.name)}
                     helperText={errors.name}
                     autoComplete="name"
                     autoFocus
+                    required
                     fullWidth
                   />
+
                   <TextField
                     label="Email"
                     name="email"
@@ -167,39 +196,39 @@ function Register() {
                     value={form.email}
                     onChange={handleChange}
                     placeholder="Enter email"
-                    inputProps={{ maxLength: 190 }}
+                    inputProps={{ maxLength: EMAIL_MAX }}
                     error={Boolean(errors.email)}
                     helperText={errors.email}
                     autoComplete="email"
-                    autoFocus
+                    required
                     fullWidth
                   />
+
                   <TextField
                     label="Phone (optional)"
                     name="phone"
-                    type="text"
+                    type="tel"
                     value={form.phone}
                     onChange={handleChange}
-                    placeholder="Enter Phone"
-                    inputProps={{ maxLength: 10 }}
+                    placeholder="Enter phone"
+                    inputProps={{ maxLength: PHONE_MAX, inputMode: "tel" }}
                     error={Boolean(errors.phone)}
                     helperText={errors.phone}
-                    autoComplete="phone"
-                    autoFocus
+                    autoComplete="tel"
                     fullWidth
                   />
+
                   <TextField
                     label="Address (optional)"
                     name="address"
-                    type="text"
                     value={form.address}
                     onChange={handleChange}
-                    placeholder="Enter Address"
+                    placeholder="Enter address"
                     error={Boolean(errors.address)}
                     helperText={errors.address}
-                    autoComplete="address"
-                    rows={3}
-                    autoFocus
+                    autoComplete="street-address"
+                    multiline
+                    minRows={3}
                     fullWidth
                   />
 
@@ -210,16 +239,19 @@ function Register() {
                     value={form.password}
                     onChange={handleChange}
                     placeholder="Enter password"
+                    inputProps={{ maxLength: PASSWORD_MAX }}
                     error={Boolean(errors.password)}
-                    helperText={errors.password}
-                    autoComplete="current-password"
+                    helperText={errors.password || `At least ${PASSWORD_MIN} characters`}
+                    autoComplete="new-password"
+                    required
                     fullWidth
                     InputProps={{
                       endAdornment: (
                         <InputAdornment position="end">
                           <IconButton
-                            aria-label="toggle password visibility"
+                            aria-label={showPassword ? "Hide password" : "Show password"}
                             onClick={() => setShowPassword((s) => !s)}
+                            onMouseDown={(e) => e.preventDefault()}
                             edge="end"
                           >
                             {showPassword ? <VisibilityOff /> : <Visibility />}
@@ -246,8 +278,9 @@ function Register() {
                 color="text.secondary"
                 sx={{ mt: 3, textAlign: "center" }}
               >
+                Already have an account?{" "}
                 <Link component={RouterLink} to="/login" fontWeight={600}>
-                  Login
+                  Log in
                 </Link>
               </Typography>
             </CardContent>

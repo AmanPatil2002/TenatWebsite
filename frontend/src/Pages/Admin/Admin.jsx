@@ -25,8 +25,6 @@ import MenuOpenIcon from "@mui/icons-material/MenuOpen";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import CategoryIcon from "@mui/icons-material/Category";
 import ViewQuiltIcon from "@mui/icons-material/ViewQuilt";
-import PaletteIcon from "@mui/icons-material/Palette";
-import NoteAddIcon from "@mui/icons-material/NoteAdd";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutlined";
 import ContactMailIcon from "@mui/icons-material/ContactMail";
@@ -43,8 +41,6 @@ const menuItems = [
   { text: "Dashboard", icon: <DashboardIcon />, path: "/admin/admindashboard" },
   { text: "Add Category", icon: <CategoryIcon />, path: "/admin/category" },
   { text: "Add Templates", icon: <ViewQuiltIcon />, path: "/admin/templates" },
-  { text: "Add Theme", icon: <PaletteIcon />, path: "/admin/theme" },
-  { text: "Add Pages", icon: <NoteAddIcon />, path: "/admin/pages" },
   { text: "View Project", icon: <FolderOpenIcon />, path: "/admin/projects" },
   { text: "FAQ", icon: <HelpOutlineIcon />, path: "/admin/faq" },
   { text: "Contact", icon: <ContactMailIcon />, path: "/admin/contact" },

@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Box,
+  Button,
   Card,
   CardContent,
   Container,
@@ -17,6 +18,7 @@ import EmailIcon from "@mui/icons-material/EmailOutlined";
 import LocationOnIcon from "@mui/icons-material/LocationOnOutlined";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const CONTACT_URL = `${API_URL}/contact/acontact`;
 
 // One labelled row: soft tinted icon tile + label + value (optionally a link)
 const InfoRow = ({ icon, label, value, href, external }) => (
@@ -67,56 +69,84 @@ const InfoRow = ({ icon, label, value, href, external }) => (
   </Stack>
 );
 
-const ContactCard = ({ contact, index, showIndex }) => (
-  <Card
-    component="article"
-    variant="outlined"
-    sx={{
-      height: "100%",
-      borderRadius: 3,
-      bgcolor: "background.paper",
-      transition: "border-color 0.2s ease, box-shadow 0.2s ease",
-      "&:hover": {
-        borderColor: "primary.main",
-        boxShadow: "0 8px 24px rgba(16, 24, 40, 0.08)",
-      },
-    }}
-  >
-    <CardContent sx={{ p: { xs: 2.5, sm: 3.5 } }}>
-      {showIndex && (
-        <Typography
-          variant="subtitle2"
-          color="text.secondary"
-          sx={{ mb: 2, fontWeight: 600, letterSpacing: 0.3 }}
-        >
-          Contact {String(index + 1).padStart(2, "0")}
-        </Typography>
-      )}
+const ContactCard = ({ contact, index, showIndex }) => {
+  const phone = String(contact.contact ?? "").trim();
+  const email = String(contact.email ?? "").trim();
+  const address = String(contact.address ?? "").trim();
 
-      <Stack spacing={2.5} divider={<Divider flexItem />}>
-        <InfoRow
-          icon={<PhoneIcon />}
-          label="Phone"
-          value={contact.contact}
-          href={`tel:${contact.contact}`}
-        />
-        <InfoRow
-          icon={<EmailIcon />}
-          label="Email"
-          value={contact.email}
-          href={`mailto:${contact.email}`}
-        />
-        <InfoRow
-          icon={<LocationOnIcon />}
-          label="Address"
-          value={contact.address}
-          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(contact.address || "")}`}
-          external
-        />
-      </Stack>
-    </CardContent>
-  </Card>
-);
+  // Build only the rows that have a value
+  const rows = [];
+  if (phone) {
+    rows.push(
+      <InfoRow
+        key="phone"
+        icon={<PhoneIcon />}
+        label="Phone"
+        value={phone}
+        href={`tel:${phone.replace(/[^\d+]/g, "")}`}
+      />,
+    );
+  }
+  if (email) {
+    rows.push(
+      <InfoRow
+        key="email"
+        icon={<EmailIcon />}
+        label="Email"
+        value={email}
+        href={`mailto:${email}`}
+      />,
+    );
+  }
+  if (address) {
+    rows.push(
+      <InfoRow
+        key="address"
+        icon={<LocationOnIcon />}
+        label="Address"
+        value={address}
+        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`}
+        external
+      />,
+    );
+  }
+
+  if (rows.length === 0) return null;
+
+  return (
+    <Card
+      component="article"
+      variant="outlined"
+      sx={{
+        height: "100%",
+        borderRadius: 3,
+        bgcolor: "background.paper",
+        transition: "border-color 0.2s ease, box-shadow 0.2s ease",
+        "&:hover": {
+          borderColor: "primary.main",
+          boxShadow: "0 8px 24px rgba(16, 24, 40, 0.08)",
+        },
+      }}
+    >
+      <CardContent sx={{ p: { xs: 2.5, sm: 3.5 } }}>
+        {showIndex && (
+          <Typography
+            variant="subtitle2"
+            component="h2"
+            color="text.secondary"
+            sx={{ mb: 2, fontWeight: 600, letterSpacing: 0.3 }}
+          >
+            Contact {String(index + 1).padStart(2, "0")}
+          </Typography>
+        )}
+
+        <Stack spacing={2.5} divider={<Divider flexItem />}>
+          {rows}
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+};
 
 const CardSkeleton = () => (
   <Card variant="outlined" sx={{ borderRadius: 3 }}>
@@ -140,17 +170,20 @@ export default function Contact() {
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
 
     (async () => {
       try {
-        const res = await fetch(`${API_URL}/contact/acontact`, {
-          signal: controller.signal,
-        });
-        if (!res.ok) throw new Error("Failed to load contact info");
-        const data = await res.json();
+        setLoading(true);
+        setError("");
+        const res = await fetch(CONTACT_URL, { signal: controller.signal });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+          throw new Error(data?.message || "Failed to load contact info");
+        }
         setContacts(Array.isArray(data) ? data : []);
       } catch (err) {
         if (err.name !== "AbortError") setError(err.message);
@@ -160,7 +193,9 @@ export default function Contact() {
     })();
 
     return () => controller.abort();
-  }, []);
+  }, [reloadKey]);
+
+  const retry = useCallback(() => setReloadKey((k) => k + 1), []);
 
   const single = contacts.length === 1;
 
@@ -203,13 +238,22 @@ export default function Contact() {
 
         {/* ---- States ---- */}
         {error && (
-          <Alert severity="error" sx={{ maxWidth: 560, mx: "auto" }}>
+          <Alert
+            severity="error"
+            sx={{ maxWidth: 560, mx: "auto" }}
+            action={
+              <Button color="inherit" size="small" onClick={retry}>
+                Try again
+              </Button>
+            }
+          >
             {error}
           </Alert>
         )}
 
         {loading && (
           <Box
+            aria-busy="true"
             sx={{
               display: "grid",
               gap: { xs: 2, md: 3 },
@@ -233,7 +277,7 @@ export default function Contact() {
         )}
 
         {/* ---- Cards ---- */}
-        {contacts.length > 0 && (
+        {!loading && contacts.length > 0 && (
           <Box
             sx={{
               display: "grid",
@@ -246,7 +290,7 @@ export default function Contact() {
             }}
           >
             {contacts.map((c, i) => (
-              <ContactCard key={c.contactId} contact={c} index={i} showIndex={!single} />
+              <ContactCard key={c.contactId ?? i} contact={c} index={i} showIndex={!single} />
             ))}
           </Box>
         )}

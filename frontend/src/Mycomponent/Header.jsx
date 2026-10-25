@@ -40,7 +40,7 @@ function Header() {
     localStorage.removeItem("username");
     localStorage.removeItem("role");
     handleCloseUserMenu();
-    navigate("/login");
+    navigate("/");
   };
 
   const isAuthenticated = Boolean(localStorage.getItem("token"));

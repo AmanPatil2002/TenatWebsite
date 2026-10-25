@@ -20,6 +20,8 @@ import Button from "@mui/material/Button";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
+const COLUMNS = ["No.", "Reviewed By", "Rating", "Review", "Created At"];
+
 const formatDate = (d) =>
   d
     ? new Date(d).toLocaleDateString(undefined, {
@@ -29,26 +31,27 @@ const formatDate = (d) =>
       })
     : "-";
 
+const reviewerLabel = (review) =>
+  review.reviewerName || `User #${review.reviewBy}`;
+
+// Fields returned by GET /review:
+// reviewId, reviewBy, reviewerName, description, rating, createdAt
 function filterReviews(reviews, query) {
   const q = query.trim().toLowerCase();
-  return reviews.filter((review) => {
-    if (!q) return true;
-    return [
+  if (!q) return reviews;
+  return reviews.filter((review) =>
+    [
       review.reviewId,
-      review.reviewBy,
-      review.name,
-      review.email,
-      review.templateId,
-      review.siteId,
+      reviewerLabel(review),
       review.description,
       review.rating,
-      review.createdAt,
+      formatDate(review.createdAt),
     ].some((field) =>
       String(field ?? "")
         .toLowerCase()
         .includes(q),
-    );
-  });
+    ),
+  );
 }
 
 export default function ViewReview() {
@@ -60,24 +63,30 @@ export default function ViewReview() {
   const [query, setQuery] = useState("");
 
   useEffect(() => {
+    const controller = new AbortController();
+
     const fetchReviews = async () => {
       try {
-        const token = localStorage.getItem("token");
-        const res = await fetch(`${API_URL}/review/getreview`, {
-          headers: { Authorization: `Bearer ${token}` },
+        // GET /review is public, so no Authorization header is needed.
+        const res = await fetch(`${API_URL}/review`, {
+          signal: controller.signal,
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || "Failed to load reviews");
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+          throw new Error(data?.message || "Failed to load reviews");
+        }
         if (!Array.isArray(data)) throw new Error("Invalid reviews response");
         setReviews(data);
       } catch (err) {
-        setError(err.message);
+        if (err.name === "AbortError") return;
+        setError(err.message || "Failed to load reviews");
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
 
     fetchReviews();
+    return () => controller.abort();
   }, []);
 
   const searching = Boolean(query.trim());
@@ -96,23 +105,22 @@ export default function ViewReview() {
     setPage(0);
   };
 
-  const emptyRows =
-    page > 0
-      ? Math.max(0, (1 + page) * rowsPerPage - filteredReviews.length)
-      : 0;
   const handleChangePage = (event, newPage) => setPage(newPage);
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
 
-  const visibleRows =
-    rowsPerPage > 0
-      ? filteredReviews.slice(
-          page * rowsPerPage,
-          page * rowsPerPage + rowsPerPage,
-        )
-      : filteredReviews;
+  const showAll = rowsPerPage < 1; // "All" option uses -1
+
+  const emptyRows =
+    page > 0 && !showAll
+      ? Math.max(0, (1 + page) * rowsPerPage - filteredReviews.length)
+      : 0;
+
+  const visibleRows = showAll
+    ? filteredReviews
+    : filteredReviews.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   return (
     <Box>
@@ -134,7 +142,7 @@ export default function ViewReview() {
         <TextField
           size="small"
           fullWidth
-          label="Search by user, target, rating or review text"
+          label="Search by reviewer, rating, date or review text"
           value={query}
           onChange={handleSearch}
           sx={{ bgcolor: "background.paper" }}
@@ -152,7 +160,7 @@ export default function ViewReview() {
         )}
       </Stack>
 
-      {!loading && (
+      {!loading && !error && (
         <Stack
           direction="row"
           justifyContent="space-between"
@@ -160,13 +168,13 @@ export default function ViewReview() {
           sx={{ mb: 1 }}
         >
           <Typography variant="body2" color="text.secondary">
-            {filteredReviews.length}{"     "}
+            {filteredReviews.length}{" "}
             {filteredReviews.length === 1 ? "review" : "reviews"}
             {searching ? " match your search" : ""}
           </Typography>
           {averageRating && (
             <Typography variant="body2" color="text.secondary">
-              ||  Average rating: {averageRating} / 5
+              Average rating: {averageRating} / 5
             </Typography>
           )}
         </Stack>
@@ -176,29 +184,24 @@ export default function ViewReview() {
         <Table sx={{ minWidth: 500 }} aria-label="reviews table">
           <TableHead>
             <TableRow sx={{ bgcolor: "primary.main" }}>
-              {["No.", "Reviewed By", "Target", "Rating", "Review", "Created At"].map(
-                (h) => (
-                  <TableCell
-                    key={h}
-                    sx={{ color: "white", fontWeight: "bold" }}
-                  >
-                    {h}
-                  </TableCell>
-                ),
-              )}
+              {COLUMNS.map((h) => (
+                <TableCell key={h} sx={{ color: "white", fontWeight: "bold" }}>
+                  {h}
+                </TableCell>
+              ))}
             </TableRow>
           </TableHead>
 
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 5 }}>
+                <TableCell colSpan={COLUMNS.length} align="center" sx={{ py: 5 }}>
                   <CircularProgress size={28} />
                 </TableCell>
               </TableRow>
             ) : visibleRows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={COLUMNS.length} align="center" sx={{ py: 4 }}>
                   {searching
                     ? "No reviews match your search"
                     : "No reviews found"}
@@ -208,29 +211,27 @@ export default function ViewReview() {
               visibleRows.map((review, index) => (
                 <TableRow key={review.reviewId} hover>
                   <TableCell>
-                    {rowsPerPage > 0 ? page * rowsPerPage + index + 1 : index + 1}
+                    {showAll ? index + 1 : page * rowsPerPage + index + 1}
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" fontWeight="medium">
-                      {review.name || `User #${review.reviewBy}`}
+                      {reviewerLabel(review)}
                     </Typography>
-                    {review.email && (
-                      <Typography variant="caption" color="text.secondary">
-                        {review.email}
-                      </Typography>
-                    )}
                   </TableCell>
                   <TableCell>
-                    {review.templateId
-                      ? `Template #${review.templateId}`
-                      : review.siteId
-                        ? `Site #${review.siteId}`
-                        : "-"}
+                    <Rating
+                      value={Number(review.rating)}
+                      readOnly
+                      size="small"
+                    />
                   </TableCell>
-                  <TableCell>
-                    <Rating value={Number(review.rating)} readOnly size="small" />
-                  </TableCell>
-                  <TableCell sx={{ maxWidth: 360, whiteSpace: "pre-wrap" }}>
+                  <TableCell
+                    sx={{
+                      maxWidth: 360,
+                      whiteSpace: "pre-wrap",
+                      overflowWrap: "anywhere",
+                    }}
+                  >
                     {review.description}
                   </TableCell>
                   <TableCell>{formatDate(review.createdAt)}</TableCell>
@@ -240,7 +241,7 @@ export default function ViewReview() {
 
             {emptyRows > 0 && (
               <TableRow style={{ height: 53 * emptyRows }}>
-                <TableCell colSpan={6} />
+                <TableCell colSpan={COLUMNS.length} />
               </TableRow>
             )}
           </TableBody>
@@ -249,7 +250,7 @@ export default function ViewReview() {
             <TableRow>
               <TablePagination
                 rowsPerPageOptions={[5, 10, 25, { label: "All", value: -1 }]}
-                colSpan={6}
+                colSpan={COLUMNS.length}
                 count={filteredReviews.length}
                 rowsPerPage={rowsPerPage}
                 page={page}
