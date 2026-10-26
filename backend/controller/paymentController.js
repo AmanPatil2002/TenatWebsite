@@ -38,6 +38,9 @@ const checkout = async (req, res) => {
     if (error.message === "Template is no longer available") {
       return res.status(404).json({ message: error.message });
     }
+    if (error.message === "Template already purchased") {
+      return res.status(409).json({ message: "This template has already been purchased by your account." });
+    }
     if (error.message === "User is unavailable") {
       return res.status(403).json({ message: "Account is not active" });
     }

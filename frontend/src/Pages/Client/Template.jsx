@@ -65,9 +65,27 @@ export default function Template() {
   const [content, setContent] = useState({ pages: [], themes: [], menuItems: [] });
   const [detailLoading, setDetailLoading] = useState(false);
   const [tabIndex, setTabIndex] = useState(0);
+  const [purchasedTemplateIds, setPurchasedTemplateIds] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
+    const token = localStorage.getItem("token");
+
+    if (token) {
+      axios
+        .get(`${API}/site`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        .then((response) => {
+          if (!cancelled && Array.isArray(response.data)) {
+            setPurchasedTemplateIds(response.data.map((site) => Number(site.templateId)).filter((id) => Number.isFinite(id)));
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setPurchasedTemplateIds([]);
+        });
+    }
+
     axios
       .get(`${API}/categories`)
       .then((response) => {
@@ -260,10 +278,12 @@ export default function Template() {
                 )}
                 <Button
                   variant="contained"
-                  disabled={detailLoading}
+                  disabled={detailLoading || purchasedTemplateIds.includes(Number(selected.templateId))}
                   onClick={() => navigate("/payment", { state: { template: selected } })}
                 >
-                  Buy for {formatPrice(selected.price, selected.currency)}
+                  {purchasedTemplateIds.includes(Number(selected.templateId))
+                    ? "Already purchased"
+                    : `Buy for ${formatPrice(selected.price, selected.currency)}`}
                 </Button>
               </Stack>
             </DialogTitle>

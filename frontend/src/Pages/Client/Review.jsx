@@ -1,5 +1,6 @@
 import { useEffect, useState,useCallback} from "react";
 import {
+  Alert,
   Box,
   CircularProgress,
   Container,
@@ -28,6 +29,7 @@ const describeTarget = (review) =>
 export default function Review() {
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const authHeaders = () => ({
     "Content-Type": "application/json",
@@ -43,7 +45,7 @@ export default function Review() {
       if (!res.ok) throw new Error(data.message || "Could not load your reviews");
       setReviews(data);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "Could not load your reviews");
     } finally {
       setLoading(false);
     }
@@ -59,6 +61,8 @@ export default function Review() {
       <Typography variant="h6" sx={{ mt: 5, mb: 2 }}>
         My reviews
       </Typography>
+
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
       {loading ? (
         <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>

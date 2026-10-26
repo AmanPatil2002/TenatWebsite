@@ -34,6 +34,7 @@ export default function Payment() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(null);
+  const [templateAlreadyPurchased, setTemplateAlreadyPurchased] = useState(false);
   const [siteName, setSiteName] = useState(template?.name || "");
   const [subdomain, setSubdomain] = useState("");
 
@@ -47,7 +48,23 @@ export default function Payment() {
 
     if (!template) {
       setError("No template selected. Please choose a template before checkout.");
+      return;
     }
+
+    axios
+      .get(`${API}/site`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then((response) => {
+        const alreadyPurchased = Array.isArray(response.data) && response.data.some((site) => Number(site.templateId) === Number(template.templateId));
+        setTemplateAlreadyPurchased(alreadyPurchased);
+        if (alreadyPurchased) {
+          setError("This template has already been purchased by your account.");
+        }
+      })
+      .catch(() => {
+        // Ignore listing errors here; checkout will still validate server-side.
+      });
   }, [navigate, template]);
 
   const totalAmount = useMemo(
@@ -60,6 +77,10 @@ export default function Payment() {
 
     if (!template) {
       setError("Choose a template before continuing.");
+      return;
+    }
+    if (templateAlreadyPurchased) {
+      setError("This template has already been purchased by your account.");
       return;
     }
     setLoading(true);
@@ -204,8 +225,8 @@ export default function Payment() {
                           <Button variant="outlined" onClick={() => navigate("/viewtemp")}>
                             Cancel
                           </Button>
-                          <Button type="submit" variant="contained" disabled={loading || !template}>
-                            {loading ? "Processing..." : "Pay now"}
+                          <Button type="submit" variant="contained" disabled={loading || !template || templateAlreadyPurchased}>
+                            {loading ? "Processing..." : templateAlreadyPurchased ? "Already purchased" : "Pay now"}
                           </Button>
                         </Box>
                       </Stack>

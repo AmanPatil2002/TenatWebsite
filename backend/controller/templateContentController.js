@@ -162,19 +162,36 @@ const updateTemplatePage = async (req, res) => {
   }
 };
 
-const deleteTemplatePage = (req, res) => {
-  db.query(
-    "DELETE FROM templatePages WHERE id = ? AND templateId = ?",
-    [req.params.pageId, req.params.templateId],
-    (err, result) => {
-      if (err) {
-        console.error("deleteTemplatePage error:", err);
-        return res.status(500).json({ message: "Internal server error" });
-      }
-      if (!result.affectedRows) return res.status(404).json({ message: "Template page not found" });
-      res.json({ message: "Template page deleted" });
+const deleteTemplatePage = async (req, res) => {
+  const { templateId, pageId } = req.params;
+  const connection = await db.promise().getConnection();
+  try {
+    await connection.beginTransaction();
+    const [pages] = await connection.execute(
+      "SELECT id FROM templatePages WHERE id = ? AND templateId = ? FOR UPDATE",
+      [pageId, templateId]
+    );
+    if (!pages.length) {
+      await connection.rollback();
+      return res.status(404).json({ message: "Template page not found" });
     }
-  );
+    await connection.execute(
+      "DELETE FROM templatePages WHERE parentId = ? AND templateId = ?",
+      [pageId, templateId]
+    );
+    await connection.execute(
+      "DELETE FROM templatePages WHERE id = ? AND templateId = ?",
+      [pageId, templateId]
+    );
+    await connection.commit();
+    res.json({ message: "Template page deleted" });
+  } catch (error) {
+    await connection.rollback();
+    console.error("deleteTemplatePage error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  } finally {
+    connection.release();
+  }
 };
 
 const listTemplateThemes = (req, res) => {

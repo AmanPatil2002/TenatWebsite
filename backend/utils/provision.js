@@ -23,6 +23,14 @@ const provisionSite = async ({ userId, templateId, siteName, subdomain }) => {
     if (!users.length) throw new Error("User is unavailable");
     const user = users[0];
 
+    const [existingSite] = await connection.execute(
+      `SELECT id FROM sites WHERE userId = ? AND templateId = ? LIMIT 1`,
+      [userId, templateId]
+    );
+    if (existingSite.length) {
+      throw new Error("Template already purchased");
+    }
+
     const transactionId = `MOCK-${crypto.randomBytes(12).toString("hex")}`;
     const [paymentResult] = await connection.execute(
       `INSERT INTO payments

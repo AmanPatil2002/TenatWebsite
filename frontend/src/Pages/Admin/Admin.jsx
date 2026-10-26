@@ -41,7 +41,7 @@ const menuItems = [
   { text: "Dashboard", icon: <DashboardIcon />, path: "/admin/admindashboard" },
   { text: "Add Category", icon: <CategoryIcon />, path: "/admin/category" },
   { text: "Add Templates", icon: <ViewQuiltIcon />, path: "/admin/templates" },
-  { text: "View Project", icon: <FolderOpenIcon />, path: "/admin/projects" },
+  { text: "Projects & Themes", icon: <FolderOpenIcon />, path: "/admin/projects" },
   { text: "FAQ", icon: <HelpOutlineIcon />, path: "/admin/faq" },
   { text: "Contact", icon: <ContactMailIcon />, path: "/admin/contact" },
   { text: "View Users", icon: <PeopleIcon />, path: "/admin/users" },

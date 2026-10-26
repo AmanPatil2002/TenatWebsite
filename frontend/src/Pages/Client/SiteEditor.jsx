@@ -62,6 +62,8 @@ export default function SiteEditor() {
   const [activatingId, setActivatingId] = useState(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const userRole = localStorage.getItem("role") || "client";
+  const canManageSiteAssets = userRole === "admin" || userRole === "superadmin";
 
   const loadSiteData = useCallback(async () => {
     setLoading(true);
@@ -265,52 +267,68 @@ export default function SiteEditor() {
                   ))}
                 </Stack>
               )}
+              {!canManageSiteAssets && (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                  Purchased clients can select and apply an available theme for this site. Theme creation stays with the admin.
+                </Typography>
+              )}
             </Paper>
 
-            <Paper sx={{ p: { xs: 2, md: 3 } }}>
-              <Typography variant="h6" fontWeight={700}>Create a custom theme</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Add a theme configuration and activate it for this site.</Typography>
-              <Box component="form" onSubmit={saveTheme}>
-                <Stack spacing={2}>
-                  <TextField label="Theme name" required value={themeForm.name} onChange={(event) => setThemeForm({ ...themeForm, name: event.target.value })} />
-                  <TextField select label="Theme type" value={themeForm.type} onChange={(event) => setThemeForm({ ...themeForm, type: event.target.value })}>
-                    {["default", "dark", "custom"].map((type) => <MenuItem key={type} value={type}>{type}</MenuItem>)}
-                  </TextField>
-                  <TextField label="Settings (JSON)" multiline minRows={5} value={themeForm.settings} onChange={(event) => setThemeForm({ ...themeForm, settings: event.target.value })} slotProps={{ input: { sx: { fontFamily: "monospace" } } }} />
-                  <Button type="submit" variant="contained" disabled={savingTheme}>{savingTheme ? "Saving…" : "Create and activate theme"}</Button>
-                </Stack>
-              </Box>
-            </Paper>
+            {canManageSiteAssets && (
+              <Paper sx={{ p: { xs: 2, md: 3 } }}>
+                <Typography variant="h6" fontWeight={700}>Create a custom theme</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Add a theme configuration and activate it for this site.</Typography>
+                <Box component="form" onSubmit={saveTheme}>
+                  <Stack spacing={2}>
+                    <TextField label="Theme name" required value={themeForm.name} onChange={(event) => setThemeForm({ ...themeForm, name: event.target.value })} />
+                    <TextField select label="Theme type" value={themeForm.type} onChange={(event) => setThemeForm({ ...themeForm, type: event.target.value })}>
+                      {["default", "dark", "custom"].map((type) => <MenuItem key={type} value={type}>{type}</MenuItem>)}
+                    </TextField>
+                    <TextField label="Settings (JSON)" multiline minRows={5} value={themeForm.settings} onChange={(event) => setThemeForm({ ...themeForm, settings: event.target.value })} slotProps={{ input: { sx: { fontFamily: "monospace" } } }} />
+                    <Button type="submit" variant="contained" disabled={savingTheme}>{savingTheme ? "Saving…" : "Create and activate theme"}</Button>
+                  </Stack>
+                </Box>
+              </Paper>
+            )}
           </Grid>
 
           <Grid size={{ xs: 12, lg: 7 }}>
-            <Paper sx={{ p: { xs: 2, md: 3 }, mb: 3 }}>
-              <Typography variant="h6" fontWeight={700}>{editingPage ? "Edit page" : "Add a page"}</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>New pages are private to this site and do not change the original template.</Typography>
-              <Box component="form" onSubmit={savePage}>
-                <Stack spacing={2}>
-                  <TextField label="Page title" required value={pageForm.title} onChange={(event) => setPageForm({ ...pageForm, title: event.target.value })} />
-                  <TextField label="Slug" required value={pageForm.slug} onChange={(event) => setPageForm({ ...pageForm, slug: event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") })} helperText="Use lowercase letters, numbers, and hyphens." />
-                  {!editingPage && (
-                    <TextField select label="Parent page (optional)" value={pageForm.parentId} onChange={(event) => setPageForm({ ...pageForm, parentId: event.target.value })}>
-                      <MenuItem value="">Top-level page</MenuItem>
-                      {pages.filter((page) => page.recordType === "page").map((page) => <MenuItem key={page.id} value={String(page.id)}>{page.title}</MenuItem>)}
-                    </TextField>
-                  )}
-                  <TextField label="Page type" value={pageForm.pageType} onChange={(event) => setPageForm({ ...pageForm, pageType: event.target.value })} />
-                  <TextField label="Page link (optional)" value={pageForm.pageLink} onChange={(event) => setPageForm({ ...pageForm, pageLink: event.target.value })} />
-                  <TextField label="Content (JSON)" multiline minRows={5} value={pageForm.content} onChange={(event) => setPageForm({ ...pageForm, content: event.target.value })} slotProps={{ input: { sx: { fontFamily: "monospace" } } }} />
-                  <Stack direction="row" alignItems="center" justifyContent="space-between">
-                    <Typography variant="body2">Published</Typography>
-                    <Switch checked={pageForm.isPublished} onChange={(event) => setPageForm({ ...pageForm, isPublished: event.target.checked })} />
+            {canManageSiteAssets ? (
+              <Paper sx={{ p: { xs: 2, md: 3 }, mb: 3 }}>
+                <Typography variant="h6" fontWeight={700}>{editingPage ? "Edit page" : "Add a page"}</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>New pages are private to this site and do not change the original template.</Typography>
+                <Box component="form" onSubmit={savePage}>
+                  <Stack spacing={2}>
+                    <TextField label="Page title" required value={pageForm.title} onChange={(event) => setPageForm({ ...pageForm, title: event.target.value })} />
+                    <TextField label="Slug" required value={pageForm.slug} onChange={(event) => setPageForm({ ...pageForm, slug: event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") })} helperText="Use lowercase letters, numbers, and hyphens." />
+                    {!editingPage && (
+                      <TextField select label="Parent page (optional)" value={pageForm.parentId} onChange={(event) => setPageForm({ ...pageForm, parentId: event.target.value })}>
+                        <MenuItem value="">Top-level page</MenuItem>
+                        {pages.filter((page) => page.recordType === "page").map((page) => <MenuItem key={page.id} value={String(page.id)}>{page.title}</MenuItem>)}
+                      </TextField>
+                    )}
+                    <TextField label="Page type" value={pageForm.pageType} onChange={(event) => setPageForm({ ...pageForm, pageType: event.target.value })} />
+                    <TextField label="Page link (optional)" value={pageForm.pageLink} onChange={(event) => setPageForm({ ...pageForm, pageLink: event.target.value })} />
+                    <TextField label="Content (JSON)" multiline minRows={5} value={pageForm.content} onChange={(event) => setPageForm({ ...pageForm, content: event.target.value })} slotProps={{ input: { sx: { fontFamily: "monospace" } } }} />
+                    <Stack direction="row" alignItems="center" justifyContent="space-between">
+                      <Typography variant="body2">Published</Typography>
+                      <Switch checked={pageForm.isPublished} onChange={(event) => setPageForm({ ...pageForm, isPublished: event.target.checked })} />
+                    </Stack>
+                    <Stack direction="row" spacing={1}>
+                      <Button type="submit" variant="contained" disabled={savingPage}>{savingPage ? "Saving…" : editingPage ? "Save page" : "Add page"}</Button>
+                      {editingPage && <Button onClick={() => { setEditingPage(null); setPageForm(NEW_PAGE); }}>Cancel edit</Button>}
+                    </Stack>
                   </Stack>
-                  <Stack direction="row" spacing={1}>
-                    <Button type="submit" variant="contained" disabled={savingPage}>{savingPage ? "Saving…" : editingPage ? "Save page" : "Add page"}</Button>
-                    {editingPage && <Button onClick={() => { setEditingPage(null); setPageForm(NEW_PAGE); }}>Cancel edit</Button>}
-                  </Stack>
-                </Stack>
-              </Box>
-            </Paper>
+                </Box>
+              </Paper>
+            ) : (
+              <Paper sx={{ p: { xs: 2, md: 3 }, mb: 3 }}>
+                <Typography variant="h6" fontWeight={700}>Site pages</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Purchased clients can select the available page set for this site. New page creation remains admin-managed.
+                </Typography>
+              </Paper>
+            )}
 
             <Paper sx={{ p: { xs: 2, md: 3 } }}>
               <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>Site pages</Typography>
@@ -324,8 +342,12 @@ export default function SiteEditor() {
                       </Box>
                       <Stack direction="row" spacing={1} alignItems="center">
                         <Chip label={page.isPublished ? "Published" : "Draft"} size="small" color={page.isPublished ? "success" : "default"} />
-                        <Button size="small" onClick={() => editPage(page)}>Edit</Button>
-                        <Button size="small" color="error" onClick={() => deletePage(page)}>Delete</Button>
+                        {canManageSiteAssets && (
+                          <>
+                            <Button size="small" onClick={() => editPage(page)}>Edit</Button>
+                            <Button size="small" color="error" onClick={() => deletePage(page)}>Delete</Button>
+                          </>
+                        )}
                       </Stack>
                     </Stack>
                   ))}
