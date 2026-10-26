@@ -243,7 +243,11 @@ export default function Template() {
                             </Typography>
                             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 2 }}>
                               {template.categoryName && <Chip size="small" label={template.categoryName} />}
+                              {template.language && <Chip size="small" variant="outlined" label={template.language} />}
                               {template.validityDays && <Chip size="small" variant="outlined" label={`${template.validityDays} days`} />}
+                              {purchasedTemplateIds.includes(Number(template.templateId)) && (
+                                <Chip size="small" color="success" label="Purchased" />
+                              )}
                             </Stack>
                             <Button variant="text" sx={{ mt: 1, px: 0 }}>View pages, themes & preview</Button>
                           </CardContent>
@@ -307,7 +311,51 @@ export default function Template() {
                         )}
                       </Paper>
                       <Typography variant="h5" fontWeight={700} sx={{ mt: 3 }}>{selected.name}</Typography>
-                      <Typography color="text.secondary" sx={{ mt: 1 }}>{selected.description || selected.shortDescription}</Typography>
+                      {selected.shortDescription && (
+                        <Typography variant="h6" color="text.secondary" sx={{ mt: 1 }}>
+                          {selected.shortDescription}
+                        </Typography>
+                      )}
+                      <Typography color="text.secondary" sx={{ mt: 1, whiteSpace: "pre-wrap" }}>
+                        {selected.description || "Explore the included pages, themes, and preview for this template."}
+                      </Typography>
+                      <Paper variant="outlined" sx={{ p: 2.5, mt: 3 }}>
+                        <Typography variant="h6" fontWeight={700}>Template details</Typography>
+                        <Divider sx={{ my: 1.5 }} />
+                        <Grid container spacing={2}>
+                          {[
+                            ["Category", selected.categoryName || "General"],
+                            ["Language", selected.language || "Not specified"],
+                            ["Access period", selected.validityDays ? `${selected.validityDays} days` : "Not specified"],
+                            ["Domain", selected.domainLink || "Choose your domain after purchase"],
+                            ["Included pages", String(content.pages.length)],
+                            ["Available themes", String(content.themes.length)],
+                          ].map(([label, value]) => (
+                            <Grid size={{ xs: 12, sm: 6 }} key={label}>
+                              <Typography variant="caption" color="text.secondary">{label}</Typography>
+                              <Typography fontWeight={600} sx={{ overflowWrap: "anywhere" }}>{value}</Typography>
+                            </Grid>
+                          ))}
+                          <Grid size={{ xs: 12, sm: 6 }}>
+                            <Typography variant="caption" color="text.secondary">Price</Typography>
+                            <Typography fontWeight={700}>{formatPrice(selected.price, selected.currency)}</Typography>
+                          </Grid>
+                          {selected.domainLink && (
+                            <Grid size={{ xs: 12 }}>
+                              <Button
+                                component="a"
+                                href={selected.domainLink.startsWith("http") ? selected.domainLink : `https://${selected.domainLink}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                size="small"
+                                sx={{ px: 0 }}
+                              >
+                                Visit domain
+                              </Button>
+                            </Grid>
+                          )}
+                        </Grid>
+                      </Paper>
                     </Grid>
                     <Grid size={{ xs: 12, lg: 4 }}>
                       <Paper variant="outlined" sx={{ p: 2.5, mb: 2 }}>

@@ -237,7 +237,10 @@ export default function SiteEditor() {
             <Typography variant="h4" fontWeight={700}>{site?.name || "Manage site"}</Typography>
             <Typography color="text.secondary">Customize the theme and pages for this site.</Typography>
           </Box>
-          <Button variant="outlined" onClick={() => navigate("/mysite")}>Back to my sites</Button>
+          <Stack direction="row" spacing={1}>
+            <Button variant="outlined" onClick={() => navigate(`/mysite/${siteId}/preview`)}>Preview site</Button>
+            <Button variant="outlined" onClick={() => navigate("/mysite")}>Back to my sites</Button>
+          </Stack>
         </Stack>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         {message && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setMessage("")}>{message}</Alert>}

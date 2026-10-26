@@ -25,6 +25,7 @@ import AddFaq from "./Mycomponent/AddFaq";
 import Preview from "./Mycomponent/Preview";
 import TemplateContentEditor from "./Mycomponent/TemplateContentEditor";
 import SiteEditor from "./Pages/Client/SiteEditor";
+import SitePreview from "./Pages/Client/SitePreview";
 
 function App() {
   return (
@@ -43,6 +44,7 @@ function App() {
             <Route path="/preview" element={<Preview/>}/>
             <Route path="/payment" element={<Payment />} />
             <Route path="/mysite" element={<MySite/>} />
+            <Route path="/mysite/:siteId/preview" element={<SitePreview />} />
             <Route path="/mysite/:siteId" element={<SiteEditor />} />
             <Route path="/detail" element={<TempDetail/>}/>
 

@@ -18,6 +18,20 @@ const getReviews = (req, res) => {
   );
 };
 
+const getMyReviews = (req, res) => {
+  db.query(
+    `SELECT reviewId, reviewBy, description, rating, createdAt
+       FROM review
+      WHERE reviewBy = ?
+      ORDER BY createdAt DESC`,
+    [req.user.userId],
+    (err, result) => {
+      if (err) return res.status(500).json({ message: err.message });
+      res.json(result);
+    }
+  );
+};
+
 // Logged-in user adds a review
 const addReview = (req, res) => {
   const description =
@@ -117,4 +131,4 @@ const deleteReview = (req, res) => {
   });
 };
 
-module.exports = { getReviews, addReview, updateReview, deleteReview };
+module.exports = { getReviews, getMyReviews, addReview, updateReview, deleteReview };

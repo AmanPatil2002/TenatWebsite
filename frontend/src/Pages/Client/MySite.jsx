@@ -119,13 +119,22 @@ export default function MySite() {
                           sx={{ alignSelf: "flex-start", textTransform: "capitalize" }}
                         />
                         {site.status === "active" && (
-                          <Button
-                            variant="contained"
-                            onClick={() => navigate(`/mysite/${site.id}`)}
-                            sx={{ alignSelf: "flex-start", mt: 1 }}
-                          >
-                            Manage pages & themes
-                          </Button>
+                          <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: "wrap" }}>
+                            <Button
+                              variant="contained"
+                              onClick={() => navigate(`/mysite/${site.id}`)}
+                              sx={{ alignSelf: "flex-start" }}
+                            >
+                              Manage pages & themes
+                            </Button>
+                            <Button
+                              variant="outlined"
+                              onClick={() => navigate(`/mysite/${site.id}/preview`)}
+                              sx={{ alignSelf: "flex-start" }}
+                            >
+                              View site
+                            </Button>
+                          </Stack>
                         )}
                       </Stack>
                     </CardContent>
