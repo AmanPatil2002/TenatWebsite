@@ -1,13 +1,12 @@
-import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
+
 import {
   Alert,
   Box,
   Button,
   CircularProgress,
+  Divider,
   FormControl,
-  FormHelperText,
-  Grid,
   InputLabel,
   MenuItem,
   Paper,
@@ -17,441 +16,696 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import axios from "axios";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
+import DeleteIcon from "@mui/icons-material/Delete";
+import AddIcon from "@mui/icons-material/Add";
+import RefreshIcon from "@mui/icons-material/Refresh";
 
-const STATUSES = ["draft", "published", "archived"];
-const MAX_URL_LENGTH = 500;
+const API_URL = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
+const TEMPLATES_URL = `${API_URL}/templates`;
+const CATEGORIES_URL = `${API_URL}/categories`;
 
-const getInitialForm = () => ({
-  categoryId: "",
+const EMPTY_FORM = {
   name: "",
-  language: "",
+  categoryId: "",
+  language: "English",
   shortDescription: "",
   description: "",
   thumbnailUrl: "",
-  demoUrl: "",
-  domainLink: "",
+  photos: [],
+  price: "0",
   currency: "INR",
-  price: "",
   validityDays: "365",
   status: "draft",
-});
-
-const isValidUrl = (value) => {
-  try {
-    const u = new URL(value);
-    return u.protocol === "http:" || u.protocol === "https:";
-  } catch {
-    return false;
-  }
 };
 
-const normalizeLanguages = (v) =>
-  v
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .join(", ");
+const authConfig = () => ({
+  headers: {
+    Authorization: `Bearer ${localStorage.getItem("token")}`,
+  },
+});
+
+const getErrorMessage = (error, fallback) =>
+  error.response?.data?.message || error.response?.data?.error || fallback;
+
+function MultiplePhotoUpload({ value, onChange, disabled = false }) {
+  const inputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+
+  const photos = Array.isArray(value) ? value : [];
+
+  const handleFiles = async (event) => {
+    const files = Array.from(event.target.files || []);
+    event.target.value = "";
+
+    if (!files.length) return;
+
+    setError("");
+
+    const imageFiles = files.filter((file) => file.type.startsWith("image/"));
+
+    if (imageFiles.length !== files.length) {
+      setError("Please select image files only.");
+    }
+
+    const validFiles = imageFiles.filter(
+      (file) => file.size <= 5 * 1024 * 1024,
+    );
+
+    if (validFiles.length !== imageFiles.length) {
+      setError("Each image must be 5 MB or smaller.");
+    }
+
+    if (!validFiles.length) return;
+
+    setUploading(true);
+
+    try {
+      const uploadedUrls = [];
+
+      for (const file of validFiles) {
+        const formData = new FormData();
+        formData.append("images", file);
+
+        const response = await axios.post(
+          `${API_URL}/uploads/images`,
+          formData,
+          authConfig(),
+        );
+
+        const data = response.data;
+
+        // Supported example response shapes:
+        // { url: "..." }
+        // { urls: ["...", "..."] }
+        // { images: [{ url: "..." }] }
+        const urls =
+          data?.urls ||
+          data?.images?.map((image) =>
+            typeof image === "string" ? image : image.url,
+          ) ||
+          (data?.url ? [data.url] : []);
+
+        uploadedUrls.push(...urls.filter(Boolean));
+      }
+
+      if (!uploadedUrls.length) {
+        throw new Error("The upload endpoint did not return any image URLs.");
+      }
+
+      onChange([...photos, ...uploadedUrls]);
+    } catch (err) {
+      setError(
+        err.response?.data?.message || err.message || "Image upload failed.",
+      );
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removePhoto = (indexToRemove) => {
+    onChange(photos.filter((_, index) => index !== indexToRemove));
+  };
+
+  return (
+    <Box>
+      <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
+        Template Photos
+      </Typography>
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        hidden
+        onChange={handleFiles}
+      />
+
+      <Paper
+        variant="outlined"
+        sx={{
+          p: 2,
+          borderStyle: "dashed",
+          textAlign: "center",
+          bgcolor: "action.hover",
+        }}
+      >
+        <CloudUploadOutlinedIcon
+          sx={{ fontSize: 36, color: "text.secondary", mb: 1 }}
+        />
+
+        <Typography variant="body2" sx={{ mb: 1 }}>
+          Select multiple images from your computer
+        </Typography>
+
+        <Button
+          variant="outlined"
+          startIcon={
+            uploading ? (
+              <CircularProgress size={16} />
+            ) : (
+              <CloudUploadOutlinedIcon />
+            )
+          }
+          onClick={() => inputRef.current?.click()}
+          disabled={disabled || uploading}
+        >
+          {uploading ? "Uploading..." : "Choose Images"}
+        </Button>
+
+        <Typography
+          variant="caption"
+          display="block"
+          color="text.secondary"
+          sx={{ mt: 1 }}
+        >
+          JPG, PNG, WEBP · Maximum 5 MB per image
+        </Typography>
+      </Paper>
+
+      {error && (
+        <Alert severity="error" sx={{ mt: 1 }}>
+          {error}
+        </Alert>
+      )}
+
+      <Stack direction="row" flexWrap="wrap" gap={1.5} sx={{ mt: 2 }}>
+        {photos.map((photo, index) => (
+          <Box
+            key={`${photo}-${index}`}
+            sx={{
+              width: 100,
+              position: "relative",
+              border: 1,
+              borderColor: "divider",
+              borderRadius: 1.5,
+              overflow: "hidden",
+            }}
+          >
+            <Box
+              component="img"
+              src={photo}
+              alt={`Template photo ${index + 1}`}
+              sx={{
+                display: "block",
+                width: "100%",
+                height: 80,
+                objectFit: "cover",
+              }}
+              onError={(event) => {
+                event.currentTarget.style.opacity = "0.3";
+              }}
+            />
+
+            <Typography
+              variant="caption"
+              display="block"
+              noWrap
+              sx={{ px: 0.75, py: 0.5 }}
+            >
+              Image {index + 1}
+            </Typography>
+
+            <Button
+              aria-label={`Remove image ${index + 1}`}
+              title="Remove image"
+              size="small"
+              color="error"
+              onClick={() => removePhoto(index)}
+              disabled={disabled || uploading}
+              sx={{
+                position: "absolute",
+                top: 2,
+                right: 2,
+                minWidth: 0,
+                width: 26,
+                height: 26,
+                p: 0,
+                bgcolor: "background.paper",
+              }}
+            >
+              <DeleteIcon fontSize="small" />
+            </Button>
+          </Box>
+        ))}
+      </Stack>
+
+      <Typography variant="caption" color="text.secondary">
+        {photos.length} image{photos.length === 1 ? "" : "s"} selected
+      </Typography>
+    </Box>
+  );
+}
+
+function TemplateForm({
+  initialValues,
+  categories,
+  submitting,
+  onSubmit,
+  onCancel,
+}) {
+  const [form, setForm] = useState({
+    ...EMPTY_FORM,
+    ...initialValues,
+    photos: Array.isArray(initialValues?.photos) ? initialValues.photos : [],
+  });
+  const [photosError, setPhotosError] = useState("");
+
+  useEffect(() => {
+    setForm({
+      ...EMPTY_FORM,
+      ...initialValues,
+      photos: Array.isArray(initialValues?.photos) ? initialValues.photos : [],
+    });
+  }, [initialValues]);
+
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setForm((previous) => ({ ...previous, [name]: value }));
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    setPhotosError("");
+
+    if (!form.name.trim()) return;
+    if (!form.categoryId) return;
+
+    let photos = [];
+
+    if (form.photos.trim()) {
+      try {
+        const parsed = JSON.parse(form.photos);
+        if (!Array.isArray(parsed)) {
+          throw new Error("Photos must be a JSON array.");
+        }
+        photos = parsed;
+      } catch {
+        setPhotosError(
+          'Enter photos as a valid JSON array, for example: ["https://example.com/photo.jpg"]',
+        );
+        return;
+      }
+    }
+
+    onSubmit({
+      ...form,
+      name: form.name.trim(),
+      categoryId: Number(form.categoryId),
+      shortDescription: form.shortDescription.trim(),
+      description: form.description,
+      thumbnailUrl: form.thumbnailUrl.trim(),
+      photos: form.photos,
+      price: Number(form.price || 0),
+      validityDays: Number(form.validityDays || 365),
+    });
+  };
+
+  return (
+    <Box component="form" onSubmit={handleSubmit} noValidate>
+      <Stack spacing={2.5}>
+        <TextField
+          required
+          fullWidth
+          label="Template name"
+          name="name"
+          value={form.name}
+          onChange={handleChange}
+        />
+
+        <FormControl fullWidth required>
+          <InputLabel id="category-label">Category</InputLabel>
+          <Select
+            labelId="category-label"
+            label="Category"
+            name="categoryId"
+            value={form.categoryId === "" ? "" : String(form.categoryId)}
+            onChange={handleChange}
+          >
+            {categories.map((category) => (
+              <MenuItem
+                key={category.categoryId}
+                value={String(category.categoryId)}
+              >
+                {category.name}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        <TextField
+          fullWidth
+          label="Language"
+          name="language"
+          value={form.language}
+          onChange={handleChange}
+        />
+
+        <TextField
+          fullWidth
+          label="Short description"
+          name="shortDescription"
+          value={form.shortDescription}
+          onChange={handleChange}
+          inputProps={{ maxLength: 500 }}
+        />
+
+        {/* Regular multiline description field — no CKEditor */}
+        <TextField
+          fullWidth
+          multiline
+          minRows={6}
+          label="Description"
+          name="description"
+          value={form.description}
+          onChange={handleChange}
+          placeholder="Enter the template description..."
+          helperText="Plain text description."
+        />
+
+        <TextField
+          fullWidth
+          label="Thumbnail URL"
+          name="thumbnailUrl"
+          value={form.thumbnailUrl}
+          onChange={handleChange}
+          placeholder="https://example.com/thumbnail.jpg"
+        />
+
+        <MultiplePhotoUpload
+          value={form.photos}
+          onChange={(photos) =>
+            setForm((previous) => ({ ...previous, photos }))
+          }
+          disabled={submitting}
+        />
+
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+          <TextField
+            fullWidth
+            type="number"
+            label="Price"
+            name="price"
+            value={form.price}
+            onChange={handleChange}
+            inputProps={{ min: 0, step: "0.01" }}
+          />
+
+          <TextField
+            fullWidth
+            label="Currency"
+            name="currency"
+            value={form.currency}
+            onChange={handleChange}
+          />
+
+          <TextField
+            fullWidth
+            type="number"
+            label="Validity (days)"
+            name="validityDays"
+            value={form.validityDays}
+            onChange={handleChange}
+            inputProps={{ min: 1, step: 1 }}
+          />
+        </Stack>
+
+        <FormControl fullWidth>
+          <InputLabel id="status-label">Status</InputLabel>
+          <Select
+            labelId="status-label"
+            label="Status"
+            name="status"
+            value={form.status}
+            onChange={handleChange}
+          >
+            <MenuItem value="draft">Draft</MenuItem>
+            <MenuItem value="published">Published</MenuItem>
+            <MenuItem value="inactive">Inactive</MenuItem>
+          </Select>
+        </FormControl>
+
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+          <Button
+            type="submit"
+            variant="contained"
+            startIcon={<AddIcon />}
+            disabled={submitting}
+          >
+            {submitting ? "Saving..." : "Save template"}
+          </Button>
+
+          {onCancel && (
+            <Button
+              type="button"
+              variant="outlined"
+              onClick={onCancel}
+              disabled={submitting}
+            >
+              Cancel
+            </Button>
+          )}
+        </Stack>
+      </Stack>
+    </Box>
+  );
+}
 
 export default function AddTemplate() {
-  const navigate = useNavigate();
-  const { templateId } = useParams();
-  const [formData, setFormData] = useState(getInitialForm);
   const [categories, setCategories] = useState([]);
-  const [loadingCategories, setLoadingCategories] = useState(true);
-  const [loadingTemplate, setLoadingTemplate] = useState(Boolean(templateId));
+  const [templates, setTemplates] = useState([]);
+  const [editingId, setEditingId] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [errors, setErrors] = useState({});
   const [snack, setSnack] = useState({
     open: false,
     message: "",
     severity: "success",
   });
 
-  const showSnack = (message, severity = "success") =>
+  const showSnack = (message, severity = "success") => {
     setSnack({ open: true, message, severity });
-
-  useEffect(() => {
-    let cancelled = false;
-    const token = localStorage.getItem("token");
-    Promise.all([
-      axios.get(`${API_URL}/categories`),
-      templateId
-        ? axios.get(`${API_URL}/templates/admin/${templateId}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          })
-        : Promise.resolve(null),
-    ])
-      .then(([categoryResponse, templateResponse]) => {
-        if (cancelled) return;
-        setCategories(Array.isArray(categoryResponse.data) ? categoryResponse.data : []);
-        if (templateId) {
-          const existing = templateResponse?.data;
-          if (!existing) {
-            showSnack("Template not found.", "error");
-          } else {
-            setFormData({
-              categoryId: String(existing.categoryId),
-              name: existing.name || "",
-              language: existing.language || "",
-              shortDescription: existing.shortDescription || "",
-              description: existing.description || "",
-              thumbnailUrl: existing.thumbnailUrl || "",
-              demoUrl: existing.demoUrl || "",
-              domainLink: existing.domainLink || "",
-              currency: existing.currency || "INR",
-              price: String(existing.price ?? ""),
-              validityDays: String(existing.validityDays || 365),
-              status: existing.status || "draft",
-            });
-          }
-        }
-      })
-      .catch((error) => {
-        if (!cancelled) showSnack(error.response?.data?.message || "Could not load template form data.", "error");
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoadingCategories(false);
-          setLoadingTemplate(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [templateId]);
-
-  const validate = () => {
-    const errs = {};
-    const f = formData;
-    const name = f.name.trim();
-    const language = normalizeLanguages(f.language);
-    const short = f.shortDescription.trim();
-    const desc = f.description.trim();
-    const thumbnailUrl = f.thumbnailUrl.trim();
-    const demoUrl = f.demoUrl.trim();
-    const domainLink = f.domainLink.trim();
-
-    if (!f.categoryId) errs.categoryId = "Select a category";
-
-    if (!name) errs.name = "Name is required";
-    else if (name.length > 150)
-      errs.name = "Name must be 150 characters or fewer";
-
-    if (short.length > 300)
-      errs.shortDescription = "Short description must be 300 characters or fewer";
-
-    if (thumbnailUrl && !isValidUrl(thumbnailUrl))
-      errs.thumbnailUrl = "Enter a valid URL starting with http:// or https://";
-    else if (thumbnailUrl && thumbnailUrl.length > MAX_URL_LENGTH)
-      errs.thumbnailUrl = `URL must be ${MAX_URL_LENGTH} characters or fewer`;
-
-    if (demoUrl && !isValidUrl(demoUrl))
-      errs.demoUrl = "Enter a valid URL starting with http:// or https://";
-    else if (demoUrl && demoUrl.length > MAX_URL_LENGTH)
-      errs.demoUrl = `URL must be ${MAX_URL_LENGTH} characters or fewer`;
-    if (f.status === "published" && !demoUrl)
-      errs.demoUrl = "A demo URL is required to publish a template";
-
-    if (!/^[A-Za-z]{3}$/.test(f.currency.trim()))
-      errs.currency = "Enter a 3-letter currency code";
-
-    if (domainLink && domainLink.length > 255)
-      errs.domainLink = "Domain link must be 255 characters or fewer";
-
-    const price = Number(f.price);
-    if (f.price === "" || Number.isNaN(price)) errs.price = "Enter a price";
-    else if (price <= 0) errs.price = "Price must be greater than 0";
-    else if (!/^\d+(\.\d{1,2})?$/.test(String(f.price).trim()))
-      errs.price = "Use at most 2 decimal places";
-
-    const days = Number(f.validityDays);
-    if (!Number.isInteger(days) || days < 1 || days > 3650)
-      errs.validityDays = "Enter a whole number of days from 1 to 3650";
-
-    if (!STATUSES.includes(f.status)) errs.status = "Select a status";
-
-    setErrors(errs);
-    return Object.keys(errs).length === 0;
   };
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    setErrors((prev) => ({ ...prev, [name]: undefined }));
-  };
-
-  const resetForm = () => {
-    setFormData(getInitialForm());
-    setErrors({});
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (submitting) return;
-    if (!validate()) return;
-
-    const token = localStorage.getItem("token");
-    if (!token) {
-      showSnack("You are not logged in. Please log in and try again.", "error");
-      return;
-    }
-
-    const payload = {
-      categoryId: formData.categoryId,
-      name: formData.name.trim(),
-      language: normalizeLanguages(formData.language) || null,
-      shortDescription: formData.shortDescription.trim() || null,
-      description: formData.description.trim() || null,
-      thumbnailUrl: formData.thumbnailUrl.trim() || null,
-      demoUrl: formData.demoUrl.trim() || null,
-      domainLink: formData.domainLink.trim() || null,
-      price: Number(formData.price),
-      currency: formData.currency.trim().toUpperCase(),
-      validityDays: Number(formData.validityDays),
-      status: formData.status,
-    };
+  const fetchData = useCallback(async () => {
+    setLoading(true);
 
     try {
-      setSubmitting(true);
-      const response = templateId
-        ? await axios.put(`${API_URL}/templates/${templateId}`, payload, {
-            headers: { Authorization: `Bearer ${token}` },
-          })
-        : await axios.post(`${API_URL}/templates`, payload, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-      const savedTemplateId = templateId || response.data.templateId;
-      showSnack(templateId ? "Template updated successfully!" : "Template added successfully!");
-      navigate(`/admin/templates/${savedTemplateId}/content`);
-    } catch (error) {
-      const code = error.response?.status;
-      let message = error.response?.data?.message;
+      const [categoryResponse, templateResponse] = await Promise.all([
+        axios.get(CATEGORIES_URL, authConfig()),
+        axios.get(`${TEMPLATES_URL}/admin/all?limit=100`, authConfig()),
+      ]);
 
-      if (!error.response) {
-        message = "Cannot reach the server. Check your connection.";
-      } else if (code === 401) {
-        message = "Your session has expired. Please log in again.";
-      } else if (code === 403) {
-        message = "You don't have permission to add templates.";
-      } else if (!message) {
-        message = "Failed to add template. Please try again.";
+      const categoryData = categoryResponse.data;
+      const templateData = templateResponse.data;
+
+      setCategories(
+        Array.isArray(categoryData)
+          ? categoryData
+          : categoryData?.categories || categoryData?.data || [],
+      );
+
+      setTemplates(
+        Array.isArray(templateData)
+          ? templateData
+          : templateData?.templates || templateData?.data || [],
+      );
+    } catch (error) {
+      showSnack(
+        getErrorMessage(error, "Could not load templates or categories."),
+        "error",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const handleSave = async (values) => {
+    setSubmitting(true);
+
+    try {
+      if (editingId !== null) {
+        await axios.put(`${TEMPLATES_URL}/${editingId}`, values, authConfig());
+        showSnack("Template updated successfully.");
+      } else {
+        await axios.post(TEMPLATES_URL, values, authConfig());
+        showSnack("Template added successfully.");
       }
 
-      showSnack(message, "error");
+      setEditingId(null);
+      await fetchData();
+    } catch (error) {
+      showSnack(
+        getErrorMessage(error, "Could not save the template."),
+        "error",
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
-  const textField = (name, label, extra = {}) => (
-    <TextField
-      fullWidth
-      size="small"
-      id={name}
-      name={name}
-      label={label}
-      value={formData[name]}
-      onChange={handleChange}
-      error={!!errors[name]}
-      helperText={errors[name] || extra.helper}
-      {...extra.props}
-    />
-  );
+  const handleDelete = async (template) => {
+    if (!window.confirm(`Delete template "${template.name}"?`)) return;
+
+    try {
+      await axios.delete(
+        `${TEMPLATES_URL}/${template.templateId}`,
+        authConfig(),
+      );
+      showSnack("Template deleted.");
+      await fetchData();
+    } catch (error) {
+      showSnack(
+        getErrorMessage(error, "Could not delete the template."),
+        "error",
+      );
+    }
+  };
+
+  const editingTemplate =
+    templates.find((item) => item.templateId === editingId) || null;
+
+  const initialValues = editingTemplate
+    ? {
+        ...EMPTY_FORM,
+        ...editingTemplate,
+        categoryId: editingTemplate.categoryId ?? "",
+        photos: Array.isArray(editingTemplate.photos)
+          ? editingTemplate.photos
+          : (() => {
+              try {
+                const parsed = JSON.parse(editingTemplate.photos || "[]");
+                return Array.isArray(parsed) ? parsed : [];
+              } catch {
+                return [];
+              }
+            })(),
+        price: String(editingTemplate.price ?? 0),
+        validityDays: String(editingTemplate.validityDays ?? 365),
+      }
+    : EMPTY_FORM;
 
   return (
-    <Box
-      sx={{
-        p: { xs: 1.5, sm: 2, md: 3 },
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "flex-start",
-      }}
-    >
-      <Paper
-        elevation={1}
-        sx={{ width: "100%", maxWidth: 820, p: { xs: 2, sm: 3 } }}
+    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1200, mx: "auto" }}>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        justifyContent="space-between"
+        alignItems={{ xs: "stretch", sm: "center" }}
+        spacing={2}
+        sx={{ mb: 3 }}
       >
-        <Typography
-          variant="h5"
-          sx={{
-            fontWeight: "bold",
-            mb: 0.5,
-            fontSize: { xs: "1.2rem", sm: "1.5rem" },
-          }}
-        >
-          {templateId ? "Edit template" : "Add template"}
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          {templateId
-            ? "Update the catalog details, then manage the pages and themes included in this template."
-            : "Add the catalog details first. You can add its themes and pages immediately after saving."}
-        </Typography>
-
-        <Box component="form" onSubmit={handleSubmit} noValidate>
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <FormControl fullWidth size="small" error={!!errors.categoryId}>
-                <InputLabel id="categoryId-label">Category</InputLabel>
-                <Select
-                  labelId="categoryId-label"
-                  id="categoryId"
-                  name="categoryId"
-                  label="Category"
-                  value={formData.categoryId}
-                  onChange={handleChange}
-                  disabled={loadingCategories || loadingTemplate}
-                  endAdornment={
-                    loadingCategories ? (
-                      <CircularProgress size={16} sx={{ mr: 3 }} />
-                    ) : null
-                  }
-                >
-                  {categories.map((c) => (
-                    <MenuItem key={c.categoryId} value={String(c.categoryId)}>
-                      {c.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-                {errors.categoryId && (
-                  <FormHelperText>{errors.categoryId}</FormHelperText>
-                )}
-              </FormControl>
-            </Grid>
-
-            <Grid size={{ xs: 12, sm: 6 }}>
-              {textField("name", "Template name")}
-            </Grid>
-
-            <Grid size={12}>
-              {textField("language", "Languages / frameworks", {
-                helper: "Comma separated, e.g. React, Node.js, MySQL",
-              })}
-            </Grid>
-
-            <Grid size={12}>
-              {textField("shortDescription", "Short description", {
-                props: { multiline: true, rows: 2 },
-                helper: `${formData.shortDescription.trim().length}/300`,
-              })}
-            </Grid>
-
-            <Grid size={12}>
-              {textField("description", "Full description", {
-                props: { multiline: true, rows: 5 },
-                helper: `${formData.description.trim().length}/2000`,
-              })}
-            </Grid>
-
-            <Grid size={{ xs: 12, sm: 6 }}>
-              {textField("thumbnailUrl", "Thumbnail URL", {
-                helper: "Optional image URL (maximum 500 characters).",
-              })}
-            </Grid>
-
-            <Grid size={{ xs: 12, sm: 6 }}>
-              {textField("demoUrl", "Demo URL", {
-                helper: "Required when publishing; maximum 500 characters.",
-              })}
-            </Grid>
-
-            <Grid size={{ xs: 12, sm: 6 }}>
-              {textField("domainLink", "Domain link (optional)", {
-                helper: "Optional domain associated with this template.",
-              })}
-            </Grid>
-
-            <Grid size={{ xs: 12, sm: 6 }}>
-              {textField("currency", "Currency", {
-                helper: "Three-letter code, e.g. INR or USD.",
-              })}
-            </Grid>
-
-            <Grid size={{ xs: 12, sm: 6 }}>
-              {textField("price", `Price (${formData.currency || "currency"})`, {
-                props: {
-                  type: "number",
-                  slotProps: { htmlInput: { min: 0, step: "0.01" } },
-                },
-              })}
-            </Grid>
-
-            <Grid size={{ xs: 12, sm: 6 }}>
-              {textField("validityDays", "Validity (days)", {
-                props: {
-                  type: "number",
-                  slotProps: { htmlInput: { min: 1, step: 1 } },
-                },
-              })}
-            </Grid>
-
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <FormControl fullWidth size="small" error={!!errors.status}>
-                <InputLabel id="status-label">Status</InputLabel>
-                <Select
-                  labelId="status-label"
-                  id="status"
-                  name="status"
-                  label="Status"
-                  value={formData.status}
-                  onChange={handleChange}
-                  sx={{ "& .MuiSelect-select": { textTransform: "capitalize" } }}
-                >
-                  {STATUSES.map((s) => (
-                    <MenuItem
-                      key={s}
-                      value={s}
-                      sx={{ textTransform: "capitalize" }}
-                    >
-                      {s}
-                    </MenuItem>
-                  ))}
-                </Select>
-                {errors.status && (
-                  <FormHelperText>{errors.status}</FormHelperText>
-                )}
-              </FormControl>
-            </Grid>
-
-            <Grid size={12}>
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-                <Button
-                  type="submit"
-                  variant="contained"
-                  fullWidth
-                  disabled={submitting}
-                  sx={{ py: 1.25, fontSize: "0.95rem", fontWeight: "bold" }}
-                >
-                  {submitting ? "Saving…" : templateId ? "Save template and manage content" : "Create template and add content"}
-                </Button>
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  disabled={submitting}
-                  onClick={() => templateId ? navigate("/admin/projects") : resetForm()}
-                  sx={{ py: 1.25, fontSize: "0.95rem" }}
-                >
-                  {templateId ? "Cancel" : "Clear form"}
-                </Button>
-              </Stack>
-            </Grid>
-          </Grid>
+        <Box>
+          <Typography variant="h4" fontWeight={700}>
+            Template Management
+          </Typography>
+          <Typography color="text.secondary">
+            Create, update and manage website templates.
+          </Typography>
         </Box>
+
+        <Button
+          variant="outlined"
+          startIcon={<RefreshIcon />}
+          onClick={fetchData}
+          disabled={loading}
+        >
+          Refresh
+        </Button>
+      </Stack>
+
+      <Paper elevation={2} sx={{ p: { xs: 2, md: 3 }, mb: 4 }}>
+        <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
+          {editingTemplate ? "Edit Template" : "Add Template"}
+        </Typography>
+
+        <Divider sx={{ mb: 3 }} />
+
+        {loading && categories.length === 0 ? (
+          <CircularProgress />
+        ) : (
+          <TemplateForm
+            key={editingId ?? "new-template"}
+            initialValues={initialValues}
+            categories={categories}
+            submitting={submitting}
+            onSubmit={handleSave}
+            onCancel={editingTemplate ? () => setEditingId(null) : undefined}
+          />
+        )}
+      </Paper>
+
+      <Paper elevation={2} sx={{ p: { xs: 2, md: 3 } }}>
+        <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
+          Existing Templates ({templates.length})
+        </Typography>
+
+        {loading ? (
+          <CircularProgress />
+        ) : templates.length === 0 ? (
+          <Typography color="text.secondary">No templates found.</Typography>
+        ) : (
+          <Stack spacing={1.5}>
+            {templates.map((template) => (
+              <Paper
+                key={template.templateId}
+                variant="outlined"
+                sx={{
+                  p: 2,
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 2,
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <Box sx={{ flex: 1, minWidth: 200 }}>
+                  <Typography fontWeight={700}>{template.name}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {template.categoryName || "Uncategorized"} ·{" "}
+                    {template.status || "draft"}
+                  </Typography>
+                </Box>
+
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => setEditingId(template.templateId)}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    size="small"
+                    color="error"
+                    variant="outlined"
+                    onClick={() => handleDelete(template)}
+                  >
+                    Delete
+                  </Button>
+                </Stack>
+              </Paper>
+            ))}
+          </Stack>
+        )}
       </Paper>
 
       <Snackbar
         open={snack.open}
         autoHideDuration={4000}
-        onClose={() => setSnack((s) => ({ ...s, open: false }))}
+        onClose={() => setSnack((previous) => ({ ...previous, open: false }))}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
         <Alert
-          onClose={() => setSnack((s) => ({ ...s, open: false }))}
           severity={snack.severity}
           variant="filled"
-          sx={{ width: "100%" }}
+          onClose={() => setSnack((previous) => ({ ...previous, open: false }))}
         >
           {snack.message}
         </Alert>

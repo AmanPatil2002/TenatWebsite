@@ -11,7 +11,7 @@ export default function Hero() {
           Professionally designed HTML templates, ready to customize, and built to grow with you.
           Browse templates made by Webflow's community of creators.
         </Typography>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="center">
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ justifyContent: 'center' }}>
           <Button variant="contained" size="large">Browse Templates</Button>
           <Button variant="outlined" size="large">Become a Creator</Button>
         </Stack>

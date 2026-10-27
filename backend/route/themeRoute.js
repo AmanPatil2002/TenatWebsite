@@ -1,20 +1,18 @@
 const express = require("express");
 const router = express.Router();
 const authenticateToken = require("../middleware/authenticate");
-const requireSiteAccess = require("../middleware/siteAccess");
+
 const { requirePlatformAdmin } = require("../middleware/siteAccess");
 const {
   listThemes,
   createTheme,
   updateTheme,
-  activateTheme,
   deleteTheme,
 } = require("../controller/themeController");
 
-router.get("/:siteId/themes", authenticateToken, requireSiteAccess, listThemes);
-router.post("/:siteId/themes", authenticateToken, requireSiteAccess, requirePlatformAdmin, createTheme);
-router.put("/:siteId/themes/:themeId", authenticateToken, requireSiteAccess, requirePlatformAdmin, updateTheme);
-router.patch("/:siteId/themes/:themeId/activate", authenticateToken, requireSiteAccess, activateTheme);
-router.delete("/:siteId/themes/:themeId", authenticateToken, requireSiteAccess, requirePlatformAdmin, deleteTheme);
+router.get("/", authenticateToken, listThemes);
+router.post("/", authenticateToken, requirePlatformAdmin, createTheme);
+router.put("/:themeId", authenticateToken, requirePlatformAdmin, updateTheme);
+router.delete("/:themeId", authenticateToken, requirePlatformAdmin, deleteTheme);
 
 module.exports = router;

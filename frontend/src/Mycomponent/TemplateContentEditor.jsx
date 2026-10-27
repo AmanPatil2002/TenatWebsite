@@ -455,16 +455,22 @@ export default function TemplateContentEditor() {
                     </MenuItem>
                   ))}
                 </TextField>
-                <TextField
-                  label="Theme settings (JSON)"
-                  multiline
-                  minRows={6}
-                  value={themeForm.settings}
-                  onChange={(event) =>
-                    setThemeForm({ ...themeForm, settings: event.target.value })
-                  }
-                  slotProps={{ input: { sx: { fontFamily: "monospace" } } }}
-                />
+                
+                    <TextField
+                      label="Theme settings (JSON)"
+                      multiline
+                      minRows={6}
+                      value={themeForm.settings}
+                      onChange={(event) =>
+                        setThemeForm({
+                          ...themeForm,
+                          settings: event.target.value,
+                        })
+                      }
+                      slotProps={{ input: { sx: { fontFamily: "monospace" } } }}
+                    />
+                 
+                  
                 <FormControlLabel
                   control={
                     <Switch
@@ -529,9 +535,12 @@ export default function TemplateContentEditor() {
                           <Chip size="small" color="primary" label="Default" />
                         )}
                       </Stack>
-                      <Typography variant="body2" color="text.secondary">
+                      <Box sx={theme.settings}>
+                        <Typography variant="body2" sx={theme.settings}>
                         {theme.type}
                       </Typography>
+                      </Box>
+                    
                     </Box>
                     <Stack direction="row">
                       <Button

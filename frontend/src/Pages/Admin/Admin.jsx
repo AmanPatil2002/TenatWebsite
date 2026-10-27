@@ -40,6 +40,8 @@ const MINI_WIDTH = 72;
 const menuItems = [
   { text: "Dashboard", icon: <DashboardIcon />, path: "/admin/admindashboard" },
   { text: "Add Category", icon: <CategoryIcon />, path: "/admin/category" },
+  { text: "Add Theme", icon: <ViewQuiltIcon />, path: "/admin/theme" },
+  { text: "Add Pages", icon: <ViewQuiltIcon />, path: "/admin/page" },
   { text: "Add Templates", icon: <ViewQuiltIcon />, path: "/admin/templates" },
   { text: "Projects & Themes", icon: <FolderOpenIcon />, path: "/admin/projects" },
   { text: "FAQ", icon: <HelpOutlineIcon />, path: "/admin/faq" },

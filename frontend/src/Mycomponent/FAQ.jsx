@@ -32,7 +32,7 @@ export default function FAQ() {
 
   return (
     <Container maxWidth="md" sx={{ py: { xs: 8, md: 10 } }}>
-      <Typography variant="h2" textAlign="center" gutterBottom>
+      <Typography variant="h2" sx={{ textAlign: 'center' }} gutterBottom>
         Frequently asked questions
       </Typography>
 

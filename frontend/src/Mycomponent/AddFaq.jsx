@@ -284,8 +284,7 @@ export default function AddFaq() {
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell>Question</TableCell>
-                      <TableCell>Answer</TableCell>
+                      <TableCell >Question & Answer</TableCell>
                       <TableCell align="right">Actions</TableCell>
                     </TableRow>
                   </TableHead>
@@ -293,22 +292,13 @@ export default function AddFaq() {
                     {faqs.map((f) => (
                       <TableRow key={f.faqId} hover selected={editingId === f.faqId}>
                         <TableCell sx={{ maxWidth: 220, verticalAlign: "top" }}>
-                          {f.question}
+                          <Stack>
+                            <Typography variant="body1"><b>Question :</b> {f.question}</Typography>
+                            <Typography variant="body1"><b>Answer : </b> {f.answer}</Typography>
+                          </Stack>
+                          
                         </TableCell>
-                        <TableCell sx={{ maxWidth: 280, verticalAlign: "top" }}>
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                            sx={{
-                              display: "-webkit-box",
-                              WebkitLineClamp: 3,
-                              WebkitBoxOrient: "vertical",
-                              overflow: "hidden",
-                            }}
-                          >
-                            {f.answer}
-                          </Typography>
-                        </TableCell>
+                        
                         <TableCell align="right" sx={{ whiteSpace: "nowrap", verticalAlign: "top" }}>
                           <Tooltip title="Edit">
                             <span>

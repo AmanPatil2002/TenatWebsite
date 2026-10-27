@@ -1,6 +1,9 @@
 const express = require("express");
 const router = express.Router();
 
+const authenticateToken = require("../middleware/authenticate");
+const { requirePlatformAdmin } = require("../middleware/siteAccess");
+
 const {
   getTemplates,
   getTemplate,
@@ -8,8 +11,7 @@ const {
   updateTemplate,
   deleteTemplate,
 } = require("../controller/templateController");
-const authenticateToken = require("../middleware/authenticate");
-const { requirePlatformAdmin } = require("../middleware/siteAccess");
+
 const {
   listTemplatePages,
   createTemplatePage,
@@ -26,29 +28,112 @@ const {
   getTemplateContent,
 } = require("../controller/templateContentController");
 
-// IMPORTANT: declare the static admin path BEFORE the parameterised one,
-// otherwise "/:templateId" would swallow "/admin/all".
+// Admin-only listing routes must come before /:templateId.
 router.get("/admin/all", authenticateToken, requirePlatformAdmin, getTemplates);
-router.get("/admin/:templateId", authenticateToken, requirePlatformAdmin, getTemplate);
 
+router.get(
+  "/admin/:templateId",
+  authenticateToken,
+  requirePlatformAdmin,
+  getTemplate,
+);
+
+// Public template listing and details.
 router.get("/", getTemplates);
 router.get("/:templateId", getTemplate);
 router.get("/:templateId/content", getTemplateContent);
-router.get("/:templateId/pages", authenticateToken, requirePlatformAdmin, listTemplatePages);
-router.post("/:templateId/pages", authenticateToken, requirePlatformAdmin, createTemplatePage);
-router.put("/:templateId/pages/:pageId", authenticateToken, requirePlatformAdmin, updateTemplatePage);
-router.delete("/:templateId/pages/:pageId", authenticateToken, requirePlatformAdmin, deleteTemplatePage);
-router.get("/:templateId/themes", authenticateToken, requirePlatformAdmin, listTemplateThemes);
-router.post("/:templateId/themes", authenticateToken, requirePlatformAdmin, createTemplateTheme);
-router.put("/:templateId/themes/:themeId", authenticateToken, requirePlatformAdmin, updateTemplateTheme);
-router.delete("/:templateId/themes/:themeId", authenticateToken, requirePlatformAdmin, deleteTemplateTheme);
-router.get("/:templateId/menu", authenticateToken, requirePlatformAdmin, listTemplateMenuItems);
-router.post("/:templateId/menu", authenticateToken, requirePlatformAdmin, createTemplateMenuItem);
-router.put("/:templateId/menu/:menuItemId", authenticateToken, requirePlatformAdmin, updateTemplateMenuItem);
-router.delete("/:templateId/menu/:menuItemId", authenticateToken, requirePlatformAdmin, deleteTemplateMenuItem);
 
+// Pages belonging to a template.
+router.get(
+  "/:templateId/pages",
+  authenticateToken,
+  requirePlatformAdmin,
+  listTemplatePages,
+);
+router.post(
+  "/:templateId/pages",
+  authenticateToken,
+  requirePlatformAdmin,
+  createTemplatePage,
+);
+router.put(
+  "/:templateId/pages/:pageId",
+  authenticateToken,
+  requirePlatformAdmin,
+  updateTemplatePage,
+);
+router.delete(
+  "/:templateId/pages/:pageId",
+  authenticateToken,
+  requirePlatformAdmin,
+  deleteTemplatePage,
+);
+
+// Themes belonging to a template.
+router.get(
+  "/:templateId/themes",
+  authenticateToken,
+  requirePlatformAdmin,
+  listTemplateThemes,
+);
+router.post(
+  "/:templateId/themes",
+  authenticateToken,
+  requirePlatformAdmin,
+  createTemplateTheme,
+);
+router.put(
+  "/:templateId/themes/:themeId",
+  authenticateToken,
+  requirePlatformAdmin,
+  updateTemplateTheme,
+);
+router.delete(
+  "/:templateId/themes/:themeId",
+  authenticateToken,
+  requirePlatformAdmin,
+  deleteTemplateTheme,
+);
+
+// Menu items belonging to a template.
+router.get(
+  "/:templateId/menu",
+  authenticateToken,
+  requirePlatformAdmin,
+  listTemplateMenuItems,
+);
+router.post(
+  "/:templateId/menu",
+  authenticateToken,
+  requirePlatformAdmin,
+  createTemplateMenuItem,
+);
+router.put(
+  "/:templateId/menu/:menuItemId",
+  authenticateToken,
+  requirePlatformAdmin,
+  updateTemplateMenuItem,
+);
+router.delete(
+  "/:templateId/menu/:menuItemId",
+  authenticateToken,
+  requirePlatformAdmin,
+  deleteTemplateMenuItem,
+);
+
+// Template CRUD.
 router.post("/", authenticateToken, requirePlatformAdmin, addTemplate);
-router.put("/:templateId", authenticateToken, requirePlatformAdmin, updateTemplate);
-router.delete("/:templateId", authenticateToken, requirePlatformAdmin, deleteTemplate);
+router.put(
+  "/:templateId",
+  authenticateToken,
+  requirePlatformAdmin,
+  updateTemplate,
+);
+router.delete(
+  "/:templateId",
+  authenticateToken,
+  requirePlatformAdmin,
+  deleteTemplate,
+);
 
 module.exports = router;

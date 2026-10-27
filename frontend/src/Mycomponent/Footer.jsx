@@ -33,7 +33,7 @@ export default function Footer() {
             py: 6,
           }}
         >
-          <Grid item xs={12} sm={6} md={4}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
             <Typography
               variant="h5"
               sx={{
@@ -123,7 +123,7 @@ export default function Footer() {
             </Stack>
           </Grid>
 
-          <Grid item xs={12} sm={6} md={2}>
+          <Grid size={{ xs: 12, sm: 6, md: 2 }}>
             <Typography
               variant="h6"
               sx={{

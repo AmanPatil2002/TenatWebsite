@@ -1,208 +1,226 @@
-import { useState, useEffect } from "react";
+
+import { useEffect, useMemo, useState } from "react";
+import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
-import Typography from "@mui/material/Typography";
-import Box from "@mui/material/Box";
-import Stack from "@mui/material/Stack";
-import Table from "@mui/material/Table";
-import TableHead from "@mui/material/TableHead";
-import TableBody from "@mui/material/TableBody";
-import TableCell from "@mui/material/TableCell";
-import TableContainer from "@mui/material/TableContainer";
-import TableFooter from "@mui/material/TableFooter";
-import TablePagination from "@mui/material/TablePagination";
-import TableRow from "@mui/material/TableRow";
-import Paper from "@mui/material/Paper";
-import CircularProgress from "@mui/material/CircularProgress";
-import Alert from "@mui/material/Alert";
-import TextField from "@mui/material/TextField";
-import Button from "@mui/material/Button";
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  CircularProgress,
+  IconButton,
+  InputAdornment,
+  Paper,
+  Snackbar,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TablePagination,
+  TableRow,
+  TextField,
+  Tooltip,
+  Typography,
+} from "@mui/material";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+import SearchIcon from "@mui/icons-material/Search";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
+import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
+import PaletteOutlinedIcon from "@mui/icons-material/PaletteOutlined";
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 
-const formatDate = (d) =>
-  d
-    ? new Date(d).toLocaleDateString(undefined, {
-        day: "numeric",
+const API_URL = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
+const TEMPLATES_URL = `${API_URL}/templates`;
+
+const authConfig = () => ({
+  headers: {
+    Authorization: `Bearer ${localStorage.getItem("token")}`,
+  },
+});
+
+const getErrorMessage = (error, fallback) =>
+  error.response?.data?.message ||
+  error.response?.data?.error ||
+  fallback;
+
+const formatDate = (value) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "—"
+    : date.toLocaleDateString("en-IN", {
+        day: "2-digit",
         month: "short",
         year: "numeric",
-      })
-    : "-";
-
-const formatPrice = (price, currency = "INR") => {
-  if (price == null || price === "") return "-";
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 2,
-  }).format(Number(price));
+      });
 };
-
-function filterTemplate(templates, query) {
-  const q = query.trim().toLowerCase();
-  if (!q) return templates;
-  return templates.filter((t) =>
-    [
-      t.name,
-      t.categoryName,
-      t.language,
-      t.shortDescription,
-      t.description,
-      t.demoUrl,
-      t.domainLink,
-      t.price,
-      t.validityDays,
-      t.status,
-      t.createdBy,
-    ].some((field) =>
-      String(field ?? "")
-        .toLowerCase()
-        .includes(q),
-    ),
-  );
-}
 
 export default function ViewProject() {
   const navigate = useNavigate();
+
   const [templates, setTemplates] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
-  const [query, setQuery] = useState("");
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState(null);
+  const [snack, setSnack] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
+
+  const showSnack = (message, severity = "success") => {
+    setSnack({ open: true, message, severity });
+  };
+
+  const fetchTemplates = async () => {
+    setLoading(true);
+
+    try {
+      const response = await axios.get(
+        `${TEMPLATES_URL}/admin/all?limit=100`,
+        authConfig()
+      );
+
+      const data = response.data;
+      setTemplates(
+        Array.isArray(data)
+          ? data
+          : data?.templates || data?.data || []
+      );
+    } catch (error) {
+      showSnack(getErrorMessage(error, "Could not load templates."), "error");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    let cancelled = false;
-
-    const fetchTemplates = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        if (!token) throw new Error("You are not logged in");
-
-        // Admin endpoint: returns every status (draft, published, archived)
-        const res = await fetch(`${API_URL}/templates/admin/all?limit=100`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json().catch(() => null);
-
-        if (!res.ok) {
-          if (res.status === 401)
-            throw new Error("Your session has expired. Please log in again.");
-          if (res.status === 403)
-            throw new Error("You don't have permission to view templates.");
-          throw new Error(data?.message || "Failed to load projects");
-        }
-        if (!Array.isArray(data))
-          throw new Error("Invalid templates response");
-
-        if (!cancelled) setTemplates(data);
-      } catch (err) {
-        if (!cancelled) setError(err.message);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
     fetchTemplates();
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
-  const searching = Boolean(query.trim());
-  const filteredTemplates = filterTemplate(templates, query);
+  const filteredTemplates = useMemo(() => {
+    const term = search.trim().toLowerCase();
 
-  const handleSearch = (e) => {
-    setQuery(e.target.value);
-    setPage(0);
+    if (!term) return templates;
+
+    return templates.filter((template) =>
+      [
+        template.name,
+        template.categoryName,
+        template.shortDescription,
+        template.status,
+        template.language,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(term))
+    );
+  }, [templates, search]);
+
+  const visibleTemplates = filteredTemplates.slice(
+    page * rowsPerPage,
+    page * rowsPerPage + rowsPerPage
+  );
+
+  const handleDelete = async (template) => {
+    if (!window.confirm(`Delete "${template.name}"?`)) return;
+
+    setDeletingId(template.templateId);
+
+    try {
+      await axios.delete(
+        `${TEMPLATES_URL}/${template.templateId}`,
+        authConfig()
+      );
+
+      setTemplates((previous) =>
+        previous.filter((item) => item.templateId !== template.templateId)
+      );
+
+      showSnack("Template deleted.");
+    } catch (error) {
+      showSnack(getErrorMessage(error, "Could not delete template."), "error");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
-  const handleChangePage = (event, newPage) => setPage(newPage);
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
+  const handleSearchChange = (event) => {
+    setSearch(event.target.value);
     setPage(0);
   };
-
-  const emptyRows =
-    page > 0 && rowsPerPage > 0
-      ? Math.max(0, (1 + page) * rowsPerPage - filteredTemplates.length)
-      : 0;
-
-  const visibleRows =
-    rowsPerPage > 0
-      ? filteredTemplates.slice(
-          page * rowsPerPage,
-          page * rowsPerPage + rowsPerPage,
-        )
-      : filteredTemplates;
 
   return (
-    <Box>
-      <Typography
-        variant="h5"
-        fontWeight="bold"
-        sx={{ textAlign: "center", mb: 2 }}
+    <Box sx={{ p: { xs: 1.5, sm: 2, md: 4 }, maxWidth: 1600, mx: "auto" }}>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        justifyContent="space-between"
+        alignItems={{ xs: "stretch", sm: "center" }}
+        spacing={2}
+        sx={{ mb: 3 }}
       >
-        View Project
-      </Typography>
+        <Box>
+          <Typography variant="h4" fontWeight={700}>
+            View Projects
+          </Typography>
+          <Typography color="text.secondary">
+            Manage templates, pages and themes.
+          </Typography>
+        </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
-
-      <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
-        <TextField
-          size="small"
-          fullWidth
-          label="Search by name, language, status or price"
-          value={query}
-          onChange={handleSearch}
-          sx={{ bgcolor: "background.paper" }}
-        />
-        {searching && (
+        <Stack direction="row" spacing={1} flexWrap="wrap">
           <Button
-            onClick={() => {
-              setQuery("");
-              setPage(0);
-            }}
-            sx={{ flexShrink: 0 }}
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={fetchTemplates}
+            disabled={loading}
           >
-            Clear
+            Refresh
           </Button>
-        )}
+
+          <Button
+            variant="contained"
+            onClick={() => navigate("/admin/templates/add")}
+          >
+            Add Template
+          </Button>
+        </Stack>
       </Stack>
 
-      {!loading && (
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="center"
-          sx={{ mb: 1 }}
-        >
-          <Typography variant="body2" color="text.secondary">
-            {filteredTemplates.length}{" "}
-            {filteredTemplates.length === 1 ? "Project" : "Projects"}
-            {searching ? " match your search" : ""}
-          </Typography>
-        </Stack>
-      )}
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <TextField
+          fullWidth
+          size="small"
+          value={search}
+          onChange={handleSearchChange}
+          placeholder="Search by template, category, language or status..."
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
+          }}
+        />
+      </Paper>
 
       <TableContainer component={Paper}>
-        <Table sx={{ minWidth: 500 }} aria-label="project table">
+        <Table>
           <TableHead>
-            <TableRow sx={{ bgcolor: "primary.main" }}>
-              {["No.", "Name", "Details", "Url", "Status", "Created At", "Actions"].map(
-                (h) => (
-                  <TableCell
-                    key={h}
-                    sx={{ color: "white", fontWeight: "bold" }}
-                  >
-                    {h}
-                  </TableCell>
-                ),
-              )}
+            <TableRow>
+              <TableCell>No.</TableCell>
+              <TableCell>Name</TableCell>
+              <TableCell>Details</TableCell>
+              <TableCell>URL</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell>Created At</TableCell>
+              <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
 
@@ -213,125 +231,185 @@ export default function ViewProject() {
                   <CircularProgress size={28} />
                 </TableCell>
               </TableRow>
-            ) : visibleRows.length === 0 ? (
+            ) : visibleTemplates.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
-                  {searching
-                    ? "No projects match your search"
-                    : "No projects found"}
+                <TableCell colSpan={7} align="center" sx={{ py: 5 }}>
+                  No templates found.
                 </TableCell>
               </TableRow>
             ) : (
-              visibleRows.map((t, index) => (
-                <TableRow key={t.templateId} hover>
+              visibleTemplates.map((template, index) => (
+                <TableRow key={template.templateId} hover>
                   <TableCell>
-                    {rowsPerPage > 0
-                      ? page * rowsPerPage + index + 1
-                      : index + 1}
+                    {page * rowsPerPage + index + 1}
                   </TableCell>
 
-                  <TableCell>
-                    <Typography variant="body1" fontWeight="medium">
-                      {t.name}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {t.language}
+                  <TableCell sx={{ minWidth: 160 }}>
+                    <Typography fontWeight={600}>
+                      {template.name || "Untitled"}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      Created by user #{t.createdBy}
+                      {template.categoryName || "Uncategorized"}
                     </Typography>
                   </TableCell>
 
-                  <TableCell sx={{ maxWidth: 320 }}>
-                    <Typography variant="body1" fontWeight="medium">
-                      {t.shortDescription} · {formatPrice(t.price, t.currency)}
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{
-                        display: "-webkit-box",
-                        WebkitLineClamp: 3,
-                        WebkitBoxOrient: "vertical",
-                        overflow: "hidden",
-                      }}
-                    >
-                      {t.description}
-                    </Typography>
+                  <TableCell sx={{ minWidth: 220 }}>
+                    {template.shortDescription ||
+                      template.description ||
+                      "—"}
                   </TableCell>
 
-                  <TableCell sx={{ wordBreak: "break-all" }}>
-                    <Typography variant="body1" fontWeight="medium">
-                      {t.demoUrl}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {t.domainLink}
-                    </Typography>
-                  </TableCell>
-
-                  <TableCell>
-                    <Typography
-                      variant="body1"
-                      fontWeight="medium"
-                      sx={{ textTransform: "capitalize" }}
-                    >
-                      {t.status}
-                    </Typography>
-                  </TableCell>
-
-                  <TableCell>
-                    <Typography variant="body1" fontWeight="medium">
-                      {formatDate(t.createdAt)}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Stack spacing={1} alignItems="flex-start">
-                      <Button
-                        size="small"
-                        onClick={() => navigate(`/admin/templates/${t.templateId}/edit`)}
+                  <TableCell sx={{ minWidth: 140 }}>
+                    {template.domainLink ? (
+                      <a
+                        href={template.domainLink}
+                        target="_blank"
+                        rel="noreferrer"
                       >
-                        Edit details
-                      </Button>
-                      <Button
-                        size="small"
-                        onClick={() => navigate(`/admin/templates/${t.templateId}/content`)}
+                        Open URL
+                      </a>
+                    ) : template.demoUrl ? (
+                      <a
+                        href={template.demoUrl}
+                        target="_blank"
+                        rel="noreferrer"
                       >
-                        Manage pages & themes
-                      </Button>
+                        Preview
+                      </a>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
+
+                  <TableCell>
+                    <Chip
+                      size="small"
+                      label={template.status || "draft"}
+                      color={
+                        template.status === "published"
+                          ? "success"
+                          : template.status === "inactive"
+                            ? "default"
+                            : "warning"
+                      }
+                    />
+                  </TableCell>
+
+                  <TableCell sx={{ whiteSpace: "nowrap" }}>
+                    {formatDate(template.createdAt)}
+                  </TableCell>
+
+                  <TableCell align="right">
+                    <Stack
+                      direction="row"
+                      spacing={0.5}
+                      justifyContent="flex-end"
+                      flexWrap="wrap"
+                    >
+                      <Tooltip title="Edit template">
+                        <IconButton
+                          size="small"
+                          onClick={() =>
+                            navigate(
+                              `/admin/templates/${template.templateId}/edit`
+                            )
+                          }
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+
+                      <Tooltip title="Manage pages and themes">
+                        <IconButton
+                          size="small"
+                          onClick={() =>
+                            navigate(
+                              `/admin/templates/${template.templateId}/content`
+                            )
+                          }
+                        >
+                          <VisibilityOutlinedIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+
+                      <Tooltip title="Manage pages">
+                        <IconButton
+                          size="small"
+                          onClick={() =>
+                            navigate(
+                              `/admin/templates/${template.templateId}/pages`
+                            )
+                          }
+                        >
+                          <ArticleOutlinedIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+
+                      <Tooltip title="Manage themes">
+                        <IconButton
+                          size="small"
+                          onClick={() =>
+                            navigate(
+                              `/admin/templates/${template.templateId}/themes`
+                            )
+                          }
+                        >
+                          <PaletteOutlinedIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+
+                      <Tooltip title="Delete template">
+                        <span>
+                          <IconButton
+                            size="small"
+                            color="error"
+                            disabled={deletingId === template.templateId}
+                            onClick={() => handleDelete(template)}
+                          >
+                            {deletingId === template.templateId ? (
+                              <CircularProgress size={16} />
+                            ) : (
+                              <DeleteIcon fontSize="small" />
+                            )}
+                          </IconButton>
+                        </span>
+                      </Tooltip>
                     </Stack>
                   </TableCell>
                 </TableRow>
               ))
             )}
-
-            {emptyRows > 0 && (
-              <TableRow style={{ height: 53 * emptyRows }}>
-                <TableCell colSpan={7} />
-              </TableRow>
-            )}
           </TableBody>
-
-          <TableFooter>
-            <TableRow>
-              <TablePagination
-                rowsPerPageOptions={[5, 10, 25, { label: "All", value: -1 }]}
-                colSpan={7}
-                count={filteredTemplates.length}
-                rowsPerPage={rowsPerPage}
-                page={page}
-                slotProps={{
-                  select: {
-                    inputProps: { "aria-label": "rows per page" },
-                    native: true,
-                  },
-                }}
-                onPageChange={handleChangePage}
-                onRowsPerPageChange={handleChangeRowsPerPage}
-              />
-            </TableRow>
-          </TableFooter>
         </Table>
+
+        <TablePagination
+          component="div"
+          count={filteredTemplates.length}
+          page={page}
+          rowsPerPage={rowsPerPage}
+          onPageChange={(_, nextPage) => setPage(nextPage)}
+          onRowsPerPageChange={(event) => {
+            setRowsPerPage(Number(event.target.value));
+            setPage(0);
+          }}
+          rowsPerPageOptions={[5, 10, 25, 50]}
+        />
       </TableContainer>
+
+      <Snackbar
+        open={snack.open}
+        autoHideDuration={4000}
+        onClose={() => setSnack((previous) => ({ ...previous, open: false }))}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          severity={snack.severity}
+          variant="filled"
+          onClose={() => setSnack((previous) => ({ ...previous, open: false }))}
+        >
+          {snack.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

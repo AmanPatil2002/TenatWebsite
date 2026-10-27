@@ -26,6 +26,8 @@ import Preview from "./Mycomponent/Preview";
 import TemplateContentEditor from "./Mycomponent/TemplateContentEditor";
 import SiteEditor from "./Pages/Client/SiteEditor";
 import SitePreview from "./Pages/Client/SitePreview";
+import AddTheme from "./Mycomponent/AddTheme";
+import AddPages from "./Mycomponent/AddPages";
 
 function App() {
   return (
@@ -53,6 +55,8 @@ function App() {
 
         <Route element={<ProtectedRoutes role="admin" />}>
           <Route path="/admin" element={<Admin />}>
+            <Route path="theme" element={<AddTheme />} />
+            <Route path="page" element={<AddPages/>}/>
             <Route path="templates" element={<AddTemplate />} />
             <Route path="templates/:templateId/edit" element={<AddTemplate />} />
             <Route path="templates/:templateId/content" element={<TemplateContentEditor />} />

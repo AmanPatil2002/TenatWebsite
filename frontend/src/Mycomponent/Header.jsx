@@ -14,7 +14,7 @@ import Button from "@mui/material/Button";
 import Tooltip from "@mui/material/Tooltip";
 import MenuItem from "@mui/material/MenuItem";
 import HailIcon from "@mui/icons-material/Hail";
-import PersonIcon from '@mui/icons-material/Person';
+import PersonIcon from "@mui/icons-material/Person";
 
 function Header() {
   const [anchorElNav, setAnchorElNav] = React.useState(null);
@@ -22,22 +22,15 @@ function Header() {
 
   const navigate = useNavigate();
 
-  const handleOpenNavMenu = (event) => {
-    setAnchorElNav(event.currentTarget);
-  };
-  const handleOpenUserMenu = (event) => {
-    setAnchorElUser(event.currentTarget);
-  };
-  const handleCloseNavMenu = () => {
-    setAnchorElNav(null);
-  };
-  const handleCloseUserMenu = () => {
-    setAnchorElUser(null);
-  };
+  const handleOpenNavMenu = (event) => setAnchorElNav(event.currentTarget);
+  const handleCloseNavMenu = () => setAnchorElNav(null);
+  const handleOpenUserMenu = (event) => setAnchorElUser(event.currentTarget);
+  const handleCloseUserMenu = () => setAnchorElUser(null);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("username");
+    localStorage.removeItem("email");
     localStorage.removeItem("role");
     handleCloseUserMenu();
     navigate("/");
@@ -45,6 +38,9 @@ function Header() {
 
   const isAuthenticated = Boolean(localStorage.getItem("token"));
   const role = localStorage.getItem("role");
+  const username = localStorage.getItem("username");
+  const email = localStorage.getItem("email");
+
   const navItems = [
     { name: "Home", path: "/" },
     ...(isAuthenticated
@@ -52,49 +48,19 @@ function Header() {
           { name: "Contact", path: "/contact" },
           { name: "Template", path: "/viewtemp" },
           { name: "My Account", path: "/myaccount" },
-          ...(role === "admin" || role === "superadmin"
+          ...(role === "admin"
             ? [{ name: "Admin", path: "/admin/admindashboard" }]
             : []),
         ]
       : []),
   ];
-  const username = localStorage.getItem("username");
-  const email = localStorage.getItem("email");
 
   return (
-    <AppBar position="static">
-      <Container maxWidth="xl" sx={{ backgroundColor: "#172033" }}>
-        <Toolbar disableGutters>
-          <HailIcon
-            sx={{
-              display: { xs: "none", md: "flex" },
-              mr: 1,
-            }}
-          />
-
-          <Typography
-            variant="h6"
-            component={Link}
-            to="/home"
-            sx={{
-              mr: 2,
-              display: { xs: "none", md: "flex" },
-              fontFamily: "monospace",
-              fontWeight: 700,
-              letterSpacing: ".3rem",
-              color: "inherit",
-              textDecoration: "none",
-            }}
-          >
-            Tenant Website
-          </Typography>
-
-          <Box
-            sx={{
-              flexGrow: 1,
-              display: { xs: "flex", md: "none" },
-            }}
-          >
+    <AppBar position="static" sx={{ backgroundColor: "#172033" }}>
+      <Container maxWidth="xl">
+        <Toolbar disableGutters sx={{ gap: 1 }}>
+          {/* Mobile: hamburger menu */}
+          <Box sx={{ display: { xs: "flex", md: "none" } }}>
             <IconButton
               size="large"
               aria-label="navigation menu"
@@ -102,6 +68,7 @@ function Header() {
               aria-haspopup="true"
               onClick={handleOpenNavMenu}
               color="inherit"
+              edge="start"
             >
               <MenuIcon />
             </IconButton>
@@ -109,20 +76,11 @@ function Header() {
             <Menu
               id="menu-appbar"
               anchorEl={anchorElNav}
-              anchorOrigin={{
-                vertical: "bottom",
-                horizontal: "left",
-              }}
+              anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+              transformOrigin={{ vertical: "top", horizontal: "left" }}
               keepMounted
-              transformOrigin={{
-                vertical: "top",
-                horizontal: "left",
-              }}
               open={Boolean(anchorElNav)}
               onClose={handleCloseNavMenu}
-              sx={{
-                display: { xs: "block", md: "none" },
-              }}
             >
               {navItems.map((item) => (
                 <MenuItem
@@ -131,43 +89,48 @@ function Header() {
                   to={item.path}
                   onClick={handleCloseNavMenu}
                 >
-                  <Typography sx={{ textAlign: "center" }}>
-                    {item.name}
-                  </Typography>
+                  <Typography>{item.name}</Typography>
                 </MenuItem>
               ))}
             </Menu>
           </Box>
 
-          <HailIcon
-            sx={{
-              display: { xs: "flex", md: "none" },
-              mr: 1,
-            }}
-          />
-
-          <Typography
-            variant="h5"
+          {/* Brand: one block for both mobile and desktop */}
+          <Box
             component={Link}
             to="/home"
             sx={{
-              mr: 2,
-              display: { xs: "flex", md: "none" },
-              flexGrow: 1,
-              fontFamily: "monospace",
-              fontWeight: 700,
-              letterSpacing: ".2rem",
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              flexGrow: { xs: 1, md: 0 }, // mobile: pushes the avatar to the right
+              mr: { md: 3 },
               color: "inherit",
               textDecoration: "none",
             }}
           >
-            Tenant Website
-          </Typography>
+            <HailIcon />
+            <Typography
+              variant="h6"
+              noWrap
+              sx={{
+                fontFamily: "monospace",
+                fontWeight: 700,
+                letterSpacing: { xs: ".15rem", md: ".3rem" },
+                fontSize: { xs: "1.05rem", md: "1.25rem" },
+              }}
+            >
+              Tenant Website
+            </Typography>
+          </Box>
 
+          {/* Desktop: nav buttons */}
           <Box
             sx={{
               flexGrow: 1,
               display: { xs: "none", md: "flex" },
+              alignItems: "center",
+              gap: 0.5,
             }}
           >
             {navItems.map((item) => (
@@ -175,80 +138,55 @@ function Header() {
                 key={item.name}
                 component={Link}
                 to={item.path}
-                onClick={handleCloseNavMenu}
-                sx={{
-                  my: 2,
-                  color: "white",
-                  display: "block",
-                }}
+                sx={{ color: "white" }}
               >
                 {item.name}
               </Button>
             ))}
           </Box>
 
-          <Box sx={{ flexGrow: 0 }}>
+          {/* User area */}
+          <Box sx={{ display: "flex", alignItems: "center" }}>
             {isAuthenticated ? (
               <>
                 <Tooltip title="My Profile">
                   <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
                     <Avatar
                       sx={{
-                        margin: "0 auto 15px",
+                        width: 36,
+                        height: 36,
                         bgcolor: "white",
                         color: "#1976d2",
-                        fontSize: 15,
+                        fontSize: 16,
+                        fontWeight: 600,
                       }}
                     >
-                      {(username || email)?.charAt(0)?.toUpperCase() || (
-                        <PersonIcon />
-                      )}
+                      {(username || email)?.charAt(0)?.toUpperCase() || <PersonIcon />}
                     </Avatar>
                   </IconButton>
                 </Tooltip>
 
                 <Menu
-                  sx={{ mt: "45px" }}
                   id="user-menu"
                   anchorEl={anchorElUser}
-                  anchorOrigin={{
-                    vertical: "top",
-                    horizontal: "right",
-                  }}
+                  anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                  transformOrigin={{ vertical: "top", horizontal: "right" }}
+                  sx={{ mt: 1 }}
                   keepMounted
-                  transformOrigin={{
-                    vertical: "top",
-                    horizontal: "right",
-                  }}
                   open={Boolean(anchorElUser)}
                   onClose={handleCloseUserMenu}
                 >
-                  <MenuItem
-                    component={Link}
-                    to="/myaccount"
-                    onClick={handleCloseUserMenu}
-                  >
-                    <Typography sx={{ textAlign: "center" }}>My Account</Typography>
+                  <MenuItem component={Link} to="/myaccount" onClick={handleCloseUserMenu}>
+                    <Typography>My Account</Typography>
                   </MenuItem>
-                  <MenuItem
-                    component={Link}
-                    to="/mysite"
-                    onClick={handleCloseUserMenu}
-                  >
-                    <Typography sx={{ textAlign: "center" }}>Purchased Templates</Typography>
+                  <MenuItem component={Link} to="/mysite" onClick={handleCloseUserMenu}>
+                    <Typography>Purchased Templates</Typography>
                   </MenuItem>
-                  <MenuItem
-                    component={Link}
-                    to="/review"
-                    onClick={handleCloseUserMenu}
-                  >
-                    <Typography sx={{ textAlign: "center" }}>Review</Typography>
+                  <MenuItem component={Link} to="/review" onClick={handleCloseUserMenu}>
+                    <Typography>Review</Typography>
                   </MenuItem>
-
                   <MenuItem onClick={handleLogout}>
-                    <Typography sx={{ textAlign: "center", color: "red" }}>
-                      Logout
-                    </Typography>
+                    <Typography sx={{ color: "red" }}>Logout</Typography>
                   </MenuItem>
                 </Menu>
               </>

@@ -1,341 +1,262 @@
 const db = require("../config/db");
 
-// Total BIGINT UNSIGNED guard — prevents 30-digit "ids" from reaching MySQL.
-const validId = (id) => {
-  if (typeof id !== "string") return false;
-  if (!/^[1-9]\d*$/.test(id)) return false;
+const isValidPrice = (value) => {
+  if (
+    value === undefined ||
+    value === null ||
+    (typeof value === "string" && !value.trim())
+  ) {
+    return false;
+  }
+
+  const price = Number(value);
+
+  return (
+    Number.isFinite(price) &&
+    price >= 0 &&
+    price <= 99999999.99 &&
+    /^\d+(\.\d{1,2})?$/.test(String(value).trim())
+  );
+};
+
+const isValidId = (value) => {
+  if (
+    value === undefined ||
+    value === null ||
+    !/^[1-9]\d*$/.test(String(value))
+  ) {
+    return false;
+  }
+
   try {
-    return BigInt(id) <= 18446744073709551615n;
+    return BigInt(value) <= 18446744073709551615n;
   } catch {
     return false;
   }
 };
 
-const isPublishedValue = (value) =>
-  value === true || value === false || value === 0 || value === 1;
-
-// Serialize JSON content safely. Returns:
-//   undefined  -> invalid (not an object / not null / circular)
-//   null       -> explicit "no content"
-//   string     -> JSON
-const serializeContent = (content) => {
-  if (content === undefined) return undefined;
-  if (content === null) return null;
-  if (typeof content !== "object") return undefined;
-  try {
-    return JSON.stringify(content);
-  } catch {
-    return undefined;
-  }
-};
-
-// Only these tables may be passed to the shared UPDATE/DELETE helpers.
-const ALLOWED_TABLES = new Set(["sitePages", "subPages"]);
-
-// ---------------------------------------------------------------------------
-
-const listPages = (req, res) => {
-  const { siteId } = req.params;
-  if (!validId(siteId)) {
-    return res.status(400).json({ message: "Invalid site ID" });
-  }
-
-  db.query(
-    `SELECT id, NULL AS parentId, 'page' AS recordType, title, slug, pageType,
-            content, pageLink, isPublished, createdAt, updatedAt
-       FROM sitePages WHERE siteId = ?
-     UNION ALL
-     SELECT sp.id, sp.pageId AS parentId, 'subPage' AS recordType, sp.title,
-            sp.slug, sp.pageType, sp.content, sp.pageLink, sp.isPublished,
-            sp.createdAt, sp.updatedAt
-       FROM subPages sp WHERE sp.siteId = ?
-     ORDER BY parentId, id`,
-    [siteId, siteId],
-    (err, rows) => {
-      if (err) {
-        console.error("listPages error:", err);
-        return res.status(500).json({ message: "Internal server error" });
-      }
-      res.json(rows);
-    }
-  );
-};
-
-// ---------------------------------------------------------------------------
-
-const validatePage = (body, partial = false) => {
-  if (body === null || typeof body !== "object" || Array.isArray(body)) {
-    return { error: "Invalid request body" };
-  }
-  const data = {};
-  const has = (key) => body[key] !== undefined;
-
-  if (!partial || has("title")) {
-    const title = typeof body.title === "string" ? body.title.trim() : "";
-    if (!title || title.length > 150) {
-      return { error: "Title must be 1–150 characters" };
-    }
-    data.title = title;
-  }
-
-  if (!partial || has("slug")) {
-    const slug = typeof body.slug === "string" ? body.slug.trim() : "";
-    if (
-      !slug ||
-      slug.length > 150 ||
-      !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)
-    ) {
-      return {
-        error:
-          "Slug must use lowercase letters, numbers and hyphens (max 150 characters)",
-      };
-    }
-    data.slug = slug;
-  }
-
-  if (!partial || has("pageType")) {
-    const pageType =
-      typeof body.pageType === "string" ? body.pageType.trim() : "";
-    if (!pageType || pageType.length > 60) {
-      return { error: "Page type must be 1–60 characters" };
-    }
-    data.pageType = pageType;
-  }
-
-  if (has("content")) {
-    const content = serializeContent(body.content);
-    if (content === undefined) {
-      return { error: "Content must be a JSON object, array, or null" };
-    }
-    data.content = content;
-  }
-
-  if (has("pageLink")) {
-    if (body.pageLink !== null && typeof body.pageLink !== "string") {
-      return { error: "Page link must be a string or null" };
-    }
-    const link = body.pageLink?.trim() || null;
-    if (link && link.length > 500) {
-      return { error: "Page link must be 500 characters or fewer" };
-    }
-    data.pageLink = link;
-  }
-
-  if (has("isPublished")) {
-    if (!isPublishedValue(body.isPublished)) {
-      return { error: "isPublished must be a boolean" };
-    }
-    data.isPublished = body.isPublished ? 1 : 0;
-  }
-
-  return { data };
-};
-
-// ---------------------------------------------------------------------------
-
+// POST /pages  (admin/superadmin)
 const createPage = (req, res) => {
-  const { siteId } = req.params;
-  if (!validId(siteId)) {
-    return res.status(400).json({ message: "Invalid site ID" });
+  const { title, categoryId, description, pagePrice } = req.body;
+
+  if (
+    typeof title !== "string" ||
+    !title.trim() ||
+    typeof description !== "string" ||
+    !description.trim() ||
+    !isValidId(categoryId) ||
+    !isValidPrice(pagePrice)
+  ) {
+    return res.status(400).json({
+      message:
+        "Valid title, categoryId, description and pagePrice are required",
+    });
   }
 
-  const { error, data } = validatePage(req.body);
-  if (error) return res.status(400).json({ message: error });
+  const cleanTitle = title.trim();
+  const cleanDescription = description.trim();
+
+  if (cleanTitle.length > 150) {
+    return res.status(400).json({
+      message: "Title must be at most 150 characters",
+    });
+  }
+
+  if (cleanDescription.length > 400) {
+    return res.status(400).json({
+      message: "Description must be at most 400 characters",
+    });
+  }
+
+  const sql = `
+    INSERT INTO pages
+      (title, categoryId, description, pagePrice, createdBy)
+    VALUES (?, ?, ?, ?, ?)
+  `;
 
   db.query(
-    `INSERT INTO sitePages (siteId, adminId, title, slug, pageType, content, pageLink, isPublished)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql,
     [
-      siteId,
-      req.siteAdmin.adminId,
-      data.title,
-      data.slug,
-      data.pageType,
-      data.content ?? null,
-      data.pageLink ?? null,
-      data.isPublished ?? 1,
+      cleanTitle,
+      String(categoryId),
+      cleanDescription,
+      Number(pagePrice),
+      req.user.userId,
     ],
     (err, result) => {
-      if (err?.code === "ER_DUP_ENTRY") {
-        return res.status(409).json({ message: "Slug already exists" });
-      }
-      if (err?.code === "ER_NO_REFERENCED_ROW_2") {
-        return res.status(404).json({ message: "Site not found" });
-      }
       if (err) {
-        console.error("createPage error:", err);
-        return res.status(500).json({ message: "Internal server error" });
-      }
-      res.status(201).json({ id: result.insertId, recordType: "page" });
-    }
-  );
-};
-
-// ---------------------------------------------------------------------------
-
-const createSubPage = (req, res) => {
-  const { siteId } = req.params;
-  if (!validId(siteId)) {
-    return res.status(400).json({ message: "Invalid site ID" });
-  }
-
-  const { parentId } = req.body;
-  if (!validId(String(parentId))) {
-    return res.status(400).json({ message: "A valid parentId is required" });
-  }
-
-  const { error, data } = validatePage(req.body);
-  if (error) return res.status(400).json({ message: error });
-
-  // INSERT ... SELECT guarantees the parent page exists AND belongs to this
-  // site, atomically — no TOCTOU race. If the parent is missing, zero rows are
-  // inserted and we return 404.
-  db.query(
-    `INSERT INTO subPages
-       (siteId, adminId, pageId, title, slug, pageType, content, pageLink, isPublished)
-     SELECT ?, ?, p.id, ?, ?, ?, ?, ?, ?
-       FROM sitePages p WHERE p.id = ? AND p.siteId = ?`,
-    [
-      siteId,
-      req.siteAdmin.adminId,
-      data.title,
-      data.slug,
-      data.pageType,
-      data.content ?? null,
-      data.pageLink ?? null,
-      data.isPublished ?? 1,
-      parentId,
-      siteId,
-    ],
-    (err, result) => {
-      if (err?.code === "ER_DUP_ENTRY") {
-        return res
-          .status(409)
-          .json({ message: "Slug already exists under this page" });
-      }
-      if (err?.code === "ER_NO_REFERENCED_ROW_2") {
-        return res.status(404).json({ message: "Site not found" });
-      }
-      if (err) {
-        console.error("createSubPage error:", err);
-        return res.status(500).json({ message: "Internal server error" });
-      }
-      if (!result.affectedRows) {
-        return res.status(404).json({ message: "Parent page not found" });
-      }
-      res
-        .status(201)
-        .json({ id: result.insertId, recordType: "subPage", parentId });
-    }
-  );
-};
-
-// ---------------------------------------------------------------------------
-
-// Shared UPDATE. `table` must be one of ALLOWED_TABLES.
-// Checks existence first so:
-//   (a) submitting unchanged values doesn't return a false 404, and
-//   (b) "not found" is distinct from "no changes".
-const updateRecord = (table, req, res) => {
-  if (!ALLOWED_TABLES.has(table)) {
-    return res.status(500).json({ message: "Internal server error" });
-  }
-
-  const { siteId, pageId } = req.params;
-  if (!validId(siteId) || !validId(pageId)) {
-    return res.status(400).json({ message: "Invalid ID" });
-  }
-
-  const { error, data } = validatePage(req.body, true);
-  if (error) return res.status(400).json({ message: error });
-
-  const columns = Object.keys(data);
-  if (!columns.length) {
-    return res.status(400).json({ message: "Nothing to update" });
-  }
-
-  db.query(
-    `SELECT 1 FROM ${table} WHERE id = ? AND siteId = ? LIMIT 1`,
-    [pageId, siteId],
-    (findErr, found) => {
-      if (findErr) {
-        console.error(`updateRecord(${table}) select error:`, findErr);
-        return res.status(500).json({ message: "Internal server error" });
-      }
-      if (found.length === 0) {
-        return res.status(404).json({ message: "Page not found" });
-      }
-
-      db.query(
-        `UPDATE ${table} SET ${columns
-          .map((column) => `${column} = ?`)
-          .join(", ")}
-          WHERE id = ? AND siteId = ?`,
-        [...columns.map((column) => data[column]), pageId, siteId],
-        (err) => {
-          if (err?.code === "ER_DUP_ENTRY") {
-            return res.status(409).json({ message: "Slug already exists" });
-          }
-          if (err?.code === "ER_NO_REFERENCED_ROW_2") {
-            return res.status(404).json({ message: "Site not found" });
-          }
-          if (err) {
-            console.error(`updateRecord(${table}) update error:`, err);
-            return res.status(500).json({ message: "Internal server error" });
-          }
-          res.json({ message: "Page updated" });
+        if (err.code === "ER_NO_REFERENCED_ROW_2") {
+          return res.status(400).json({
+            message: "Invalid categoryId or user",
+          });
         }
-      );
-    }
-  );
-};
 
-const updatePage = (req, res) => updateRecord("sitePages", req, res);
-const updateSubPage = (req, res) => updateRecord("subPages", req, res);
-
-// ---------------------------------------------------------------------------
-
-const deleteRecord = (table, req, res) => {
-  if (!ALLOWED_TABLES.has(table)) {
-    return res.status(500).json({ message: "Internal server error" });
-  }
-
-  const { siteId, pageId } = req.params;
-  if (!validId(siteId) || !validId(pageId)) {
-    return res.status(400).json({ message: "Invalid ID" });
-  }
-
-  db.query(
-    `DELETE FROM ${table} WHERE id = ? AND siteId = ?`,
-    [pageId, siteId],
-    (err, result) => {
-      if (err?.code === "ER_ROW_IS_REFERENCED_2") {
-        return res.status(409).json({
-          message:
-            "Page has sub-pages. Delete them first or enable ON DELETE CASCADE.",
+        console.error("Create page error:", err);
+        return res.status(500).json({
+          message: "Database error",
         });
       }
-      if (err) {
-        console.error(`deleteRecord(${table}) error:`, err);
-        return res.status(500).json({ message: "Internal server error" });
-      }
-      if (!result.affectedRows) {
-        return res.status(404).json({ message: "Page not found" });
-      }
-      res.json({ message: "Page deleted" });
-    }
+
+      return res.status(201).json({
+        message: "Page created successfully",
+        pagesId: result.insertId,
+      });
+    },
   );
 };
 
-const deletePage = (req, res) => deleteRecord("sitePages", req, res);
-const deleteSubPage = (req, res) => deleteRecord("subPages", req, res);
+// GET /pages?categoryId=1&search=home&page=1&limit=20
+const getPages = (req, res) => {
+  const { categoryId, search } = req.query;
+  const page = Math.max(parseInt(req.query.page) || 1, 1);
+  const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 100);
+  const offset = (page - 1) * limit;
 
-module.exports = {
-  listPages,
-  createPage,
-  createSubPage,
-  updatePage,
-  updateSubPage,
-  deletePage,
-  deleteSubPage,
+  const where = [];
+  const params = [];
+  if (categoryId) {
+    where.push("categoryId = ?");
+    params.push(categoryId);
+  }
+  if (search) {
+    where.push("title LIKE ?");
+    params.push(`%${search}%`);
+  }
+  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+
+  db.query(
+    `SELECT COUNT(*) AS total FROM pages ${whereSql}`,
+    params,
+    (err, countRows) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ message: "Database error" });
+      }
+      const sql = `SELECT * FROM pages ${whereSql} ORDER BY createdAt DESC LIMIT ? OFFSET ?`;
+      db.query(sql, [...params, limit, offset], (err2, rows) => {
+        if (err2) {
+          console.error(err2);
+          return res.status(500).json({ message: "Database error" });
+        }
+        res.json({ total: countRows[0].total, page, limit, data: rows });
+      });
+    },
+  );
 };
+
+// GET /pages/:id
+const getPageById = (req, res) => {
+  db.query(
+    "SELECT * FROM pages WHERE pagesId = ?",
+    [req.params.id],
+    (err, rows) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ message: "Database error" });
+      }
+      if (!rows.length)
+        return res.status(404).json({ message: "Page not found" });
+      res.json(rows[0]);
+    },
+  );
+};
+
+// PUT /pages/:id  (admin/superadmin) - partial update
+const updatePage = (req, res) => {
+  const { title, categoryId, description, pagePrice } = req.body;
+  const fields = [];
+  const params = [];
+
+  if (title !== undefined) {
+    if (
+      typeof title !== "string" ||
+      !title.trim() ||
+      title.trim().length > 150
+    ) {
+      return res.status(400).json({
+        message: "Title must be nonempty and at most 150 characters",
+      });
+    }
+
+    fields.push("title = ?");
+    params.push(title.trim());
+  }
+
+  if (categoryId !== undefined) {
+    if (!isValidId(categoryId)) {
+      return res.status(400).json({
+        message: "Invalid categoryId",
+      });
+    }
+
+    fields.push("categoryId = ?");
+    params.push(String(categoryId));
+  }
+
+  if (description !== undefined) {
+    if (
+      typeof description !== "string" ||
+      !description.trim() ||
+      description.trim().length > 400
+    ) {
+      return res.status(400).json({
+        message: "Description must be nonempty and at most 400 characters",
+      });
+    }
+
+    fields.push("description = ?");
+    params.push(description.trim());
+  }
+
+  if (pagePrice !== undefined) {
+    if (!isValidPrice(pagePrice)) {
+      return res.status(400).json({
+        message: "Invalid pagePrice",
+      });
+    }
+
+    fields.push("pagePrice = ?");
+    params.push(Number(pagePrice));
+  }
+
+  db.query(
+    `UPDATE pages SET ${fields.join(", ")} WHERE pagesId = ?`,
+    [...params, req.params.id],
+    (err, result) => {
+      if (err) {
+        if (err.code === "ER_NO_REFERENCED_ROW_2") {
+          return res.status(400).json({ message: "Invalid categoryId" });
+        }
+        console.error(err);
+        return res.status(500).json({ message: "Database error" });
+      }
+      if (!result.affectedRows)
+        return res.status(404).json({ message: "Page not found" });
+      res.json({ message: "Page updated successfully" });
+    },
+  );
+};
+
+// DELETE /pages/:id  (admin/superadmin)
+const deletePage = (req, res) => {
+  db.query(
+    "DELETE FROM pages WHERE pagesId = ?",
+    [req.params.id],
+    (err, result) => {
+      if (err) {
+        if (err.code === "ER_ROW_IS_REFERENCED_2") {
+          return res
+            .status(409)
+            .json({ message: "Page is in use and cannot be deleted" });
+        }
+        console.error(err);
+        return res.status(500).json({ message: "Database error" });
+      }
+      if (!result.affectedRows)
+        return res.status(404).json({ message: "Page not found" });
+      res.json({ message: "Page deleted successfully" });
+    },
+  );
+};
+
+module.exports = { createPage, updatePage, deletePage, getPageById, getPages };

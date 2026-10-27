@@ -7,7 +7,6 @@ const reviewRoute = require("./route/reviewRoute");
 const categoryRoute = require("./route/categoryRoute");
 const templateRoute = require("./route/templateRoute");
 const paymentRoute = require("./route/paymentRoute");
-const refundRoute = require("./route/refundRoute");
 const siteRoute = require("./route/siteRoute");
 const pageRoute = require("./route/pageRoute");
 const themeRoute = require("./route/themeRoute");
@@ -17,9 +16,7 @@ const acontactRoute = require("./route/acontactRoute");
 
 const app = express();
 
-// CLIENT_URL can be a single origin or a comma-separated list, e.g.
-// CLIENT_URL=https://myapp.com,https://admin.myapp.com
-// If it is not set (local development), all origins are allowed.
+
 const allowedOrigins = process.env.CLIENT_URL
   ? process.env.CLIENT_URL.split(",").map((s) => s.trim())
   : true;
@@ -32,13 +29,9 @@ app.use("/review", reviewRoute);
 app.use("/categories", categoryRoute);
 app.use("/templates", templateRoute);
 app.use("/payments", paymentRoute);
-app.use("/refunds", refundRoute);
-// siteRoute, pageRoute, themeRoute all mount under /site but with different patterns.
-// pageRoute uses /site/:siteId/pages, themeRoute uses /site/:siteId/themes —
-// they don't collide with siteRoute's /site and /site/:siteId.
 app.use("/site", siteRoute);
-app.use("/site", pageRoute);
-app.use("/site", themeRoute);
+app.use("/pages", pageRoute);
+app.use("/theme", themeRoute);
 app.use("/site", siteMenuRoute);
 app.use("/faq", faqRoute);
 app.use("/contact", acontactRoute);

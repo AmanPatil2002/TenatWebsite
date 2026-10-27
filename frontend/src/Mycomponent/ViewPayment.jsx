@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Box,
+  Button,
   Chip,
   CircularProgress,
+  Collapse,
   Divider,
   MenuItem,
   Paper,
@@ -45,6 +47,116 @@ const formatDate = (value) =>
     ? new Date(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
     : "—";
 
+// JSON_ARRAYAGG returns NULL when there are no rows, and some drivers return a string
+const asArray = (value) => {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
+function PaymentRow({ p, admin, open, onToggle }) {
+  const pages = asArray(p.pages);
+  const colSpan = admin ? 9 : 8;
+
+  return (
+    <Fragment>
+      <TableRow hover>
+        <TableCell sx={{ whiteSpace: "nowrap" }}>{formatDate(p.paidAt)}</TableCell>
+        {admin && (
+          <TableCell>
+            {p.userName || "—"}
+            {p.userEmail && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                {p.userEmail}
+              </Typography>
+            )}
+          </TableCell>
+        )}
+        <TableCell>
+          {p.templateName || `#${p.templateId}`}
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+            {p.themeName ? `Theme: ${p.themeName}` : "No theme"} · {pages.length} page
+            {pages.length === 1 ? "" : "s"}
+          </Typography>
+        </TableCell>
+        <TableCell sx={{ fontFamily: "monospace", fontSize: "0.8rem" }}>{p.transactionId}</TableCell>
+        <TableCell>{p.invoiceNumber || "—"}</TableCell>
+        <TableCell>{p.method || "—"}</TableCell>
+        <TableCell>
+          <Chip size="small" label={p.status} color={STATUS_COLOR[p.status] || "default"} />
+        </TableCell>
+        <TableCell align="right" sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+          {formatMoney(p.amount, p.currency)}
+        </TableCell>
+        <TableCell align="right">
+          <Button size="small" onClick={onToggle}>
+            {open ? "Hide" : "Details"}
+          </Button>
+        </TableCell>
+      </TableRow>
+
+      <TableRow>
+        <TableCell colSpan={colSpan} sx={{ py: 0, borderBottom: open ? undefined : "none" }}>
+          <Collapse in={open} timeout="auto" unmountOnExit>
+            <Box sx={{ py: 2, px: { xs: 0, sm: 2 } }}>
+              <Stack direction={{ xs: "column", md: "row" }} spacing={3}>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Purchase
+                  </Typography>
+                  <Typography variant="body2">
+                    Theme: <strong>{p.themeName || "—"}</strong>
+                  </Typography>
+                  <Typography variant="body2">
+                    Template price: {formatMoney(p.baseAmount, p.currency)}
+                  </Typography>
+                  <Typography variant="body2">
+                    Pages subtotal: {formatMoney(p.pagesAmount, p.currency)}
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, mt: 0.5 }}>
+                    Total: {formatMoney(p.amount, p.currency)}
+                  </Typography>
+                </Box>
+
+                <Box sx={{ flex: 2 }}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Pages purchased
+                  </Typography>
+                  {pages.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary">
+                      No pages recorded for this payment.
+                    </Typography>
+                  ) : (
+                    <Table size="small">
+                      <TableBody>
+                        {pages.map((pg) => (
+                          <TableRow key={pg.pagesId}>
+                            <TableCell sx={{ pl: 0 }}>{pg.title || `Page #${pg.pagesId}`}</TableCell>
+                            <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                              {formatMoney(pg.price, p.currency)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </Box>
+              </Stack>
+            </Box>
+          </Collapse>
+        </TableCell>
+      </TableRow>
+    </Fragment>
+  );
+}
+
 // Client:  <PaymentsView />            -> GET /payments/my
 // Admin:   <PaymentsView admin />      -> GET /payments
 export default function PaymentsView({ admin = false }) {
@@ -53,6 +165,7 @@ export default function PaymentsView({ admin = false }) {
   const [error, setError] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [openId, setOpenId] = useState(null);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -92,7 +205,16 @@ export default function PaymentsView({ admin = false }) {
     return payments.filter((p) => {
       if (statusFilter !== "all" && p.status !== statusFilter) return false;
       if (!q) return true;
-      return [p.transactionId, p.invoiceNumber, p.templateName, p.userName, p.userEmail]
+      const pageTitles = asArray(p.pages).map((pg) => pg.title);
+      return [
+        p.transactionId,
+        p.invoiceNumber,
+        p.templateName,
+        p.themeName,
+        p.userName,
+        p.userEmail,
+        ...pageTitles,
+      ]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q));
     });
@@ -121,14 +243,18 @@ export default function PaymentsView({ admin = false }) {
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           {admin
             ? "Every purchase made on the platform."
-            : "Your template purchases and their invoices."}
+            : "Your template purchases, with the theme and pages you chose."}
         </Typography>
 
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ mb: 2 }}>
           <TextField
             size="small"
             label="Search"
-            placeholder={admin ? "Transaction, invoice, template, user" : "Transaction, invoice, template"}
+            placeholder={
+              admin
+                ? "Transaction, invoice, template, theme, page, user"
+                : "Transaction, invoice, template, theme, page"
+            }
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             sx={{ flex: 1 }}
@@ -153,9 +279,17 @@ export default function PaymentsView({ admin = false }) {
         {totals.length > 0 && (
           <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: "wrap", rowGap: 1 }}>
             {totals.map(([currency, sum]) => (
-              <Chip key={currency} color="primary" variant="outlined" label={`Captured: ${formatMoney(sum, currency)}`} />
+              <Chip
+                key={currency}
+                color="primary"
+                variant="outlined"
+                label={`Captured: ${formatMoney(sum, currency)}`}
+              />
             ))}
-            <Chip variant="outlined" label={`${filtered.length} payment${filtered.length === 1 ? "" : "s"}`} />
+            <Chip
+              variant="outlined"
+              label={`${filtered.length} payment${filtered.length === 1 ? "" : "s"}`}
+            />
           </Stack>
         )}
 
@@ -188,40 +322,22 @@ export default function PaymentsView({ admin = false }) {
                   <TableCell>Method</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell align="right">Amount</TableCell>
+                  <TableCell />
                 </TableRow>
               </TableHead>
               <TableBody>
-                {filtered.map((p) => (
-                  <TableRow key={p.paymentId ?? p.transactionId} hover>
-                    <TableCell sx={{ whiteSpace: "nowrap" }}>{formatDate(p.paidAt)}</TableCell>
-                    {admin && (
-                      <TableCell>
-                        {p.userName || "—"}
-                        {p.userEmail && (
-                          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-                            {p.userEmail}
-                          </Typography>
-                        )}
-                      </TableCell>
-                    )}
-                    <TableCell>{p.templateName || `#${p.templateId}`}</TableCell>
-                    <TableCell sx={{ fontFamily: "monospace", fontSize: "0.8rem" }}>
-                      {p.transactionId}
-                    </TableCell>
-                    <TableCell>{p.invoiceNumber || "—"}</TableCell>
-                    <TableCell>{p.method || "—"}</TableCell>
-                    <TableCell>
-                      <Chip
-                        size="small"
-                        label={p.status}
-                        color={STATUS_COLOR[p.status] || "default"}
-                      />
-                    </TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
-                      {formatMoney(p.amount, p.currency)}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {filtered.map((p) => {
+                  const key = p.paymentId ?? p.transactionId;
+                  return (
+                    <PaymentRow
+                      key={key}
+                      p={p}
+                      admin={admin}
+                      open={openId === key}
+                      onToggle={() => setOpenId(openId === key ? null : key)}
+                    />
+                  );
+                })}
               </TableBody>
             </Table>
           </TableContainer>
