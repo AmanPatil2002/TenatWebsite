@@ -1,3 +1,4 @@
+
 const db = require("../config/db");
 
 const isValidPrice = (value) => {
@@ -9,13 +10,14 @@ const isValidPrice = (value) => {
     return false;
   }
 
-  const price = Number(value);
+  const priceString = String(value).trim();
+  const price = Number(priceString);
 
   return (
     Number.isFinite(price) &&
     price >= 0 &&
     price <= 99999999.99 &&
-    /^\d+(\.\d{1,2})?$/.test(String(value).trim())
+    /^\d+(\.\d{1,2})?$/.test(priceString)
   );
 };
 
@@ -35,26 +37,27 @@ const isValidId = (value) => {
   }
 };
 
-// POST /pages  (admin/superadmin)
+// POST /pages
+// Create a page containing CKEditor HTML.
 const createPage = (req, res) => {
-  const { title, categoryId, description, pagePrice } = req.body;
+  const { title, categoryId, page, pagePrice } = req.body;
 
   if (
     typeof title !== "string" ||
     !title.trim() ||
-    typeof description !== "string" ||
-    !description.trim() ||
+    typeof page !== "string" ||
+    !page.trim() ||
     !isValidId(categoryId) ||
     !isValidPrice(pagePrice)
   ) {
     return res.status(400).json({
       message:
-        "Valid title, categoryId, description and pagePrice are required",
+        "Valid title, categoryId, page HTML and pagePrice are required",
     });
   }
 
   const cleanTitle = title.trim();
-  const cleanDescription = description.trim();
+  const pageContent = page.trim();
 
   if (cleanTitle.length > 150) {
     return res.status(400).json({
@@ -62,15 +65,9 @@ const createPage = (req, res) => {
     });
   }
 
-  if (cleanDescription.length > 400) {
-    return res.status(400).json({
-      message: "Description must be at most 400 characters",
-    });
-  }
-
   const sql = `
     INSERT INTO pages
-      (title, categoryId, description, pagePrice, createdBy)
+      (title, categoryId, page, pagePrice, createdBy)
     VALUES (?, ?, ?, ?, ?)
   `;
 
@@ -79,7 +76,7 @@ const createPage = (req, res) => {
     [
       cleanTitle,
       String(categoryId),
-      cleanDescription,
+      pageContent,
       Number(pagePrice),
       req.user.userId,
     ],
@@ -92,6 +89,7 @@ const createPage = (req, res) => {
         }
 
         console.error("Create page error:", err);
+
         return res.status(500).json({
           message: "Database error",
         });
@@ -101,69 +99,130 @@ const createPage = (req, res) => {
         message: "Page created successfully",
         pagesId: result.insertId,
       });
-    },
+    }
   );
 };
 
 // GET /pages?categoryId=1&search=home&page=1&limit=20
 const getPages = (req, res) => {
   const { categoryId, search } = req.query;
-  const page = Math.max(parseInt(req.query.page) || 1, 1);
-  const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 100);
-  const offset = (page - 1) * limit;
+
+  const pageNumber = Math.max(parseInt(req.query.page, 10) || 1, 1);
+  const limit = Math.min(
+    Math.max(parseInt(req.query.limit, 10) || 20, 1),
+    100
+  );
+  const offset = (pageNumber - 1) * limit;
 
   const where = [];
   const params = [];
-  if (categoryId) {
+
+  if (categoryId !== undefined && categoryId !== "") {
+    if (!isValidId(categoryId)) {
+      return res.status(400).json({
+        message: "Invalid categoryId",
+      });
+    }
+
     where.push("categoryId = ?");
-    params.push(categoryId);
+    params.push(String(categoryId));
   }
+
   if (search) {
     where.push("title LIKE ?");
     params.push(`%${search}%`);
   }
-  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+
+  const whereSql = where.length
+    ? `WHERE ${where.join(" AND ")}`
+    : "";
 
   db.query(
     `SELECT COUNT(*) AS total FROM pages ${whereSql}`,
     params,
     (err, countRows) => {
       if (err) {
-        console.error(err);
-        return res.status(500).json({ message: "Database error" });
+        console.error("Get pages count error:", err);
+
+        return res.status(500).json({
+          message: "Database error",
+        });
       }
-      const sql = `SELECT * FROM pages ${whereSql} ORDER BY createdAt DESC LIMIT ? OFFSET ?`;
-      db.query(sql, [...params, limit, offset], (err2, rows) => {
-        if (err2) {
-          console.error(err2);
-          return res.status(500).json({ message: "Database error" });
+
+      const sql = `
+        SELECT *
+        FROM pages
+        ${whereSql}
+        ORDER BY createdAt DESC
+        LIMIT ? OFFSET ?
+      `;
+
+      db.query(
+        sql,
+        [...params, limit, offset],
+        (err2, rows) => {
+          if (err2) {
+            console.error("Get pages error:", err2);
+
+            return res.status(500).json({
+              message: "Database error",
+            });
+          }
+
+          return res.json({
+            total: countRows[0].total,
+            page: pageNumber,
+            limit,
+            data: rows,
+          });
         }
-        res.json({ total: countRows[0].total, page, limit, data: rows });
-      });
-    },
+      );
+    }
   );
 };
 
 // GET /pages/:id
 const getPageById = (req, res) => {
+  if (!isValidId(req.params.id)) {
+    return res.status(400).json({
+      message: "Invalid page ID",
+    });
+  }
+
   db.query(
     "SELECT * FROM pages WHERE pagesId = ?",
     [req.params.id],
     (err, rows) => {
       if (err) {
-        console.error(err);
-        return res.status(500).json({ message: "Database error" });
+        console.error("Get page by ID error:", err);
+
+        return res.status(500).json({
+          message: "Database error",
+        });
       }
-      if (!rows.length)
-        return res.status(404).json({ message: "Page not found" });
-      res.json(rows[0]);
-    },
+
+      if (!rows.length) {
+        return res.status(404).json({
+          message: "Page not found",
+        });
+      }
+
+      return res.json(rows[0]);
+    }
   );
 };
 
-// PUT /pages/:id  (admin/superadmin) - partial update
+// PUT /pages/:id
+// Update only the fields provided.
 const updatePage = (req, res) => {
-  const { title, categoryId, description, pagePrice } = req.body;
+  if (!isValidId(req.params.id)) {
+    return res.status(400).json({
+      message: "Invalid page ID",
+    });
+  }
+
+  const { title, categoryId, page, pagePrice } = req.body;
+
   const fields = [];
   const params = [];
 
@@ -193,19 +252,15 @@ const updatePage = (req, res) => {
     params.push(String(categoryId));
   }
 
-  if (description !== undefined) {
-    if (
-      typeof description !== "string" ||
-      !description.trim() ||
-      description.trim().length > 400
-    ) {
+  if (page !== undefined) {
+    if (typeof page !== "string" || !page.trim()) {
       return res.status(400).json({
-        message: "Description must be nonempty and at most 400 characters",
+        message: "Page HTML must be a nonempty string",
       });
     }
 
-    fields.push("description = ?");
-    params.push(description.trim());
+    fields.push("page = ?");
+    params.push(page.trim());
   }
 
   if (pagePrice !== undefined) {
@@ -219,44 +274,86 @@ const updatePage = (req, res) => {
     params.push(Number(pagePrice));
   }
 
+  if (fields.length === 0) {
+    return res.status(400).json({
+      message: "No valid fields provided for update",
+    });
+  }
+
   db.query(
     `UPDATE pages SET ${fields.join(", ")} WHERE pagesId = ?`,
     [...params, req.params.id],
     (err, result) => {
       if (err) {
         if (err.code === "ER_NO_REFERENCED_ROW_2") {
-          return res.status(400).json({ message: "Invalid categoryId" });
+          return res.status(400).json({
+            message: "Invalid categoryId",
+          });
         }
-        console.error(err);
-        return res.status(500).json({ message: "Database error" });
+
+        console.error("Update page error:", err);
+
+        return res.status(500).json({
+          message: "Database error",
+        });
       }
-      if (!result.affectedRows)
-        return res.status(404).json({ message: "Page not found" });
-      res.json({ message: "Page updated successfully" });
-    },
+
+      if (!result.affectedRows) {
+        return res.status(404).json({
+          message: "Page not found",
+        });
+      }
+
+      return res.json({
+        message: "Page updated successfully",
+      });
+    }
   );
 };
 
-// DELETE /pages/:id  (admin/superadmin)
+// DELETE /pages/:id
 const deletePage = (req, res) => {
+  if (!isValidId(req.params.id)) {
+    return res.status(400).json({
+      message: "Invalid page ID",
+    });
+  }
+
   db.query(
     "DELETE FROM pages WHERE pagesId = ?",
     [req.params.id],
     (err, result) => {
       if (err) {
         if (err.code === "ER_ROW_IS_REFERENCED_2") {
-          return res
-            .status(409)
-            .json({ message: "Page is in use and cannot be deleted" });
+          return res.status(409).json({
+            message: "Page is in use and cannot be deleted",
+          });
         }
-        console.error(err);
-        return res.status(500).json({ message: "Database error" });
+
+        console.error("Delete page error:", err);
+
+        return res.status(500).json({
+          message: "Database error",
+        });
       }
-      if (!result.affectedRows)
-        return res.status(404).json({ message: "Page not found" });
-      res.json({ message: "Page deleted successfully" });
-    },
+
+      if (!result.affectedRows) {
+        return res.status(404).json({
+          message: "Page not found",
+        });
+      }
+
+      return res.json({
+        message: "Page deleted successfully",
+      });
+    }
   );
 };
 
-module.exports = { createPage, updatePage, deletePage, getPageById, getPages };
+module.exports = {
+  createPage,
+  updatePage,
+  deletePage,
+  getPageById,
+  getPages,
+};

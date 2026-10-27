@@ -384,15 +384,46 @@ export default function AddCategory() {
                 No categories yet. Add your first one using the form.
               </Typography>
             ) : (
-              <TableContainer>
-                <Table size="small">
+              <TableContainer
+                sx={{
+                  width: "100%",
+                  overflowX: "hidden",
+                  overflowY: "auto",
+                  WebkitOverflowScrolling: "touch",
+                  borderRadius: 1,
+                  height: 500,
+                }}
+              >
+                <Table
+                  size="small"
+                  sx={{
+                    minWidth: 600,
+                    tableLayout: "auto",
+                  }}
+                >
                   <TableHead>
                     <TableRow>
-                      <TableCell>Name</TableCell>
-                      <TableCell>Tag</TableCell>
-                      <TableCell align="right">Actions</TableCell>
+                      <TableCell sx={{ minWidth: 200, fontWeight: "bold" }}>
+                        Name
+                      </TableCell>
+
+                      <TableCell sx={{ minWidth: 280, fontWeight: "bold" }}>
+                        Tag
+                      </TableCell>
+
+                      <TableCell
+                        align="right"
+                        sx={{
+                          minWidth: 120,
+                          whiteSpace: "nowrap",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        Actions
+                      </TableCell>
                     </TableRow>
                   </TableHead>
+
                   <TableBody>
                     {categories.map((c) => (
                       <TableRow
@@ -400,13 +431,50 @@ export default function AddCategory() {
                         hover
                         selected={editingId === c.categoryId}
                       >
-                        <TableCell sx={{ overflowWrap: "anywhere" }}>
+                        <TableCell
+                          sx={{
+                            minWidth: 200,
+                            overflowWrap: "anywhere",
+                            verticalAlign: "middle",
+                          }}
+                        >
                           {c.name}
                         </TableCell>
-                        <TableCell sx={{ overflowWrap: "anywhere" }}>
-                          {c.tag ? <Chip size="small" label={c.tag} /> : "—"}
+
+                        <TableCell
+                          sx={{
+                            minWidth: 280,
+                            verticalAlign: "middle",
+                          }}
+                        >
+                          {c.tag ? (
+                            <Chip
+                              size="small"
+                              label={c.tag}
+                              sx={{
+                                maxWidth: "100%",
+                                height: "auto",
+                                "& .MuiChip-label": {
+                                  display: "block",
+                                  whiteSpace: "normal",
+                                  overflowWrap: "anywhere",
+                                  py: 0.5,
+                                },
+                              }}
+                            />
+                          ) : (
+                            "—"
+                          )}
                         </TableCell>
-                        <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+
+                        <TableCell
+                          align="right"
+                          sx={{
+                            minWidth: 120,
+                            whiteSpace: "nowrap",
+                            verticalAlign: "middle",
+                          }}
+                        >
                           <Tooltip title="Edit">
                             <span>
                               <IconButton
@@ -421,6 +489,7 @@ export default function AddCategory() {
                               </IconButton>
                             </span>
                           </Tooltip>
+
                           <Tooltip title="Delete">
                             <span>
                               <IconButton

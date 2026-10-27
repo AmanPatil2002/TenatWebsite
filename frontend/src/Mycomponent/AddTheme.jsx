@@ -42,8 +42,7 @@ const HEX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 // Read the token using the same storage key as your login code.
 const getToken = () => {
   const token =
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken");
+    localStorage.getItem("token") || localStorage.getItem("accessToken");
 
   return token?.replace(/^Bearer\s+/i, "").trim() || "";
 };
@@ -67,9 +66,7 @@ function ThemeForm({
   onCancel,
   submitting,
 }) {
-  const [formData, setFormData] = useState(
-    initialValues || getInitialForm()
-  );
+  const [formData, setFormData] = useState(initialValues || getInitialForm());
   const [errors, setErrors] = useState({});
 
   const validate = () => {
@@ -90,8 +87,7 @@ function ThemeForm({
     if (!formData.background.trim()) {
       nextErrors.background = "Background is required";
     } else if (!HEX.test(formData.background.trim())) {
-      nextErrors.background =
-        "Enter a valid hex color, e.g. #121212";
+      nextErrors.background = "Enter a valid hex color, e.g. #121212";
     }
 
     setErrors(nextErrors);
@@ -174,10 +170,7 @@ function ThemeForm({
         </Grid>
 
         <Grid size={12}>
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={1.5}
-          >
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
             <Button
               type="submit"
               variant="contained"
@@ -254,7 +247,7 @@ export default function AddTheme() {
       setLoadingList(false);
       showSnack(
         "Please log in first. No authentication token was found.",
-        "error"
+        "error",
       );
       return;
     }
@@ -264,15 +257,10 @@ export default function AddTheme() {
 
       const response = await axios.get(THEME_URL, config);
 
-      setThemes(
-        Array.isArray(response.data) ? response.data : []
-      );
+      setThemes(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       setThemes([]);
-      showSnack(
-        getErrorMessage(error, "Could not load themes."),
-        "error"
-      );
+      showSnack(getErrorMessage(error, "Could not load themes."), "error");
     } finally {
       setLoadingList(false);
     }
@@ -300,10 +288,7 @@ export default function AddTheme() {
 
       return true;
     } catch (error) {
-      showSnack(
-        getErrorMessage(error, "Failed to add theme."),
-        "error"
-      );
+      showSnack(getErrorMessage(error, "Failed to add theme."), "error");
       return false;
     } finally {
       setSubmitting(false);
@@ -321,11 +306,7 @@ export default function AddTheme() {
     try {
       setSubmitting(true);
 
-      await axios.put(
-        `${THEME_URL}/${editingId}`,
-        values,
-        config
-      );
+      await axios.put(`${THEME_URL}/${editingId}`, values, config);
 
       showSnack("Theme updated successfully!");
       setEditingId(null);
@@ -333,10 +314,7 @@ export default function AddTheme() {
 
       return true;
     } catch (error) {
-      showSnack(
-        getErrorMessage(error, "Failed to update theme."),
-        "error"
-      );
+      showSnack(getErrorMessage(error, "Failed to update theme."), "error");
       return false;
     } finally {
       setSubmitting(false);
@@ -358,10 +336,7 @@ export default function AddTheme() {
     try {
       setDeletingId(theme.themeId);
 
-      await axios.delete(
-        `${THEME_URL}/${theme.themeId}`,
-        config
-      );
+      await axios.delete(`${THEME_URL}/${theme.themeId}`, config);
 
       showSnack("Theme deleted successfully!");
 
@@ -371,10 +346,7 @@ export default function AddTheme() {
 
       await fetchThemes();
     } catch (error) {
-      showSnack(
-        getErrorMessage(error, "Failed to delete theme."),
-        "error"
-      );
+      showSnack(getErrorMessage(error, "Failed to delete theme."), "error");
     } finally {
       setDeletingId(null);
     }
@@ -382,10 +354,7 @@ export default function AddTheme() {
 
   const editingTheme =
     editingId !== null
-      ? themes.find(
-          (theme) =>
-            String(theme.themeId) === String(editingId)
-        )
+      ? themes.find((theme) => String(theme.themeId) === String(editingId))
       : null;
 
   return (
@@ -415,11 +384,7 @@ export default function AddTheme() {
               {editingTheme ? "Edit Theme" : "Add Theme"}
             </Typography>
 
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{ mb: 3 }}
-            >
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
               Create and manage website color themes.
             </Typography>
 
@@ -434,17 +399,9 @@ export default function AddTheme() {
                     }
                   : getInitialForm()
               }
-              submitLabel={
-                editingTheme ? "Save Changes" : "Add Theme"
-              }
-              onSubmit={
-                editingTheme ? handleUpdate : handleCreate
-              }
-              onCancel={
-                editingTheme
-                  ? () => setEditingId(null)
-                  : undefined
-              }
+              submitLabel={editingTheme ? "Save Changes" : "Add Theme"}
+              onSubmit={editingTheme ? handleUpdate : handleCreate}
+              onCancel={editingTheme ? () => setEditingId(null) : undefined}
               submitting={submitting}
             />
           </Paper>
@@ -464,11 +421,7 @@ export default function AddTheme() {
                 Existing Themes
               </Typography>
 
-              <Button
-                size="small"
-                onClick={fetchThemes}
-                disabled={loadingList}
-              >
+              <Button size="small" onClick={fetchThemes} disabled={loadingList}>
                 Refresh
               </Button>
             </Stack>
@@ -486,24 +439,33 @@ export default function AddTheme() {
                 <CircularProgress size={24} />
               </Box>
             ) : themes.length === 0 ? (
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                sx={{ py: 2 }}
-              >
-                No themes available. Log in with a valid account
-                and add your first theme.
+              <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
+                No themes available. Log in with a valid account and add your
+                first theme.
               </Typography>
             ) : (
-              <TableContainer>
-                <Table size="small">
+              <TableContainer
+                sx={{
+                  width: "100%",
+                  overflowX: "auto",
+                  overflowY: "auto",
+                  WebkitOverflowScrolling: "touch",
+                  borderRadius: 1,
+                  height: 500,
+                }}
+              >
+                <Table
+                  size="small"
+                  sx={{
+                    minWidth: 500,
+                    tableLayout: "auto",
+                  }}
+                >
                   <TableHead>
                     <TableRow>
                       <TableCell>Name</TableCell>
                       <TableCell>Colors</TableCell>
-                      <TableCell align="right">
-                        Actions
-                      </TableCell>
+                      <TableCell align="right">Actions</TableCell>
                     </TableRow>
                   </TableHead>
 
@@ -512,10 +474,7 @@ export default function AddTheme() {
                       <TableRow
                         key={theme.themeId}
                         hover
-                        selected={
-                          String(editingId) ===
-                          String(theme.themeId)
-                        }
+                        selected={String(editingId) === String(theme.themeId)}
                       >
                         <TableCell
                           sx={{
@@ -524,9 +483,7 @@ export default function AddTheme() {
                             verticalAlign: "middle",
                           }}
                         >
-                          <Typography variant="body2">
-                            {theme.name}
-                          </Typography>
+                          <Typography variant="body2">{theme.name}</Typography>
                         </TableCell>
 
                         <TableCell sx={{ verticalAlign: "middle" }}>
@@ -610,12 +567,9 @@ export default function AddTheme() {
                               <IconButton
                                 size="small"
                                 aria-label={`Edit ${theme.name}`}
-                                onClick={() =>
-                                  setEditingId(theme.themeId)
-                                }
+                                onClick={() => setEditingId(theme.themeId)}
                                 disabled={
-                                  submitting ||
-                                  deletingId === theme.themeId
+                                  submitting || deletingId === theme.themeId
                                 }
                               >
                                 <EditIcon fontSize="small" />
@@ -631,8 +585,7 @@ export default function AddTheme() {
                                 aria-label={`Delete ${theme.name}`}
                                 onClick={() => handleDelete(theme)}
                                 disabled={
-                                  submitting ||
-                                  deletingId === theme.themeId
+                                  submitting || deletingId === theme.themeId
                                 }
                               >
                                 {deletingId === theme.themeId ? (

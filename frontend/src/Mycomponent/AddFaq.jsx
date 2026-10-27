@@ -26,14 +26,19 @@ import axios from "axios";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-
 const MIN_QUESTION = 10;
 const MIN_ANSWER = 20;
 
 const getInitialForm = () => ({ question: "", answer: "" });
 
 // ---- Shared form (add + edit) -------------------------------------------
-function FaqForm({ initialValues, submitLabel, onSubmit, onCancel, submitting }) {
+function FaqForm({
+  initialValues,
+  submitLabel,
+  onSubmit,
+  onCancel,
+  submitting,
+}) {
   const [formData, setFormData] = useState(initialValues || getInitialForm());
   const [errors, setErrors] = useState({});
 
@@ -144,13 +149,19 @@ export default function AddFaq() {
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
-  const [snack, setSnack] = useState({ open: false, message: "", severity: "success" });
+  const [snack, setSnack] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
 
   const showSnack = (message, severity = "success") =>
     setSnack({ open: true, message, severity });
 
   const getToken = () => localStorage.getItem("token");
-  const authHeaders = () => ({ headers: { Authorization: `Bearer ${getToken()}` } });
+  const authHeaders = () => ({
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
   const faqUrl = `${API_URL}/faq/faq`;
 
   const fetchFaqs = useCallback(async () => {
@@ -206,7 +217,10 @@ export default function AddFaq() {
       fetchFaqs();
       return true;
     } catch (error) {
-      showSnack(error.response?.data?.message || "Failed to update FAQ.", "error");
+      showSnack(
+        error.response?.data?.message || "Failed to update FAQ.",
+        "error",
+      );
       return false;
     } finally {
       setSubmitting(false);
@@ -224,23 +238,41 @@ export default function AddFaq() {
       if (editingId === faq.faqId) setEditingId(null);
       fetchFaqs();
     } catch (error) {
-      showSnack(error.response?.data?.message || "Failed to delete FAQ.", "error");
+      showSnack(
+        error.response?.data?.message || "Failed to delete FAQ.",
+        "error",
+      );
     } finally {
       setDeletingId(null);
     }
   };
 
-  const editingFaq = editingId != null ? faqs.find((f) => f.faqId === editingId) : null;
+  const editingFaq =
+    editingId != null ? faqs.find((f) => f.faqId === editingId) : null;
 
   return (
-    <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, minHeight: "100vh", backgroundColor: "#f5f5f5" }}>
-      <Grid container spacing={{ xs: 2, md: 3 }} sx={{ maxWidth: 1200, mx: "auto" }}>
+    <Box
+      sx={{
+        p: { xs: 1.5, sm: 2, md: 3 },
+        minHeight: "100vh",
+        backgroundColor: "#f5f5f5",
+      }}
+    >
+      <Grid
+        container
+        spacing={{ xs: 2, md: 3 }}
+        sx={{ maxWidth: 1200, mx: "auto" }}
+      >
         {/* -------- Form card -------- */}
         <Grid size={{ xs: 12, md: 5 }}>
           <Paper elevation={1} sx={{ p: { xs: 2, sm: 3 } }}>
             <Typography
               variant="h5"
-              sx={{ fontWeight: "bold", mb: 0.5, fontSize: { xs: "1.2rem", sm: "1.5rem" } }}
+              sx={{
+                fontWeight: "bold",
+                mb: 0.5,
+                fontSize: { xs: "1.2rem", sm: "1.5rem" },
+              }}
             >
               {editingFaq ? "Edit FAQ" : "Add FAQ"}
             </Typography>
@@ -252,7 +284,10 @@ export default function AddFaq() {
               key={editingFaq ? editingFaq.faqId : "new"}
               initialValues={
                 editingFaq
-                  ? { question: editingFaq.question || "", answer: editingFaq.answer || "" }
+                  ? {
+                      question: editingFaq.question || "",
+                      answer: editingFaq.answer || "",
+                    }
                   : getInitialForm()
               }
               submitLabel={editingFaq ? "Save changes" : "Add FAQ"}
@@ -280,26 +315,76 @@ export default function AddFaq() {
                 No FAQs yet. Add your first one using the form.
               </Typography>
             ) : (
-              <TableContainer>
-                <Table size="small">
+              <TableContainer
+                sx={{
+                  width: "100%",
+                  overflowX: "auto",
+                  overflowY: "hidden",
+                  WebkitOverflowScrolling: "touch",
+                  borderRadius: 1,
+                }}
+              >
+                <Table
+                  size="small"
+                  sx={{
+                    minWidth: 650,
+                    tableLayout: "auto",
+                  }}
+                >
                   <TableHead>
                     <TableRow>
-                      <TableCell >Question & Answer</TableCell>
-                      <TableCell align="right">Actions</TableCell>
+                      <TableCell sx={{ minWidth: 450, fontWeight: "bold" }}>
+                        Question & Answer
+                      </TableCell>
+
+                      <TableCell
+                        align="right"
+                        sx={{
+                          minWidth: 120,
+                          whiteSpace: "nowrap",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        Actions
+                      </TableCell>
                     </TableRow>
                   </TableHead>
+
                   <TableBody>
                     {faqs.map((f) => (
-                      <TableRow key={f.faqId} hover selected={editingId === f.faqId}>
-                        <TableCell sx={{ maxWidth: 220, verticalAlign: "top" }}>
-                          <Stack>
-                            <Typography variant="body1"><b>Question :</b> {f.question}</Typography>
-                            <Typography variant="body1"><b>Answer : </b> {f.answer}</Typography>
+                      <TableRow
+                        key={f.faqId}
+                        hover
+                        selected={editingId === f.faqId}
+                      >
+                        <TableCell
+                          sx={{
+                            minWidth: 450,
+                            maxWidth: 650,
+                            verticalAlign: "top",
+                            whiteSpace: "normal",
+                            overflowWrap: "anywhere",
+                          }}
+                        >
+                          <Stack spacing={1}>
+                            <Typography variant="body1">
+                              <b>Question:</b> {f.question}
+                            </Typography>
+
+                            <Typography variant="body1">
+                              <b>Answer:</b> {f.answer}
+                            </Typography>
                           </Stack>
-                          
                         </TableCell>
-                        
-                        <TableCell align="right" sx={{ whiteSpace: "nowrap", verticalAlign: "top" }}>
+
+                        <TableCell
+                          align="right"
+                          sx={{
+                            minWidth: 120,
+                            whiteSpace: "nowrap",
+                            verticalAlign: "top",
+                          }}
+                        >
                           <Tooltip title="Edit">
                             <span>
                               <IconButton
@@ -311,6 +396,7 @@ export default function AddFaq() {
                               </IconButton>
                             </span>
                           </Tooltip>
+
                           <Tooltip title="Delete">
                             <span>
                               <IconButton

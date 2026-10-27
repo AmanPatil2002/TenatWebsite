@@ -15,6 +15,7 @@
     "@mui/icons-material": "^9.5.0",
     "@mui/material": "^9.5.0",
     "@mui/styled-engine-sc": "^9.5.0",
+    "@mui/x-charts": "^9.16.0",
     "axios": "^1.20.0",
     "ckeditor4": "^4.25.2",
     "ckeditor4-react": "^5.2.1",

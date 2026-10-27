@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
 
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import axios from "axios";
 import {
   Alert,
   Box,
@@ -7,516 +8,353 @@ import {
   CircularProgress,
   Divider,
   FormControl,
+  FormControlLabel,
+  FormGroup,
+  FormHelperText,
+  Grid,
   InputLabel,
   MenuItem,
   Paper,
   Select,
-  Snackbar,
   Stack,
+  Switch,
   TextField,
   Typography,
 } from "@mui/material";
+import {
+  AddPhotoAlternateOutlined,
+  CloudUploadOutlined,
+  // DeleteOutline,
+  SaveOutlined,
+} from "@mui/icons-material";
 
-import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
-import DeleteIcon from "@mui/icons-material/Delete";
-import AddIcon from "@mui/icons-material/Add";
-import RefreshIcon from "@mui/icons-material/Refresh";
+const API_URL = (
+  import.meta.env.VITE_API_URL || "http://localhost:5000"
+).replace(/\/+$/, "");
 
-const API_URL = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 const TEMPLATES_URL = `${API_URL}/templates`;
 const CATEGORIES_URL = `${API_URL}/categories`;
+const THEMES_URL = `${API_URL}/theme`;
+const PAGES_URL = `${API_URL}/pages`;
+const IMAGE_UPLOAD_URL = `${API_URL}/uploads/ckeditor`;
 
 const EMPTY_FORM = {
-  name: "",
   categoryId: "",
+  name: "",
   language: "English",
   shortDescription: "",
   description: "",
   thumbnailUrl: "",
   photos: [],
-  price: "0",
+  price: "",
   currency: "INR",
-  validityDays: "365",
+  validityDays: 365,
   status: "draft",
+  themeIds: [],
+  pageIds: [],
 };
 
-const authConfig = () => ({
-  headers: {
-    Authorization: `Bearer ${localStorage.getItem("token")}`,
-  },
-});
+const authConfig = (extraHeaders = {}) => {
+  const token =
+    localStorage.getItem("token") ||
+    localStorage.getItem("authToken") ||
+    localStorage.getItem("accessToken");
 
-const getErrorMessage = (error, fallback) =>
-  error.response?.data?.message || error.response?.data?.error || fallback;
+  return {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...extraHeaders,
+    },
+  };
+};
 
-function MultiplePhotoUpload({ value, onChange, disabled = false }) {
+const getId = (item) =>
+  item?.id ??
+  item?.categoryId ??
+  item?.themeId ??
+  item?.pageId ??
+  item?.templateId;
+
+const getName = (item) =>
+  item?.name ?? item?.title ?? item?.pageName ?? item?.themeName ?? "";
+
+const getArray = (response) => {
+  const data = response?.data;
+
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.data)) return data.data;
+  if (Array.isArray(data?.categories)) return data.categories;
+  if (Array.isArray(data?.themes)) return data.themes;
+  if (Array.isArray(data?.pages)) return data.pages;
+  if (Array.isArray(data?.templates)) return data.templates;
+
+  return [];
+};
+
+const parsePhotos = (photos) => {
+  if (Array.isArray(photos)) {
+    return photos.filter(
+      (photo) => typeof photo === "string" && photo.trim()
+    );
+  }
+
+  if (typeof photos !== "string" || !photos.trim()) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(photos);
+
+    if (Array.isArray(parsed)) {
+      return parsed.filter(
+        (photo) => typeof photo === "string" && photo.trim()
+      );
+    }
+
+    if (typeof parsed === "string" && parsed.trim()) {
+      return [parsed.trim()];
+    }
+
+    return [];
+  } catch {
+    return /^https?:\/\//i.test(photos.trim())
+      ? [photos.trim()]
+      : [];
+  }
+};
+
+const getPagePrice = (page) =>
+  Number(
+    page?.price ??
+      page?.pagePrice ??
+      page?.amount ??
+      0
+  ) || 0;
+
+function MultiplePhotoUpload({
+  value = [],
+  onChange,
+  disabled = false,
+}) {
   const inputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
 
-  const photos = Array.isArray(value) ? value : [];
+  const photos = useMemo(() => parsePhotos(value), [value]);
 
-  const handleFiles = async (event) => {
-    const files = Array.from(event.target.files || []);
-    event.target.value = "";
+  const handleFiles = useCallback(
+    async (event) => {
+      const files = Array.from(event.target.files || []);
+      event.target.value = "";
 
-    if (!files.length) return;
+      if (!files.length) return;
 
-    setError("");
-
-    const imageFiles = files.filter((file) => file.type.startsWith("image/"));
-
-    if (imageFiles.length !== files.length) {
-      setError("Please select image files only.");
-    }
-
-    const validFiles = imageFiles.filter(
-      (file) => file.size <= 5 * 1024 * 1024,
-    );
-
-    if (validFiles.length !== imageFiles.length) {
-      setError("Each image must be 5 MB or smaller.");
-    }
-
-    if (!validFiles.length) return;
-
-    setUploading(true);
-
-    try {
-      const uploadedUrls = [];
-
-      for (const file of validFiles) {
-        const formData = new FormData();
-        formData.append("images", file);
-
-        const response = await axios.post(
-          `${API_URL}/uploads/images`,
-          formData,
-          authConfig(),
-        );
-
-        const data = response.data;
-
-        // Supported example response shapes:
-        // { url: "..." }
-        // { urls: ["...", "..."] }
-        // { images: [{ url: "..." }] }
-        const urls =
-          data?.urls ||
-          data?.images?.map((image) =>
-            typeof image === "string" ? image : image.url,
-          ) ||
-          (data?.url ? [data.url] : []);
-
-        uploadedUrls.push(...urls.filter(Boolean));
-      }
-
-      if (!uploadedUrls.length) {
-        throw new Error("The upload endpoint did not return any image URLs.");
-      }
-
-      onChange([...photos, ...uploadedUrls]);
-    } catch (err) {
-      setError(
-        err.response?.data?.message || err.message || "Image upload failed.",
+      const invalidFile = files.find(
+        (file) => !file.type.startsWith("image/")
       );
-    } finally {
-      setUploading(false);
-    }
-  };
 
-  const removePhoto = (indexToRemove) => {
-    onChange(photos.filter((_, index) => index !== indexToRemove));
+      if (invalidFile) {
+        setError("Please select image files only.");
+        return;
+      }
+
+      const oversizedFile = files.find(
+        (file) => file.size > 10 * 1024 * 1024
+      );
+
+      if (oversizedFile) {
+        setError("Each image must be 10 MB or smaller.");
+        return;
+      }
+
+      setError("");
+      setUploading(true);
+
+      try {
+        const uploadedUrls = [];
+
+        for (const file of files) {
+          const body = new FormData();
+          body.append("upload", file);
+
+          const response = await axios.post(
+            IMAGE_UPLOAD_URL,
+            body,
+            authConfig()
+          );
+
+          const data = response.data;
+
+          const imageUrl =
+            data?.url ||
+            data?.data?.url ||
+            data?.file?.url ||
+            data?.data?.file?.url;
+
+          if (
+            typeof imageUrl !== "string" ||
+            !/^https?:\/\/\S+$/i.test(imageUrl.trim())
+          ) {
+            throw new Error(
+              `The upload response did not contain a valid URL for "${file.name}".`
+            );
+          }
+
+          uploadedUrls.push(imageUrl.trim());
+        }
+
+        onChange([...photos, ...uploadedUrls]);
+      } catch (err) {
+        console.error("Photo upload failed:", err);
+
+        setError(
+          err.response?.data?.message ||
+            err.response?.data?.error ||
+            err.message ||
+            "Failed to upload photos."
+        );
+      } finally {
+        setUploading(false);
+      }
+    },
+    [onChange, photos]
+  );
+
+  const removePhoto = (index) => {
+    onChange(photos.filter((_, photoIndex) => photoIndex !== index));
   };
 
   return (
     <Box>
-      <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
-        Template Photos
+      <Typography variant="subtitle1" fontWeight={700} gutterBottom>
+        Additional Template Photos
+      </Typography>
+
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Select multiple images. Each image is uploaded and its URL is saved
+        with the template.
       </Typography>
 
       <input
         ref={inputRef}
+        hidden
+        multiple
         type="file"
         accept="image/*"
-        multiple
-        hidden
         onChange={handleFiles}
+        disabled={disabled || uploading}
       />
 
-      <Paper
+      <Button
         variant="outlined"
-        sx={{
-          p: 2,
-          borderStyle: "dashed",
-          textAlign: "center",
-          bgcolor: "action.hover",
-        }}
+        startIcon={
+          uploading ? (
+            <CircularProgress size={18} />
+          ) : (
+            <CloudUploadOutlined />
+          )
+        }
+        onClick={() => inputRef.current?.click()}
+        disabled={disabled || uploading}
       >
-        <CloudUploadOutlinedIcon
-          sx={{ fontSize: 36, color: "text.secondary", mb: 1 }}
-        />
-
-        <Typography variant="body2" sx={{ mb: 1 }}>
-          Select multiple images from your computer
-        </Typography>
-
-        <Button
-          variant="outlined"
-          startIcon={
-            uploading ? (
-              <CircularProgress size={16} />
-            ) : (
-              <CloudUploadOutlinedIcon />
-            )
-          }
-          onClick={() => inputRef.current?.click()}
-          disabled={disabled || uploading}
-        >
-          {uploading ? "Uploading..." : "Choose Images"}
-        </Button>
-
-        <Typography
-          variant="caption"
-          display="block"
-          color="text.secondary"
-          sx={{ mt: 1 }}
-        >
-          JPG, PNG, WEBP · Maximum 5 MB per image
-        </Typography>
-      </Paper>
+        {uploading ? "Uploading photos..." : "Choose Photos"}
+      </Button>
 
       {error && (
-        <Alert severity="error" sx={{ mt: 1 }}>
+        <Alert severity="error" sx={{ mt: 2 }}>
           {error}
         </Alert>
       )}
 
-      <Stack direction="row" flexWrap="wrap" gap={1.5} sx={{ mt: 2 }}>
-        {photos.map((photo, index) => (
-          <Box
-            key={`${photo}-${index}`}
-            sx={{
-              width: 100,
-              position: "relative",
-              border: 1,
-              borderColor: "divider",
-              borderRadius: 1.5,
-              overflow: "hidden",
-            }}
-          >
-            <Box
-              component="img"
-              src={photo}
-              alt={`Template photo ${index + 1}`}
-              sx={{
-                display: "block",
-                width: "100%",
-                height: 80,
-                objectFit: "cover",
-              }}
-              onError={(event) => {
-                event.currentTarget.style.opacity = "0.3";
-              }}
-            />
-
-            <Typography
-              variant="caption"
-              display="block"
-              noWrap
-              sx={{ px: 0.75, py: 0.5 }}
-            >
-              Image {index + 1}
-            </Typography>
-
-            <Button
-              aria-label={`Remove image ${index + 1}`}
-              title="Remove image"
-              size="small"
-              color="error"
-              onClick={() => removePhoto(index)}
-              disabled={disabled || uploading}
-              sx={{
-                position: "absolute",
-                top: 2,
-                right: 2,
-                minWidth: 0,
-                width: 26,
-                height: 26,
-                p: 0,
-                bgcolor: "background.paper",
-              }}
-            >
-              <DeleteIcon fontSize="small" />
-            </Button>
-          </Box>
-        ))}
-      </Stack>
-
-      <Typography variant="caption" color="text.secondary">
-        {photos.length} image{photos.length === 1 ? "" : "s"} selected
-      </Typography>
-    </Box>
-  );
-}
-
-function TemplateForm({
-  initialValues,
-  categories,
-  submitting,
-  onSubmit,
-  onCancel,
-}) {
-  const [form, setForm] = useState({
-    ...EMPTY_FORM,
-    ...initialValues,
-    photos: Array.isArray(initialValues?.photos) ? initialValues.photos : [],
-  });
-  const [photosError, setPhotosError] = useState("");
-
-  useEffect(() => {
-    setForm({
-      ...EMPTY_FORM,
-      ...initialValues,
-      photos: Array.isArray(initialValues?.photos) ? initialValues.photos : [],
-    });
-  }, [initialValues]);
-
-  const handleChange = (event) => {
-    const { name, value } = event.target;
-    setForm((previous) => ({ ...previous, [name]: value }));
-  };
-
-  const handleSubmit = (event) => {
-    event.preventDefault();
-    setPhotosError("");
-
-    if (!form.name.trim()) return;
-    if (!form.categoryId) return;
-
-    let photos = [];
-
-    if (form.photos.trim()) {
-      try {
-        const parsed = JSON.parse(form.photos);
-        if (!Array.isArray(parsed)) {
-          throw new Error("Photos must be a JSON array.");
-        }
-        photos = parsed;
-      } catch {
-        setPhotosError(
-          'Enter photos as a valid JSON array, for example: ["https://example.com/photo.jpg"]',
-        );
-        return;
-      }
-    }
-
-    onSubmit({
-      ...form,
-      name: form.name.trim(),
-      categoryId: Number(form.categoryId),
-      shortDescription: form.shortDescription.trim(),
-      description: form.description,
-      thumbnailUrl: form.thumbnailUrl.trim(),
-      photos: form.photos,
-      price: Number(form.price || 0),
-      validityDays: Number(form.validityDays || 365),
-    });
-  };
-
-  return (
-    <Box component="form" onSubmit={handleSubmit} noValidate>
-      <Stack spacing={2.5}>
-        <TextField
-          required
-          fullWidth
-          label="Template name"
-          name="name"
-          value={form.name}
-          onChange={handleChange}
-        />
-
-        <FormControl fullWidth required>
-          <InputLabel id="category-label">Category</InputLabel>
-          <Select
-            labelId="category-label"
-            label="Category"
-            name="categoryId"
-            value={form.categoryId === "" ? "" : String(form.categoryId)}
-            onChange={handleChange}
-          >
-            {categories.map((category) => (
-              <MenuItem
-                key={category.categoryId}
-                value={String(category.categoryId)}
+      {photos.length > 0 && (
+        <Grid container spacing={2} sx={{ mt: 1 }}>
+          {photos.map((photo, index) => (
+            <Grid item xs={6} sm={4} md={3} key={`${photo}-${index}`}>
+              <Paper
+                variant="outlined"
+                sx={{
+                  overflow: "hidden",
+                  borderRadius: 2,
+                  height: "100%",
+                }}
               >
-                {category.name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+                <Box
+                  component="img"
+                  src={photo}
+                  alt={`Template photo ${index + 1}`}
+                  sx={{
+                    display: "block",
+                    width: "100%",
+                    height: 130,
+                    objectFit: "cover",
+                  }}
+                />
 
-        <TextField
-          fullWidth
-          label="Language"
-          name="language"
-          value={form.language}
-          onChange={handleChange}
-        />
+                <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  sx={{ p: 1 }}
+                >
+                  <Typography variant="caption" noWrap>
+                    Photo {index + 1}
+                  </Typography>
 
-        <TextField
-          fullWidth
-          label="Short description"
-          name="shortDescription"
-          value={form.shortDescription}
-          onChange={handleChange}
-          inputProps={{ maxLength: 500 }}
-        />
+                  <Button
+                    color="error"
+                    size="small"
+                    aria-label={`Remove photo ${index + 1}`}
+                    onClick={() => removePhoto(index)}
+                    disabled={disabled || uploading}
+                    sx={{ minWidth: 36 }}
+                  >
+                    <DeleteOutline fontSize="small" />
+                  </Button>
+                </Stack>
+              </Paper>
+            </Grid>
+          ))}
+        </Grid>
+      )}
 
-        {/* Regular multiline description field — no CKEditor */}
-        <TextField
-          fullWidth
-          multiline
-          minRows={6}
-          label="Description"
-          name="description"
-          value={form.description}
-          onChange={handleChange}
-          placeholder="Enter the template description..."
-          helperText="Plain text description."
-        />
-
-        <TextField
-          fullWidth
-          label="Thumbnail URL"
-          name="thumbnailUrl"
-          value={form.thumbnailUrl}
-          onChange={handleChange}
-          placeholder="https://example.com/thumbnail.jpg"
-        />
-
-        <MultiplePhotoUpload
-          value={form.photos}
-          onChange={(photos) =>
-            setForm((previous) => ({ ...previous, photos }))
-          }
-          disabled={submitting}
-        />
-
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-          <TextField
-            fullWidth
-            type="number"
-            label="Price"
-            name="price"
-            value={form.price}
-            onChange={handleChange}
-            inputProps={{ min: 0, step: "0.01" }}
-          />
-
-          <TextField
-            fullWidth
-            label="Currency"
-            name="currency"
-            value={form.currency}
-            onChange={handleChange}
-          />
-
-          <TextField
-            fullWidth
-            type="number"
-            label="Validity (days)"
-            name="validityDays"
-            value={form.validityDays}
-            onChange={handleChange}
-            inputProps={{ min: 1, step: 1 }}
-          />
-        </Stack>
-
-        <FormControl fullWidth>
-          <InputLabel id="status-label">Status</InputLabel>
-          <Select
-            labelId="status-label"
-            label="Status"
-            name="status"
-            value={form.status}
-            onChange={handleChange}
-          >
-            <MenuItem value="draft">Draft</MenuItem>
-            <MenuItem value="published">Published</MenuItem>
-            <MenuItem value="inactive">Inactive</MenuItem>
-          </Select>
-        </FormControl>
-
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-          <Button
-            type="submit"
-            variant="contained"
-            startIcon={<AddIcon />}
-            disabled={submitting}
-          >
-            {submitting ? "Saving..." : "Save template"}
-          </Button>
-
-          {onCancel && (
-            <Button
-              type="button"
-              variant="outlined"
-              onClick={onCancel}
-              disabled={submitting}
-            >
-              Cancel
-            </Button>
-          )}
-        </Stack>
-      </Stack>
+      <FormHelperText>
+        {photos.length} photo{photos.length === 1 ? "" : "s"} selected
+      </FormHelperText>
     </Box>
   );
 }
 
 export default function AddTemplate() {
+  const [form, setForm] = useState(EMPTY_FORM);
   const [categories, setCategories] = useState([]);
-  const [templates, setTemplates] = useState([]);
-  const [editingId, setEditingId] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [snack, setSnack] = useState({
-    open: false,
-    message: "",
-    severity: "success",
-  });
+  const [themes, setThemes] = useState([]);
+  const [pages, setPages] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
-  const showSnack = (message, severity = "success") => {
-    setSnack({ open: true, message, severity });
-  };
-
-  const fetchData = useCallback(async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
+    setError("");
 
     try {
-      const [categoryResponse, templateResponse] = await Promise.all([
-        axios.get(CATEGORIES_URL, authConfig()),
-        axios.get(`${TEMPLATES_URL}/admin/all?limit=100`, authConfig()),
-      ]);
+      const [categoryResponse, themeResponse, pageResponse] =
+        await Promise.all([
+          axios.get(CATEGORIES_URL, authConfig()),
+          axios.get(THEMES_URL, authConfig()),
+          axios.get(PAGES_URL, authConfig()),
+        ]);
 
-      const categoryData = categoryResponse.data;
-      const templateData = templateResponse.data;
+      setCategories(getArray(categoryResponse));
+      setThemes(getArray(themeResponse));
+      setPages(getArray(pageResponse));
+    } catch (err) {
+      console.error("Failed to load template form data:", err);
 
-      setCategories(
-        Array.isArray(categoryData)
-          ? categoryData
-          : categoryData?.categories || categoryData?.data || [],
-      );
-
-      setTemplates(
-        Array.isArray(templateData)
-          ? templateData
-          : templateData?.templates || templateData?.data || [],
-      );
-    } catch (error) {
-      showSnack(
-        getErrorMessage(error, "Could not load templates or categories."),
-        "error",
+      setError(
+        err.response?.data?.message ||
+          "Unable to load categories, themes, or pages. Check your API routes."
       );
     } finally {
       setLoading(false);
@@ -524,192 +362,480 @@ export default function AddTemplate() {
   }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    loadData();
+  }, [loadData]);
 
-  const handleSave = async (values) => {
-    setSubmitting(true);
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+
+    setForm((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
+  };
+
+  const handlePhotoChange = (photos) => {
+    setForm((previous) => ({
+      ...previous,
+      photos,
+    }));
+  };
+
+  const handleThemeChange = (event) => {
+    const values = event.target.value;
+
+    setForm((previous) => ({
+      ...previous,
+      themeIds: typeof values === "string" ? values.split(",") : values,
+    }));
+  };
+
+  const handlePageChange = (event) => {
+    const values = event.target.value;
+
+    setForm((previous) => ({
+      ...previous,
+      pageIds: typeof values === "string" ? values.split(",") : values,
+    }));
+  };
+
+  const selectedPages = useMemo(
+    () =>
+      pages.filter((page) =>
+        form.pageIds.map(String).includes(String(getId(page)))
+      ),
+    [pages, form.pageIds]
+  );
+
+  const calculatedPagePrice = useMemo(
+    () =>
+      selectedPages.reduce(
+        (total, page) => total + getPagePrice(page),
+        0
+      ),
+    [selectedPages]
+  );
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError("");
+    setSuccess("");
+
+    if (!form.categoryId) {
+      setError("Please select a category.");
+      return;
+    }
+
+    if (!form.name.trim()) {
+      setError("Please enter a template name.");
+      return;
+    }
+
+    if (form.price === "" || !Number.isFinite(Number(form.price))) {
+      setError("Please enter a valid template price.");
+      return;
+    }
+
+    if (
+      !Number.isInteger(Number(form.validityDays)) ||
+      Number(form.validityDays) < 1
+    ) {
+      setError("Validity must be a positive whole number of days.");
+      return;
+    }
+
+    setSaving(true);
 
     try {
-      if (editingId !== null) {
-        await axios.put(`${TEMPLATES_URL}/${editingId}`, values, authConfig());
-        showSnack("Template updated successfully.");
-      } else {
-        await axios.post(TEMPLATES_URL, values, authConfig());
-        showSnack("Template added successfully.");
-      }
+      const payload = {
+        categoryId: Number(form.categoryId),
+        name: form.name.trim(),
+        language: form.language.trim() || null,
+        shortDescription: form.shortDescription.trim() || null,
+        description: form.description.trim() || null,
+        thumbnailUrl: form.thumbnailUrl.trim() || null,
 
-      setEditingId(null);
-      await fetchData();
-    } catch (error) {
-      showSnack(
-        getErrorMessage(error, "Could not save the template."),
-        "error",
+        // IMPORTANT: Send an array. The backend validates each URL
+        // and serializes the array before storing it in MySQL.
+        photos: parsePhotos(form.photos),
+
+        price: Number(form.price),
+        currency: form.currency.trim().toUpperCase(),
+        validityDays: Number(form.validityDays),
+        status: form.status,
+
+        // Included for APIs that support template-theme/page associations.
+        themeIds: form.themeIds.map(Number),
+        pageIds: form.pageIds.map(Number),
+      };
+
+      const response = await axios.post(
+        TEMPLATES_URL,
+        payload,
+        authConfig({ "Content-Type": "application/json" })
+      );
+
+      setSuccess(
+        response.data?.message || "Template created successfully."
+      );
+
+      setForm({ ...EMPTY_FORM });
+    } catch (err) {
+      console.error("Create template failed:", err);
+
+      const responseData = err.response?.data;
+
+      setError(
+        responseData?.message ||
+          responseData?.error ||
+          (Array.isArray(responseData?.errors)
+            ? responseData.errors.join(", ")
+            : "") ||
+          "Failed to create template. Please check the form and try again."
       );
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   };
 
-  const handleDelete = async (template) => {
-    if (!window.confirm(`Delete template "${template.name}"?`)) return;
-
-    try {
-      await axios.delete(
-        `${TEMPLATES_URL}/${template.templateId}`,
-        authConfig(),
-      );
-      showSnack("Template deleted.");
-      await fetchData();
-    } catch (error) {
-      showSnack(
-        getErrorMessage(error, "Could not delete the template."),
-        "error",
-      );
-    }
-  };
-
-  const editingTemplate =
-    templates.find((item) => item.templateId === editingId) || null;
-
-  const initialValues = editingTemplate
-    ? {
-        ...EMPTY_FORM,
-        ...editingTemplate,
-        categoryId: editingTemplate.categoryId ?? "",
-        photos: Array.isArray(editingTemplate.photos)
-          ? editingTemplate.photos
-          : (() => {
-              try {
-                const parsed = JSON.parse(editingTemplate.photos || "[]");
-                return Array.isArray(parsed) ? parsed : [];
-              } catch {
-                return [];
-              }
-            })(),
-        price: String(editingTemplate.price ?? 0),
-        validityDays: String(editingTemplate.validityDays ?? 365),
-      }
-    : EMPTY_FORM;
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          minHeight: 250,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 2,
+        }}
+      >
+        <CircularProgress />
+        <Typography>Loading template form...</Typography>
+      </Box>
+    );
+  }
 
   return (
-    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1200, mx: "auto" }}>
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        justifyContent="space-between"
-        alignItems={{ xs: "stretch", sm: "center" }}
-        spacing={2}
-        sx={{ mb: 3 }}
-      >
-        <Box>
-          <Typography variant="h4" fontWeight={700}>
-            Template Management
-          </Typography>
-          <Typography color="text.secondary">
-            Create, update and manage website templates.
-          </Typography>
-        </Box>
+    <Box sx={{ maxWidth: 1100, mx: "auto", p: { xs: 2, md: 4 } }}>
+      <Typography variant="h4" fontWeight={800} gutterBottom>
+        Add Template
+      </Typography>
 
-        <Button
-          variant="outlined"
-          startIcon={<RefreshIcon />}
-          onClick={fetchData}
-          disabled={loading}
-        >
-          Refresh
-        </Button>
-      </Stack>
+      <Typography color="text.secondary" sx={{ mb: 3 }}>
+        Create a template, upload its photos, and select its category,
+        themes, and pages.
+      </Typography>
 
-      <Paper elevation={2} sx={{ p: { xs: 2, md: 3 }, mb: 4 }}>
-        <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
-          {editingTemplate ? "Edit Template" : "Add Template"}
-        </Typography>
-
-        <Divider sx={{ mb: 3 }} />
-
-        {loading && categories.length === 0 ? (
-          <CircularProgress />
-        ) : (
-          <TemplateForm
-            key={editingId ?? "new-template"}
-            initialValues={initialValues}
-            categories={categories}
-            submitting={submitting}
-            onSubmit={handleSave}
-            onCancel={editingTemplate ? () => setEditingId(null) : undefined}
-          />
-        )}
-      </Paper>
-
-      <Paper elevation={2} sx={{ p: { xs: 2, md: 3 } }}>
-        <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
-          Existing Templates ({templates.length})
-        </Typography>
-
-        {loading ? (
-          <CircularProgress />
-        ) : templates.length === 0 ? (
-          <Typography color="text.secondary">No templates found.</Typography>
-        ) : (
-          <Stack spacing={1.5}>
-            {templates.map((template) => (
-              <Paper
-                key={template.templateId}
-                variant="outlined"
-                sx={{
-                  p: 2,
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: 2,
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
-                <Box sx={{ flex: 1, minWidth: 200 }}>
-                  <Typography fontWeight={700}>{template.name}</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {template.categoryName || "Uncategorized"} ·{" "}
-                    {template.status || "draft"}
-                  </Typography>
-                </Box>
-
-                <Stack direction="row" spacing={1}>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={() => setEditingId(template.templateId)}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    size="small"
-                    color="error"
-                    variant="outlined"
-                    onClick={() => handleDelete(template)}
-                  >
-                    Delete
-                  </Button>
-                </Stack>
-              </Paper>
-            ))}
-          </Stack>
-        )}
-      </Paper>
-
-      <Snackbar
-        open={snack.open}
-        autoHideDuration={4000}
-        onClose={() => setSnack((previous) => ({ ...previous, open: false }))}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-      >
+      {error && (
         <Alert
-          severity={snack.severity}
-          variant="filled"
-          onClose={() => setSnack((previous) => ({ ...previous, open: false }))}
+          severity="error"
+          sx={{ mb: 2 }}
+          onClose={() => setError("")}
         >
-          {snack.message}
+          {error}
         </Alert>
-      </Snackbar>
+      )}
+
+      {success && (
+        <Alert
+          severity="success"
+          sx={{ mb: 2 }}
+          onClose={() => setSuccess("")}
+        >
+          {success}
+        </Alert>
+      )}
+
+      <Paper
+        component="form"
+        onSubmit={handleSubmit}
+        elevation={2}
+        sx={{
+          p: { xs: 2, md: 4 },
+          borderRadius: 3,
+        }}
+      >
+        <Stack spacing={3}>
+          <Typography variant="h6" fontWeight={700}>
+            Basic Information
+          </Typography>
+
+          <FormControl fullWidth required>
+            <InputLabel id="category-label">Category</InputLabel>
+            <Select
+              labelId="category-label"
+              name="categoryId"
+              value={form.categoryId}
+              label="Category"
+              onChange={handleChange}
+            >
+              {categories.map((category) => (
+                <MenuItem
+                  key={getId(category)}
+                  value={getId(category)}
+                >
+                  {getName(category)}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <TextField
+            label="Template Name"
+            name="name"
+            value={form.name}
+            onChange={handleChange}
+            required
+            fullWidth
+            inputProps={{ maxLength: 150 }}
+          />
+
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Language"
+                name="language"
+                value={form.language}
+                onChange={handleChange}
+                fullWidth
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Currency"
+                name="currency"
+                value={form.currency}
+                onChange={handleChange}
+                required
+                fullWidth
+                inputProps={{ maxLength: 3 }}
+                helperText="Use a three-letter code, e.g. INR"
+              />
+            </Grid>
+          </Grid>
+
+          <TextField
+            label="Short Description"
+            name="shortDescription"
+            value={form.shortDescription}
+            onChange={handleChange}
+            fullWidth
+            multiline
+            minRows={2}
+            inputProps={{ maxLength: 300 }}
+          />
+
+          <TextField
+            label="Description"
+            name="description"
+            value={form.description}
+            onChange={handleChange}
+            fullWidth
+            multiline
+            minRows={4}
+          />
+
+          <Divider />
+
+          <Typography variant="h6" fontWeight={700}>
+            Template Images
+          </Typography>
+
+          <TextField
+            label="Thumbnail URL"
+            name="thumbnailUrl"
+            value={form.thumbnailUrl}
+            onChange={handleChange}
+            fullWidth
+            placeholder="https://example.com/thumbnail.jpg"
+            helperText="Optional main image URL. Additional photos can be uploaded below."
+          />
+
+          {form.thumbnailUrl && (
+            <Box
+              component="img"
+              src={form.thumbnailUrl}
+              alt="Template thumbnail preview"
+              onError={(event) => {
+                event.currentTarget.style.display = "none";
+              }}
+              sx={{
+                width: "100%",
+                maxWidth: 400,
+                maxHeight: 220,
+                objectFit: "cover",
+                borderRadius: 2,
+              }}
+            />
+          )}
+
+          <MultiplePhotoUpload
+            value={form.photos}
+            onChange={handlePhotoChange}
+            disabled={saving}
+          />
+
+          <Divider />
+
+          <Typography variant="h6" fontWeight={700}>
+            Themes and Pages
+          </Typography>
+
+          <FormControl fullWidth>
+            <InputLabel id="themes-label">Themes</InputLabel>
+            <Select
+              labelId="themes-label"
+              multiple
+              name="themeIds"
+              value={form.themeIds}
+              label="Themes"
+              onChange={handleThemeChange}
+              renderValue={(selected) =>
+                themes
+                  .filter((theme) =>
+                    selected.map(String).includes(String(getId(theme)))
+                  )
+                  .map(getName)
+                  .join(", ")
+              }
+            >
+              {themes.map((theme) => (
+                <MenuItem key={getId(theme)} value={String(getId(theme))}>
+                  {getName(theme)}
+                </MenuItem>
+              ))}
+            </Select>
+            <FormHelperText>
+              Select one or more themes.
+            </FormHelperText>
+          </FormControl>
+
+          <FormControl fullWidth>
+            <InputLabel id="pages-label">Pages</InputLabel>
+            <Select
+              labelId="pages-label"
+              multiple
+              name="pageIds"
+              value={form.pageIds}
+              label="Pages"
+              onChange={handlePageChange}
+              renderValue={(selected) =>
+                pages
+                  .filter((page) =>
+                    selected.map(String).includes(String(getId(page)))
+                  )
+                  .map(getName)
+                  .join(", ")
+              }
+            >
+              {pages.map((page) => (
+                <MenuItem key={getId(page)} value={String(getId(page))}>
+                  {getName(page)}
+                  {getPagePrice(page) > 0
+                    ? ` — ${form.currency} ${getPagePrice(page).toFixed(2)}`
+                    : ""}
+                </MenuItem>
+              ))}
+            </Select>
+            <FormHelperText>
+              Select the pages included in this template.
+            </FormHelperText>
+          </FormControl>
+
+          {form.pageIds.length > 0 && (
+            <Alert severity="info">
+              Selected page total: {form.currency}{" "}
+              {calculatedPagePrice.toFixed(2)}
+            </Alert>
+          )}
+
+          <Divider />
+
+          <Typography variant="h6" fontWeight={700}>
+            Pricing and Publishing
+          </Typography>
+
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Template Price"
+                name="price"
+                type="number"
+                value={form.price}
+                onChange={handleChange}
+                required
+                fullWidth
+                inputProps={{ min: 0, step: "0.01" }}
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Validity (days)"
+                name="validityDays"
+                type="number"
+                value={form.validityDays}
+                onChange={handleChange}
+                required
+                fullWidth
+                inputProps={{ min: 1, step: 1 }}
+              />
+            </Grid>
+          </Grid>
+
+          <FormControl fullWidth required>
+            <InputLabel id="status-label">Status</InputLabel>
+            <Select
+              labelId="status-label"
+              name="status"
+              value={form.status}
+              label="Status"
+              onChange={handleChange}
+            >
+              <MenuItem value="draft">Draft</MenuItem>
+              <MenuItem value="published">Published</MenuItem>
+              <MenuItem value="archived">Archived</MenuItem>
+            </Select>
+          </FormControl>
+
+          <Divider />
+
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={2}
+            justifyContent="flex-end"
+          >
+            <Button
+              type="button"
+              variant="outlined"
+              onClick={() => {
+                setForm({ ...EMPTY_FORM });
+                setError("");
+                setSuccess("");
+              }}
+              disabled={saving}
+            >
+              Reset
+            </Button>
+
+            <Button
+              type="submit"
+              variant="contained"
+              startIcon={
+                saving ? (
+                  <CircularProgress size={18} color="inherit" />
+                ) : (
+                  <SaveOutlined />
+                )
+              }
+              disabled={saving || loading}
+            >
+              {saving ? "Saving..." : "Save Template"}
+            </Button>
+          </Stack>
+        </Stack>
+      </Paper>
     </Box>
   );
 }

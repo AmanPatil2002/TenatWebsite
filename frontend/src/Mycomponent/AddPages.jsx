@@ -1,5 +1,3 @@
-
-
 import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { CKEditor } from "ckeditor4-react";
@@ -15,6 +13,7 @@ import {
   DialogContentText,
   DialogTitle,
   Divider,
+  IconButton,
   MenuItem,
   Paper,
   Snackbar,
@@ -48,13 +47,15 @@ const EMPTY_FORM = {
   title: "",
   categoryId: "",
   pagePrice: "",
-  description: "",
+  page: "",
 };
 
 // Convert CKEditor HTML to visible text for character counting.
 const getPlainText = (html = "") => {
   if (typeof document === "undefined") {
-    return String(html).replace(/<[^>]*>/g, "").trim();
+    return String(html)
+      .replace(/<[^>]*>/g, "")
+      .trim();
   }
 
   const element = document.createElement("div");
@@ -67,9 +68,7 @@ const getPlainText = (html = "") => {
 
 const getToken = () => {
   const storedToken =
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken") ||
-    "";
+    localStorage.getItem("token") || localStorage.getItem("accessToken") || "";
 
   return storedToken.replace(/^Bearer\s+/i, "").trim();
 };
@@ -96,14 +95,11 @@ const getErrorMessage = (error) => {
   }
 
   return (
-    error.response?.data?.message ||
-    error.message ||
-    "Something went wrong."
+    error.response?.data?.message || error.message || "Something went wrong."
   );
 };
 
-const getCategoryId = (category) =>
-  category.categoryId ?? category.id ?? "";
+const getCategoryId = (category) => category.categoryId ?? category.id ?? "";
 
 const getCategoryName = (category) =>
   category.categoryName ??
@@ -115,10 +111,9 @@ const getPageId = (page) => page.pagesId ?? page.id;
 
 const getInitialForm = (page = null) => ({
   title: page?.title ?? "",
-  categoryId:
-    page?.categoryId != null ? String(page.categoryId) : "",
+  categoryId: page?.categoryId != null ? String(page.categoryId) : "",
   pagePrice: page?.pagePrice != null ? String(page.pagePrice) : "",
-  description: page?.description ?? "",
+  page: page?.page ?? "",
 });
 
 const formatDate = (value) => {
@@ -147,12 +142,12 @@ function PageForm({
   onSubmit,
   onCancelEdit,
 }) {
-  const [formData, setFormData] = useState(() =>
-    getInitialForm(initialValues)
-  );
+  const [formData, setFormData] = useState(() => getInitialForm(initialValues));
 
   const [errors, setErrors] = useState({});
   const [editorReady, setEditorReady] = useState(false);
+  // Changing this key remounts CKEditor so it really clears after a create
+  const [editorKey, setEditorKey] = useState(0);
 
   useEffect(() => {
     setFormData(getInitialForm(initialValues));
@@ -178,7 +173,7 @@ function PageForm({
     const nextErrors = {};
 
     const title = formData.title.trim();
-    const descriptionText = getPlainText(formData.description);
+    const pageText = getPlainText(formData.page);
     const price = formData.pagePrice.trim();
 
     if (!title) {
@@ -203,13 +198,9 @@ function PageForm({
       nextErrors.pagePrice = "Price cannot be negative.";
     }
 
-    if (!descriptionText) {
-      nextErrors.description = "Page description is required.";
-    } else if (descriptionText.length > 400) {
-      nextErrors.description =
-        "Description cannot exceed 400 visible characters.";
+    if (!pageText) {
+      nextErrors.page = "Page content is required.";
     }
-
     setErrors(nextErrors);
 
     return Object.keys(nextErrors).length === 0;
@@ -224,13 +215,14 @@ function PageForm({
       title: formData.title.trim(),
       categoryId: Number(formData.categoryId),
       pagePrice: Number(formData.pagePrice),
-      description: formData.description,
+      page: formData.page,
     });
 
     if (succeeded && !isEditing) {
       setFormData({ ...EMPTY_FORM });
       setErrors({});
       setEditorReady(false);
+      setEditorKey((previous) => previous + 1);
     }
   };
 
@@ -243,6 +235,7 @@ function PageForm({
         p: { xs: 2, sm: 3 },
         borderRadius: 2,
         width: "100%",
+        boxSizing: "border-box",
       }}
     >
       <Typography variant="h5" fontWeight={700} gutterBottom>
@@ -250,7 +243,7 @@ function PageForm({
       </Typography>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Add a title, category, price, and formatted description.
+        Add a title, category, price, and formatted page content.
       </Typography>
 
       <Stack spacing={2.5}>
@@ -269,7 +262,7 @@ function PageForm({
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={2}
-          alignItems="flex-start"
+          alignItems={{ xs: "stretch", sm: "flex-start" }}
         >
           <TextField
             select
@@ -311,21 +304,22 @@ function PageForm({
         </Stack>
 
         <Box>
-          <Typography
-            variant="subtitle1"
-            fontWeight={600}
-            sx={{ mb: 1 }}
-          >
-            Page description *
+          <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
+            Page content *
           </Typography>
 
           <Box
             sx={{
               width: "100%",
               minWidth: 0,
-              "& .cke": {
+              overflow: "hidden",
+              "& .cke, & .cke_chrome, & .cke_inner, & .cke_contents": {
                 width: "100% !important",
+                maxWidth: "100%",
                 boxSizing: "border-box",
+              },
+              "& .cke_top": {
+                whiteSpace: "normal",
               },
               "& .cke_contents": {
                 minHeight: "250px",
@@ -333,16 +327,20 @@ function PageForm({
             }}
           >
             <CKEditor
+              key={editorKey}
               editorUrl="https://cdn.ckeditor.com/4.22.1/standard-all/ckeditor.js"
-              initData={formData.description}
+              initData={formData.page}
               config={{
-                height: 250,
+                height: 350,
                 language: "en",
                 allowedContent: true,
+                extraPlugins: "uploadimage",
+                uploadUrl: `${API_URL}/uploads/ckeditor`,
+                imageUploadUrl: `${API_URL}/uploads/ckeditor`,
                 toolbar: [
                   {
                     name: "document",
-                    items: ["Source", "Preview"],
+                    items: ["Source", "Preview", "Maximize"],
                   },
                   {
                     name: "clipboard",
@@ -354,21 +352,13 @@ function PageForm({
                   },
                   {
                     name: "basicstyles",
-                    items: [
-                      "Bold",
-                      "Italic",
-                      "Underline",
-                      "Strike",
-                      "RemoveFormat",
-                    ],
+                    items: ["Bold", "Italic", "Underline", "Strike"],
                   },
                   {
                     name: "paragraph",
                     items: [
                       "NumberedList",
                       "BulletedList",
-                      "Outdent",
-                      "Indent",
                       "JustifyLeft",
                       "JustifyCenter",
                       "JustifyRight",
@@ -380,7 +370,7 @@ function PageForm({
                   },
                   {
                     name: "insert",
-                    items: ["Table", "HorizontalRule"],
+                    items: ["Image", "Table", "HorizontalRule"],
                   },
                 ],
               }}
@@ -388,38 +378,23 @@ function PageForm({
               onChange={(event) => {
                 const html = event.editor.getData();
 
-                setFormData((previous) => ({
-                  ...previous,
-                  description: html,
-                }));
-
-                setErrors((previous) => ({
-                  ...previous,
-                  description: "",
+                setFormData((prev) => ({
+                  ...prev,
+                  page: html,
                 }));
               }}
             />
           </Box>
 
-          {errors.description && (
-            <Typography color="error" variant="caption">
-              {errors.description}
+          {errors.page && (
+            <Typography
+              color="error"
+              variant="caption"
+              sx={{ display: "block", mt: 0.5 }}
+            >
+              {errors.page}
             </Typography>
           )}
-
-          <Typography
-            variant="caption"
-            color={
-              getPlainText(formData.description).length > 400
-                ? "error"
-                : "text.secondary"
-            }
-            sx={{ display: "block", mt: 1 }}
-          >
-            Maximum 400 visible characters:{" "}
-            {getPlainText(formData.description).length}/400
-            {!editorReady && " · Loading editor…"}
-          </Typography>
         </Box>
 
         <Divider />
@@ -453,8 +428,10 @@ function PageForm({
             <Button
               type="button"
               variant="outlined"
+              size="large"
               onClick={onCancelEdit}
               disabled={submitting}
+              sx={{ py: 1.4, px: 4 }}
             >
               Cancel
             </Button>
@@ -489,7 +466,6 @@ export default function AddPages() {
 
   // TablePagination is zero-based; the API page number is one-based.
   const [pageNo, setPageNo] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
   const [totalRows, setTotalRows] = useState(0);
 
   const [editingPage, setEditingPage] = useState(null);
@@ -525,7 +501,7 @@ export default function AddPages() {
     try {
       const response = await axios.get(
         `${API_URL}/categories`,
-        getAuthConfig()
+        getAuthConfig(),
       );
 
       const body = response.data;
@@ -542,7 +518,7 @@ export default function AddPages() {
     } catch (error) {
       showNotice(
         `Unable to load categories. ${getErrorMessage(error)}`,
-        "error"
+        "error",
       );
     } finally {
       setLoadingCategories(false);
@@ -583,18 +559,13 @@ export default function AddPages() {
 
       setPages(list);
       setTotalRows(
-        Number(body.total ?? body.totalRows ?? body.count ?? list.length)
+        Number(body.total ?? body.totalRows ?? body.count ?? list.length),
       );
-      setTotalPages(Number(body.totalPages ?? 0));
     } catch (error) {
       setPages([]);
       setTotalRows(0);
-      setTotalPages(0);
 
-      showNotice(
-        `Unable to load pages. ${getErrorMessage(error)}`,
-        "error"
-      );
+      showNotice(`Unable to load pages. ${getErrorMessage(error)}`, "error");
     } finally {
       setLoadingPages(false);
     }
@@ -615,20 +586,12 @@ export default function AddPages() {
       if (editingPage) {
         const id = getPageId(editingPage);
 
-        await axios.put(
-          `${API_URL}/pages/${id}`,
-          formData,
-          getAuthConfig()
-        );
+        await axios.put(`${API_URL}/pages/${id}`, formData, getAuthConfig());
 
         showNotice("Page updated successfully.");
         setEditingPage(null);
       } else {
-        await axios.post(
-          `${API_URL}/pages`,
-          formData,
-          getAuthConfig()
-        );
+        await axios.post(`${API_URL}/pages`, formData, getAuthConfig());
 
         showNotice("Page created successfully.");
       }
@@ -669,7 +632,7 @@ export default function AddPages() {
     try {
       await axios.delete(
         `${API_URL}/pages/${getPageId(deleteTarget)}`,
-        getAuthConfig()
+        getAuthConfig(),
       );
 
       showNotice("Page deleted successfully.");
@@ -696,7 +659,7 @@ export default function AddPages() {
 
   const getCategoryLabel = (categoryId) => {
     const category = categories.find(
-      (item) => String(getCategoryId(item)) === String(categoryId)
+      (item) => String(getCategoryId(item)) === String(categoryId),
     );
 
     return category ? getCategoryName(category) : "—";
@@ -707,7 +670,6 @@ export default function AddPages() {
       sx={{
         p: { xs: 2, md: 3 },
         backgroundColor: "#f5f6fa",
-        minHeight: "100vh",
       }}
     >
       <Typography variant="h4" fontWeight={700} sx={{ mb: 3 }}>
@@ -719,14 +681,14 @@ export default function AddPages() {
           display: "grid",
           gridTemplateColumns: {
             xs: "minmax(0, 1fr)",
-            lg: "minmax(360px, 0.9fr) minmax(0, 1.3fr)",
+            xl: "minmax(0, 5fr) minmax(0, 7fr)",
           },
           alignItems: "start",
           gap: 3,
         }}
       >
         {/* LEFT: CREATE / EDIT FORM */}
-        <Box>
+        <Box sx={{ minWidth: 0 }}>
           {loadingCategories ? (
             <Paper
               sx={{
@@ -740,9 +702,7 @@ export default function AddPages() {
           ) : (
             <PageForm
               key={
-                editingPage
-                  ? `edit-${getPageId(editingPage)}`
-                  : "create-page"
+                editingPage ? `edit-${getPageId(editingPage)}` : "create-page"
               }
               categories={categories}
               initialValues={editingPage}
@@ -761,6 +721,7 @@ export default function AddPages() {
             p: { xs: 2, sm: 3 },
             borderRadius: 2,
             minWidth: 0,
+            boxSizing: "border-box",
           }}
         >
           <Stack
@@ -774,16 +735,14 @@ export default function AddPages() {
               Existing pages
             </Typography>
 
-            <Tooltip title="Refresh pages">
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<RefreshIcon />}
-                onClick={() => setRefreshKey((previous) => previous + 1)}
-              >
-                Refresh
-              </Button>
-            </Tooltip>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<RefreshIcon />}
+              onClick={() => setRefreshKey((previous) => previous + 1)}
+            >
+              Refresh
+            </Button>
           </Stack>
 
           <Divider sx={{ mb: 2.5 }} />
@@ -859,9 +818,7 @@ export default function AddPages() {
                 ) : pages.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} align="center" sx={{ py: 5 }}>
-                      <Typography fontWeight={600}>
-                        No pages found.
-                      </Typography>
+                      <Typography fontWeight={600}>No pages found.</Typography>
 
                       <Typography
                         variant="body2"
@@ -874,59 +831,49 @@ export default function AddPages() {
                   </TableRow>
                 ) : (
                   pages.map((page) => (
-                    <TableRow
-                      hover
-                      key={getPageId(page)}
-                    >
-                      <TableCell sx={{ minWidth: 140 }}>
-                        <Typography fontWeight={600}>
-                          {page.title}
-                        </Typography>
+                    <TableRow hover key={getPageId(page)}>
+                      <TableCell
+                        sx={{
+                          minWidth: 140,
+                          maxWidth: 260,
+                          overflowWrap: "anywhere",
+                        }}
+                      >
+                        <Typography fontWeight={600}>{page.title}</Typography>
 
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                        >
+                        <Typography variant="caption" color="text.secondary">
                           Created: {formatDate(page.createdAt)}
                         </Typography>
                       </TableCell>
 
-                      <TableCell>
-                        {getCategoryLabel(page.categoryId)}
-                      </TableCell>
+                      <TableCell>{getCategoryLabel(page.categoryId)}</TableCell>
 
                       <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
                         ₹{Number(page.pagePrice || 0).toFixed(2)}
                       </TableCell>
 
-                      <TableCell align="center">
-                        <Stack
-                          direction="row"
-                          spacing={0.5}
-                          justifyContent="center"
-                        >
-                          <Tooltip title="Edit page">
-                            <Button
-                              size="small"
-                              color="primary"
-                              onClick={() => handleEdit(page)}
-                              aria-label={`Edit ${page.title}`}
-                            >
-                              <EditIcon fontSize="small" />
-                            </Button>
-                          </Tooltip>
+                      <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
+                        <Tooltip title="Edit page">
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={() => handleEdit(page)}
+                            aria-label={`Edit ${page.title}`}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
 
-                          <Tooltip title="Delete page">
-                            <Button
-                              size="small"
-                              color="error"
-                              onClick={() => setDeleteTarget(page)}
-                              aria-label={`Delete ${page.title}`}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </Button>
-                          </Tooltip>
-                        </Stack>
+                        <Tooltip title="Delete page">
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => setDeleteTarget(page)}
+                            aria-label={`Delete ${page.title}`}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                       </TableCell>
                     </TableRow>
                   ))
@@ -943,16 +890,6 @@ export default function AddPages() {
             rowsPerPageOptions={[PAGE_LIMIT]}
             onPageChange={(_, newPage) => setPageNo(newPage)}
           />
-
-          {totalPages > 0 && (
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ display: "block", textAlign: "right" }}
-            >
-              API pages: {totalPages}
-            </Typography>
-          )}
         </Paper>
       </Box>
 
@@ -972,10 +909,7 @@ export default function AddPages() {
         </DialogContent>
 
         <DialogActions>
-          <Button
-            onClick={() => setDeleteTarget(null)}
-            disabled={deleting}
-          >
+          <Button onClick={() => setDeleteTarget(null)} disabled={deleting}>
             Cancel
           </Button>
 

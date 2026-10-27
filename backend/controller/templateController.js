@@ -3,34 +3,6 @@ const db = require("../config/db");
 
 const STATUSES = ["draft", "published", "archived"];
 
-const isAdmin = (req) =>
-  ["admin", "superadmin"].includes(req.user?.role);
-
-const isPlainObject = (value) =>
-  value !== null &&
-  typeof value === "object" &&
-  !Array.isArray(value);
-
-const validId = (id) => {
-  if (typeof id === "number") {
-    if (!Number.isSafeInteger(id) || id < 1) return false;
-    id = String(id);
-  }
-
-  if (typeof id !== "string" || !/^[1-9]\d*$/.test(id)) {
-    return false;
-  }
-
-  try {
-    return BigInt(id) <= 18446744073709551615n;
-  } catch {
-    return false;
-  }
-};
-
-const escapeLike = (value) =>
-  value.replace(/[\\%_]/g, (character) => `\\${character}`);
-
 const SELECT_COLUMNS = `
   t.templateId,
   t.categoryId,
@@ -55,42 +27,69 @@ const TEXT_FIELDS = [
   ["shortDescription", 300],
   ["description", null],
   ["thumbnailUrl", 500],
-  ["photos", 500],
 ];
+
+const hasOwn = (obj, key) =>
+  Object.prototype.hasOwnProperty.call(obj, key);
+
+const isPlainObject = (value) =>
+  value !== null &&
+  typeof value === "object" &&
+  !Array.isArray(value);
+
+const isValidHttpUrl = (value) => {
+  try {
+    const url = new URL(value);
+
+    return (
+      ["http:", "https:"].includes(url.protocol) &&
+      Boolean(url.hostname)
+    );
+  } catch {
+    return false;
+  }
+};
 
 const cleanTemplate = (body, partial = false) => {
   if (!isPlainObject(body)) {
-    return { error: "Invalid request body" };
+    return { error: "Request body must be an object" };
   }
 
   const data = {};
-  const has = (key) => body[key] !== undefined;
+  const has = (field) => hasOwn(body, field);
 
+  // Category
   if (!partial || has("categoryId")) {
-    const raw = body.categoryId;
-    const categoryId =
-      typeof raw === "number" ? String(raw) : raw;
+    const categoryId = Number(body.categoryId);
 
-    if (!validId(categoryId)) {
+    if (
+      body.categoryId === null ||
+      body.categoryId === "" ||
+      !Number.isInteger(categoryId) ||
+      categoryId <= 0
+    ) {
       return { error: "A valid categoryId is required" };
     }
 
     data.categoryId = categoryId;
   }
 
+  // Template name
   if (!partial || has("name")) {
-    const name =
-      typeof body.name === "string" ? body.name.trim() : "";
-
-    if (!name) return { error: "Template name is required" };
-
-    if (name.length > 150) {
-      return { error: "Name must be 150 characters or fewer" };
+    if (typeof body.name !== "string" || !body.name.trim()) {
+      return { error: "Template name is required" };
     }
 
-    data.name = name;
+    if (body.name.trim().length > 150) {
+      return {
+        error: "Template name must be 150 characters or fewer",
+      };
+    }
+
+    data.name = body.name.trim();
   }
 
+  // Regular text fields and the single thumbnail URL
   for (const [field, maxLength] of TEXT_FIELDS) {
     if (!has(field)) continue;
 
@@ -113,412 +112,348 @@ const cleanTemplate = (body, partial = false) => {
 
     if (
       value &&
-      ["thumbnailUrl", "photos"].includes(field) &&
-      !/^https?:\/\/\S+$/i.test(value)
+      field === "thumbnailUrl" &&
+      !isValidHttpUrl(value)
     ) {
       return {
-        error: `${field} must be a valid HTTP or HTTPS URL`,
+        error: "thumbnailUrl must be a valid HTTP or HTTPS URL",
       };
     }
 
     data[field] = value;
   }
 
+  // Multiple photos: accept an array or a JSON-encoded array.
+  // Save the normalized array as JSON text in MySQL.
+  if (has("photos")) {
+    const raw = body.photos;
+
+    if (raw === null || raw === "") {
+      data.photos = null;
+    } else {
+      let photoUrls = raw;
+
+      if (typeof photoUrls === "string") {
+        try {
+          photoUrls = JSON.parse(photoUrls);
+        } catch {
+          // Also accept one URL as a string for compatibility.
+          photoUrls = [photoUrls];
+        }
+      }
+
+      if (!Array.isArray(photoUrls)) {
+        return {
+          error: "photos must be an array of HTTP or HTTPS URLs",
+        };
+      }
+
+      const normalizedUrls = [];
+
+      for (const photo of photoUrls) {
+        if (typeof photo !== "string" || !photo.trim()) {
+          return {
+            error: "Each photo must be a valid HTTP or HTTPS URL",
+          };
+        }
+
+        const url = photo.trim();
+
+        if (!isValidHttpUrl(url)) {
+          return {
+            error: "Each photo must be a valid HTTP or HTTPS URL",
+          };
+        }
+
+        normalizedUrls.push(url);
+      }
+
+      data.photos = normalizedUrls.length
+        ? JSON.stringify(normalizedUrls)
+        : null;
+    }
+  }
+
+  // Price
   if (!partial || has("price")) {
-    const raw = body.price;
-    const priceText =
-      typeof raw === "number" || typeof raw === "string"
-        ? String(raw).trim()
+    const price = Number(body.price);
+
+    if (
+      body.price === null ||
+      body.price === "" ||
+      !Number.isFinite(price) ||
+      price < 0
+    ) {
+      return { error: "Price must be a non-negative number" };
+    }
+
+    data.price = price;
+  }
+
+  // Currency
+  if (!partial || has("currency")) {
+    const currency =
+      typeof body.currency === "string"
+        ? body.currency.trim().toUpperCase()
         : "";
 
-    const price = Number(priceText);
-
-    if (
-      !/^\d+(?:\.\d{1,2})?$/.test(priceText) ||
-      !Number.isFinite(price) ||
-      price <= 0 ||
-      price > 99999999.99
-    ) {
+    if (!/^[A-Z]{3}$/.test(currency)) {
       return {
-        error:
-          "Price must be positive, at most 99999999.99, with up to 2 decimal places",
+        error: "Currency must be a valid three-letter code",
       };
     }
 
-    data.price = price.toFixed(2);
+    data.currency = currency;
   }
 
-  if (has("currency")) {
-    if (
-      typeof body.currency !== "string" ||
-      !/^[A-Za-z]{3}$/.test(body.currency.trim())
-    ) {
-      return {
-        error: "Currency must be a three-letter code, such as INR",
-      };
-    }
-
-    data.currency = body.currency.trim().toUpperCase();
-  }
-
-  if (has("validityDays")) {
-    const raw = body.validityDays;
+  // Validity
+  if (!partial || has("validityDays")) {
+    const validityDays = Number(body.validityDays);
 
     if (
-      raw === "" ||
-      raw === null ||
-      raw === undefined ||
-      !/^\d+$/.test(String(raw))
+      body.validityDays === null ||
+      body.validityDays === "" ||
+      !Number.isInteger(validityDays) ||
+      validityDays < 1
     ) {
       return {
-        error: "Validity must be a whole number from 1 to 3650 days",
+        error: "validityDays must be a positive integer",
       };
     }
 
-    const days = Number(raw);
-
-    if (!Number.isInteger(days) || days < 1 || days > 3650) {
-      return {
-        error: "Validity must be a whole number from 1 to 3650 days",
-      };
-    }
-
-    data.validityDays = days;
+    data.validityDays = validityDays;
   }
 
-  if (has("status")) {
-    if (!STATUSES.includes(body.status)) {
+  // Status
+  if (!partial || has("status")) {
+    const status = body.status;
+
+    if (!STATUSES.includes(status)) {
       return {
-        error: "Status must be draft, published or archived",
+        error: `Status must be one of: ${STATUSES.join(", ")}`,
       };
     }
 
-    data.status = body.status;
+    data.status = status;
   }
 
   return { data };
 };
 
 // GET /templates
-// Public users see published templates.
-// Administrators can filter by status.
-const getTemplates = (req, res) => {
-  const where = [];
-  const values = [];
+const getTemplates = async (req, res) => {
+  try {
+    const sql = `
+      SELECT ${SELECT_COLUMNS}
+      FROM templates t
+      LEFT JOIN categories c ON c.categoryId = t.categoryId
+      ORDER BY t.createdAt DESC
+    `;
 
-  if (!isAdmin(req)) {
-    where.push("t.status = 'published'");
-  } else if (STATUSES.includes(req.query.status)) {
-    where.push("t.status = ?");
-    values.push(req.query.status);
-  }
-
-  if (req.query.categoryId !== undefined) {
-    if (!validId(req.query.categoryId)) {
-      return res.status(400).json({
-        message: "Invalid category ID",
-      });
-    }
-
-    where.push("t.categoryId = ?");
-    values.push(req.query.categoryId);
-  }
-
-  const q = typeof req.query.q === "string"
-    ? req.query.q.trim()
-    : "";
-
-  if (q) {
-    const pattern = `%${escapeLike(q)}%`;
-
-    where.push(
-      "(t.name LIKE ? OR t.shortDescription LIKE ?)"
-    );
-
-    values.push(pattern, pattern);
-  }
-
-  const orders = {
-    newest: "t.createdAt DESC",
-    price_asc: "t.price ASC",
-    price_desc: "t.price DESC",
-    name: "t.name ASC",
-  };
-
-  const orderBy = orders[req.query.sort] || orders.newest;
-
-  const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
-  const limit = Math.min(
-    Math.max(parseInt(req.query.limit, 10) || 20, 1),
-    100
-  );
-  const offset = (page - 1) * limit;
-  const whereSql = where.length
-    ? ` WHERE ${where.join(" AND ")}`
-    : "";
-
-  db.query(
-    `SELECT COUNT(*) AS total
-     FROM template t
-     ${whereSql}`,
-    values,
-    (countError, countRows) => {
-      if (countError) {
-        console.error("getTemplates count error:", countError);
-
+    db.query(sql, (err, results) => {
+      if (err) {
+        console.error("Get templates error:", err);
         return res.status(500).json({
-          message: "Internal server error",
+          message: "Failed to fetch templates",
         });
       }
 
-      db.query(
-        `SELECT ${SELECT_COLUMNS}
-         FROM template t
-         JOIN categories c ON c.categoryId = t.categoryId
-         ${whereSql}
-         ORDER BY ${orderBy}
-         LIMIT ? OFFSET ?`,
-        [...values, limit, offset],
-        (error, rows) => {
-          if (error) {
-            console.error("getTemplates query error:", error);
-
-            return res.status(500).json({
-              message: "Internal server error",
-            });
-          }
-
-          const total = Number(countRows[0].total);
-
-          res.set("X-Total-Count", String(total));
-          res.set("X-Page", String(page));
-          res.set("X-Limit", String(limit));
-
-          return res.json(rows);
-        }
-      );
-    }
-  );
+      return res.status(200).json(results);
+    });
+  } catch (error) {
+    console.error("Get templates exception:", error);
+    return res.status(500).json({
+      message: "Server error while fetching templates",
+    });
+  }
 };
 
 // GET /templates/:templateId
-const getTemplate = (req, res) => {
-  const { templateId } = req.params;
+const getTemplate = async (req, res) => {
+  const templateId = Number(req.params.templateId);
 
-  if (!validId(templateId)) {
+  if (!Number.isInteger(templateId) || templateId <= 0) {
     return res.status(400).json({
-      message: "Invalid template ID",
+      message: "Invalid templateId",
     });
   }
 
-  let sql = `
+  const sql = `
     SELECT ${SELECT_COLUMNS}
-    FROM template t
-    JOIN categories c ON c.categoryId = t.categoryId
+    FROM templates t
+    LEFT JOIN categories c ON c.categoryId = t.categoryId
     WHERE t.templateId = ?
+    LIMIT 1
   `;
 
-  const values = [templateId];
-
-  if (!isAdmin(req)) {
-    sql += " AND t.status = 'published'";
-  }
-
-  db.query(sql, values, (error, rows) => {
-    if (error) {
-      console.error("getTemplate error:", error);
-
+  db.query(sql, [templateId], (err, results) => {
+    if (err) {
+      console.error("Get template error:", err);
       return res.status(500).json({
-        message: "Internal server error",
+        message: "Failed to fetch template",
       });
     }
 
-    if (rows.length === 0) {
+    if (!results.length) {
       return res.status(404).json({
         message: "Template not found",
       });
     }
 
-    return res.json(rows[0]);
+    return res.status(200).json(results[0]);
   });
 };
 
 // POST /templates
-const addTemplate = (req, res) => {
-  if (!isAdmin(req)) {
-    return res.status(403).json({ message: "Forbidden" });
-  }
-
-  const { error, data } = cleanTemplate(req.body, false);
+const addTemplate = async (req, res) => {
+  const { data, error } = cleanTemplate(req.body);
 
   if (error) {
     return res.status(400).json({ message: error });
   }
 
-  data.status = data.status || "draft";
-  data.currency = data.currency || "INR";
-  data.createdBy = req.user.userId;
+  const sql = `
+    INSERT INTO templates (
+      categoryId,
+      name,
+      language,
+      shortDescription,
+      description,
+      thumbnailUrl,
+      photos,
+      price,
+      currency,
+      validityDays,
+      status,
+      createdBy
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `;
 
-  const columns = Object.keys(data);
-  const placeholders = columns.map(() => "?").join(", ");
+  const values = [
+    data.categoryId,
+    data.name,
+    data.language ?? null,
+    data.shortDescription ?? null,
+    data.description ?? null,
+    data.thumbnailUrl ?? null,
+    data.photos ?? null,
+    data.price,
+    data.currency,
+    data.validityDays,
+    data.status,
+    req.user?.id ?? req.user?.userId ?? null,
+  ];
 
-  db.query(
-    `INSERT INTO template (${columns.join(", ")})
-     VALUES (${placeholders})`,
-    columns.map((column) => data[column]),
-    (insertError, result) => {
-      if (insertError?.code === "ER_NO_REFERENCED_ROW_2") {
+  db.query(sql, values, (err, result) => {
+    if (err) {
+      console.error("Add template error:", err);
+
+      if (err.code === "ER_NO_REFERENCED_ROW_2") {
         return res.status(400).json({
           message: "The selected category does not exist",
         });
       }
 
-      if (insertError) {
-        console.error("addTemplate error:", insertError);
-
-        return res.status(500).json({
-          message: "Internal server error",
-        });
-      }
-
-      return res.status(201).json({
-        message: "Template created successfully",
-        templateId: String(result.insertId),
+      return res.status(500).json({
+        message: "Failed to create template",
       });
     }
-  );
+
+    return res.status(201).json({
+      message: "Template created successfully",
+      templateId: result.insertId,
+    });
+  });
 };
 
 // PUT /templates/:templateId
-const updateTemplate = (req, res) => {
-  if (!isAdmin(req)) {
-    return res.status(403).json({ message: "Forbidden" });
-  }
+const updateTemplate = async (req, res) => {
+  const templateId = Number(req.params.templateId);
 
-  const { templateId } = req.params;
-
-  if (!validId(templateId)) {
+  if (!Number.isInteger(templateId) || templateId <= 0) {
     return res.status(400).json({
-      message: "Invalid template ID",
+      message: "Invalid templateId",
     });
   }
 
-  const { error, data } = cleanTemplate(req.body, true);
+  const { data, error } = cleanTemplate(req.body, true);
 
   if (error) {
     return res.status(400).json({ message: error });
   }
 
-  const columns = Object.keys(data);
+  const fields = Object.keys(data);
 
-  if (columns.length === 0) {
+  if (!fields.length) {
     return res.status(400).json({
-      message: "No valid fields were provided for update",
+      message: "No valid fields supplied for update",
     });
   }
 
-  const setClause = columns
-    .map((column) => `${column} = ?`)
+  const values = fields.map((field) => data[field]);
+  const setClause = fields
+    .map((field) => `\`${field}\` = ?`)
     .join(", ");
 
-  db.query(
-    `UPDATE template
-     SET ${setClause}
-     WHERE templateId = ?`,
-    [...columns.map((column) => data[column]), templateId],
-    (updateError, result) => {
-      if (updateError?.code === "ER_NO_REFERENCED_ROW_2") {
-        return res.status(400).json({
-          message: "The selected category does not exist",
-        });
-      }
+  const sql = `
+    UPDATE templates
+    SET ${setClause}, updatedAt = CURRENT_TIMESTAMP
+    WHERE templateId = ?
+  `;
 
-      if (updateError) {
-        console.error("updateTemplate error:", updateError);
+  values.push(templateId);
 
-        return res.status(500).json({
-          message: "Internal server error",
-        });
-      }
-
-      if (result.affectedRows === 0) {
-        // MySQL may report zero for unchanged values. Confirm existence.
-        return db.query(
-          "SELECT templateId FROM template WHERE templateId = ?",
-          [templateId],
-          (findError, rows) => {
-            if (findError) {
-              console.error("updateTemplate existence error:", findError);
-
-              return res.status(500).json({
-                message: "Internal server error",
-              });
-            }
-
-            if (rows.length === 0) {
-              return res.status(404).json({
-                message: "Template not found",
-              });
-            }
-
-            return res.json({
-              message: "Template updated successfully",
-              templateId,
-            });
-          }
-        );
-      }
-
-      return res.json({
-        message: "Template updated successfully",
-        templateId,
+  db.query(sql, values, (err, result) => {
+    if (err) {
+      console.error("Update template error:", err);
+      return res.status(500).json({
+        message: "Failed to update template",
       });
     }
-  );
+
+    if (!result.affectedRows) {
+      return res.status(404).json({
+        message: "Template not found",
+      });
+    }
+
+    return res.status(200).json({
+      message: "Template updated successfully",
+      templateId,
+    });
+  });
 };
 
 // DELETE /templates/:templateId
-const deleteTemplate = (req, res) => {
-  if (!isAdmin(req)) {
-    return res.status(403).json({ message: "Forbidden" });
-  }
+const deleteTemplate = async (req, res) => {
+  const templateId = Number(req.params.templateId);
 
-  const { templateId } = req.params;
-
-  if (!validId(templateId)) {
+  if (!Number.isInteger(templateId) || templateId <= 0) {
     return res.status(400).json({
-      message: "Invalid template ID",
+      message: "Invalid templateId",
     });
   }
 
   db.query(
-    "DELETE FROM template WHERE templateId = ?",
+    "DELETE FROM templates WHERE templateId = ?",
     [templateId],
-    (error, result) => {
-      if (error?.code === "ER_ROW_IS_REFERENCED_2") {
-        return res.status(409).json({
-          message:
-            "This template is in use. Archive it instead of deleting it.",
-        });
-      }
-
-      if (error) {
-        console.error("deleteTemplate error:", error);
-
+    (err, result) => {
+      if (err) {
+        console.error("Delete template error:", err);
         return res.status(500).json({
-          message: "Internal server error",
+          message: "Failed to delete template",
         });
       }
 
-      if (result.affectedRows === 0) {
+      if (!result.affectedRows) {
         return res.status(404).json({
           message: "Template not found",
         });
       }
 
-      return res.json({
+      return res.status(200).json({
         message: "Template deleted successfully",
-        templateId,
       });
     }
   );

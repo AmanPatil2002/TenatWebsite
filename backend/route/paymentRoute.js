@@ -1,20 +1,31 @@
 const express = require("express");
 const router = express.Router();
+
 const authenticateToken = require("../middleware/authenticate");
 const { requirePlatformAdmin } = require("../middleware/siteAccess");
+
 const {
-  getQuote,
-  checkout,
+  createPayment,
+  confirmPayment,
   getMyPayments,
+  getPayment,
   getAllPayments,
+  refundPayment,
 } = require("../controller/paymentController");
 
+// Admin routes first so they are not swallowed by /:id.
+router.get("/admin/all", authenticateToken, requirePlatformAdmin, getAllPayments);
+router.patch(
+  "/admin/:id/refund",
+  authenticateToken,
+  requirePlatformAdmin,
+  refundPayment,
+);
 
-router.post("/quote", authenticateToken, getQuote);
-router.post("/checkout", authenticateToken, checkout);
-
+// Client routes.
 router.get("/my", authenticateToken, getMyPayments);
-
-router.get("/", authenticateToken, requirePlatformAdmin, getAllPayments);
+router.post("/", authenticateToken, createPayment);
+router.post("/:transactionId/confirm", authenticateToken, confirmPayment);
+router.get("/:id", authenticateToken, getPayment);
 
 module.exports = router;
