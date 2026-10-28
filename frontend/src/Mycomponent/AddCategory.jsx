@@ -387,7 +387,7 @@ export default function AddCategory() {
               <TableContainer
                 sx={{
                   width: "100%",
-                  overflowX: "hidden",
+                  overflowX: "auto",
                   overflowY: "auto",
                   WebkitOverflowScrolling: "touch",
                   borderRadius: 1,

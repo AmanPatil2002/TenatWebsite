@@ -1,7 +1,6 @@
-
 const express = require("express");
 const authenticateToken = require("../middleware/authenticate");
-
+const { requirePlatformAdmin } = require("../middleware/siteAccess");
 const {
   createPage,
   getPages,
@@ -12,23 +11,13 @@ const {
 
 const router = express.Router();
 
-const requireAdmin = (req, res, next) => {
-  if (!["admin", "superadmin"].includes(req.user?.role)) {
-    return res.status(403).json({
-      message: "Access denied",
-    });
-  }
-
-  next();
-};
-
 // Read pages: authenticated users
 router.get("/", authenticateToken, getPages);
 router.get("/:id", authenticateToken, getPageById);
 
-// Create, update and delete: admin/superadmin only
-router.post("/", authenticateToken, requireAdmin, createPage);
-router.put("/:id", authenticateToken, requireAdmin, updatePage);
-router.delete("/:id", authenticateToken, requireAdmin, deletePage);
+// Create, update, delete: admin only
+router.post("/", authenticateToken, requirePlatformAdmin, createPage);
+router.put("/:id", authenticateToken, requirePlatformAdmin, updatePage);
+router.delete("/:id", authenticateToken, requirePlatformAdmin, deletePage);
 
 module.exports = router;

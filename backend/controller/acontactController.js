@@ -16,16 +16,18 @@ const getAcontact = (req, res) => {
         return res.status(500).json({ message: "Internal server error" });
       }
       res.json(rows);
-    }
+    },
   );
 };
 
 const postAcontact = (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ message: "Forbidden" });
 
-  const contact = typeof req.body.contact === "string" ? req.body.contact.trim() : "";
+  const contact =
+    typeof req.body.contact === "string" ? req.body.contact.trim() : "";
   const email = typeof req.body.email === "string" ? req.body.email.trim() : "";
-  const address = typeof req.body.address === "string" ? req.body.address.trim() : "";
+  const address =
+    typeof req.body.address === "string" ? req.body.address.trim() : "";
 
   if (!/^\d{10}$/.test(contact)) {
     return res.status(400).json({ message: "Contact must be 10 digits" });
@@ -34,7 +36,11 @@ const postAcontact = (req, res) => {
     return res.status(400).json({ message: "Enter a valid email" });
   }
   if (!address || address.length > 100) {
-    return res.status(400).json({ message: "Address is required and must be 100 characters or fewer" });
+    return res
+      .status(400)
+      .json({
+        message: "Address is required and must be 100 characters or fewer",
+      });
   }
 
   db.query(
@@ -45,8 +51,51 @@ const postAcontact = (req, res) => {
         console.error("postAcontact error:", err);
         return res.status(500).json({ message: "Internal server error" });
       }
-      res.status(201).json({ message: "Contact saved", contactId: result.insertId });
-    }
+      res
+        .status(201)
+        .json({ message: "Contact saved", contactId: result.insertId });
+    },
+  );
+};
+
+const updateAcontact = (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ message: "Forbidden" });
+  const { acontactId } = req.params;
+
+  const contact =
+    typeof req.body.contact === "string" ? req.body.contact.trim() : "";
+  const email = typeof req.body.email === "string" ? req.body.email.trim() : "";
+  const address =
+    typeof req.body.address === "string" ? req.body.address.trim() : "";
+  if (!validId(acontactId)) {
+    return res.status(400).json({ message: "Invalid contact ID" });
+  }
+  if (!/^\d{10}$/.test(contact)) {
+    return res.status(400).json({ message: "Contact must be 10 digits" });
+  }
+  if (email.length > 190 || !/^\S+@\S+\.\S+$/.test(email)) {
+    return res.status(400).json({ message: "Enter a valid email" });
+  }
+  if (!address || address.length > 100) {
+    return res
+      .status(400)
+      .json({
+        message: "Address is required and must be 100 characters or fewer",
+      });
+  }
+
+  db.query(
+    "UPDATE acontact SET contact = ?, email = ?, address = ?, createdBy = ? WHERE contactId = ?",
+    [contact, email, address, req.user.userId, acontactId],
+    (err, result) => {
+      if (err) {
+        console.error("updateAcontact error:", err);
+        return res.status(500).json({ message: "Internal server error" });
+      }
+      res
+        .status(201)
+        .json({ message: "Contact Updated", acontactId: result.insertId });
+    },
   );
 };
 
@@ -65,10 +114,11 @@ const deleteAcontact = (req, res) => {
         console.error("deleteAcontact error:", err);
         return res.status(500).json({ message: "Internal server error" });
       }
-      if (!result.affectedRows) return res.status(404).json({ message: "Contact not found" });
+      if (!result.affectedRows)
+        return res.status(404).json({ message: "Contact not found" });
       res.json({ message: "Contact deleted" });
-    }
+    },
   );
 };
 
-module.exports = { getAcontact, postAcontact, deleteAcontact };
+module.exports = { getAcontact, postAcontact, updateAcontact, deleteAcontact };

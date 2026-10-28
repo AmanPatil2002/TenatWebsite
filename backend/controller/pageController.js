@@ -149,8 +149,12 @@ const getPages = (req, res) => {
         });
       }
 
+      const columns =
+        req.user?.role === "admin"
+          ? "*"
+          : "pagesId, title, categoryId, pagePrice, createdAt";
       const sql = `
-        SELECT *
+        SELECT ${columns}
         FROM pages
         ${whereSql}
         ORDER BY createdAt DESC
@@ -190,7 +194,11 @@ const getPageById = (req, res) => {
   }
 
   db.query(
-    "SELECT * FROM pages WHERE pagesId = ?",
+    `SELECT ${
+      req.user?.role === "admin"
+        ? "*"
+        : "pagesId, title, categoryId, pagePrice, createdAt"
+    } FROM pages WHERE pagesId = ?`,
     [req.params.id],
     (err, rows) => {
       if (err) {

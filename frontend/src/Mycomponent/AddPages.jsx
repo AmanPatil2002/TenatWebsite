@@ -681,7 +681,7 @@ export default function AddPages() {
           display: "grid",
           gridTemplateColumns: {
             xs: "minmax(0, 1fr)",
-            xl: "minmax(0, 5fr) minmax(0, 7fr)",
+            xl: "minmax(0, 5fr) minmax(0, 5fr)",
           },
           alignItems: "start",
           gap: 3,

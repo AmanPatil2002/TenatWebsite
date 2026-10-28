@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
@@ -9,6 +9,7 @@ import {
   CardContent,
   Checkbox,
   Chip,
+  CircularProgress,
   Container,
   Divider,
   FormControlLabel,
@@ -17,7 +18,6 @@ import {
   Radio,
   RadioGroup,
   Stack,
-  TextField,
   Typography,
 } from "@mui/material";
 
@@ -25,17 +25,21 @@ const API = (
   import.meta.env.VITE_API_URL || "http://localhost:5000"
 ).replace(/\/+$/, "");
 
-const formatPrice = (price, currency = "INR") =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(Number(price || 0));
+const formatPrice = (price, currency = "INR") => {
+  try {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: currency || "INR",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(Number(price || 0));
+  } catch {
+    return `${currency || "INR"} ${Number(price || 0).toFixed(2)}`;
+  }
+};
 
 const asArray = (value) => {
   if (Array.isArray(value)) return value;
-
   if (typeof value === "string") {
     try {
       const parsed = JSON.parse(value);
@@ -44,12 +48,11 @@ const asArray = (value) => {
       return [];
     }
   }
-
   return [];
 };
 
 const getErrorMessage = (error, fallback) =>
-  error.response?.data?.message || error.message || fallback;
+  error?.response?.data?.message || error?.message || fallback;
 
 const getId = (value) => {
   const id = Number(value);
@@ -61,48 +64,47 @@ const isDefaultPage = (page) =>
   page.isDefault === "true" ||
   Number(page.isDefault) === 1;
 
+const isDefaultTheme = (theme) =>
+  theme.isDefault === true ||
+  theme.isDefault === "true" ||
+  Number(theme.isDefault) === 1;
+
+const getToken = () =>
+  localStorage.getItem("token") ||
+  localStorage.getItem("authToken") ||
+  localStorage.getItem("accessToken");
+
+const authHeaders = (extra = {}) => {
+  const token = getToken();
+  return {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...extra,
+  };
+};
+
+const loadRazorpay = () =>
+  new Promise((resolve) => {
+    if (window.Razorpay) return resolve(true);
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+
 export default function Payment() {
   const navigate = useNavigate();
   const location = useLocation();
 
   const template = location.state?.template || null;
+  const initialThemeId = location.state?.themeId ?? null;
 
   const themes = useMemo(() => asArray(template?.themes), [template]);
   const pages = useMemo(() => asArray(template?.pages), [template]);
 
   const currency = template?.currency || "INR";
 
-  const [loading, setLoading] = useState(false);
-  const [quoteLoading, setQuoteLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState(null);
-  const [siteName, setSiteName] = useState(template?.name || "");
-  const [subdomain, setSubdomain] = useState("");
-
-  const [themeId, setThemeId] = useState("");
-  const [selectedExtraIds, setSelectedExtraIds] = useState([]);
-  const [quote, setQuote] = useState(null);
-
-  // ---------- Authentication and initial validation ----------
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-
-    if (!token) {
-      navigate("/login", { replace: true });
-      return;
-    }
-
-    if (!template) {
-      setError(
-        "No template selected. Please select a template before checkout."
-      );
-      return;
-    }
-
-    setError("");
-  }, [navigate, template]);
-
-  // ---------- Normalize pages: default (included) vs additional (paid) ----------
+  // Normalize pages once so all downstream logic uses the same field names.
   const normalizedPages = useMemo(
     () =>
       pages
@@ -117,57 +119,61 @@ export default function Payment() {
   );
 
   const defaultPages = useMemo(
-    () => normalizedPages.filter((page) => page.isDefault),
+    () => normalizedPages.filter((p) => p.isDefault),
     [normalizedPages]
   );
 
   const additionalPages = useMemo(
-    () => normalizedPages.filter((page) => !page.isDefault),
+    () => normalizedPages.filter((p) => !p.isDefault),
     [normalizedPages]
   );
 
-  // Reset the selection when the template changes.
-  // A single theme is preselected because only one can be chosen anyway.
-  useEffect(() => {
-    setSelectedExtraIds([]);
-    setQuote(null);
+  // ---- state ----
+  const [themeId, setThemeId] = useState(() =>
+    initialThemeId != null
+      ? String(initialThemeId)
+      : (() => {
+          const def = themes.find(isDefaultTheme) || themes[0];
+          return def ? String(def.themeId) : "";
+        })()
+  );
 
-    setThemeId(
-      themes.length === 1 && getId(themes[0].themeId)
-        ? String(themes[0].themeId)
-        : ""
-    );
-  }, [template, themes]);
+  const [selectedExtraIds, setSelectedExtraIds] = useState([]);
+  const [quote, setQuote] = useState(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(null);
+
+  // Tracks whether the Razorpay handler already fired — prevents double-verify
+  const verifyingRef = useRef(false);
+
+  // Auth guard
+  useEffect(() => {
+    if (!getToken()) {
+      navigate("/login", { replace: true });
+      return;
+    }
+    if (!template) {
+      setError("No template selected. Please select a template first.");
+    }
+  }, [navigate, template]);
 
   const selectedThemeId = getId(themeId);
 
-  // Only valid additional page ids can ever be selected.
   const additionalPageIds = useMemo(() => {
-    const valid = new Set(additionalPages.map((page) => page.pageKey));
+    const valid = new Set(additionalPages.map((p) => p.pageKey));
     return [...new Set(selectedExtraIds.map(getId).filter(Boolean))].filter(
       (id) => valid.has(id)
     );
   }, [selectedExtraIds, additionalPages]);
 
-  // ---------- Local estimate for display only ----------
-  const localPagesAmount = useMemo(
-    () =>
-      additionalPages
-        .filter((page) => additionalPageIds.includes(page.pageKey))
-        .reduce((sum, page) => sum + page.pagePrice, 0),
-    [additionalPages, additionalPageIds]
-  );
-
-  const localBaseAmount = Number(
-    template?.price ?? template?.baseAmount ?? 0
-  );
-
-  // ---------- Server-calculated quote ----------
-  // A quote is needed as soon as a theme is chosen; additional pages are optional.
+  // ---- server quote ----
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = getToken();
+    const templateId = getId(template?.templateId);
 
-    if (!token || !getId(template?.templateId) || !selectedThemeId) {
+    if (!token || !templateId || !selectedThemeId) {
       setQuote(null);
       setQuoteLoading(false);
       return;
@@ -178,20 +184,18 @@ export default function Payment() {
     const fetchQuote = async () => {
       setQuoteLoading(true);
       setError("");
-      setQuote(null);
-
       try {
-        const response = await axios.post(
+        const { data } = await axios.post(
           `${API}/payments/quote`,
           {
-            templateId: getId(template.templateId),
+            templateId,
             themeId: selectedThemeId,
-            pageIds: additionalPageIds, // additional pages only
+            // FIX: correct field name
+            additionalPageIds,
           },
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: authHeaders({ "Content-Type": "application/json" }) }
         );
-
-        if (!cancelled) setQuote(response.data);
+        if (!cancelled) setQuote(data);
       } catch (err) {
         if (!cancelled) {
           setQuote(null);
@@ -209,110 +213,130 @@ export default function Payment() {
     };
   }, [template?.templateId, selectedThemeId, additionalPageIds]);
 
-  const baseAmount = quote ? Number(quote.baseAmount) : localBaseAmount;
-  const pagesAmount = quote ? Number(quote.pagesAmount) : localPagesAmount;
-  const total = quote
-    ? Number(quote.amount)
-    : localBaseAmount + localPagesAmount;
+  const templatePrice = quote
+    ? Number(quote.templatePrice)
+    : Number(template?.price ?? 0);
 
-  // ---------- Additional page selection ----------
+  const extrasAmount = quote
+    ? Number(quote.total) - Number(quote.templatePrice)
+    : additionalPages
+        .filter((p) => additionalPageIds.includes(p.pageKey))
+        .reduce((sum, p) => sum + p.pagePrice, 0);
+
+  const total = quote ? Number(quote.total) : templatePrice + extrasAmount;
+
   const toggleExtraPage = (rawId) => {
     const id = getId(rawId);
     if (!id) return;
-
     setError("");
-    setQuote(null);
-
-    setSelectedExtraIds((previous) =>
-      previous.includes(id)
-        ? previous.filter((x) => x !== id)
-        : [...previous, id]
+    setSelectedExtraIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
   };
 
-  // ---------- Checkout ----------
-  const handleSubmit = async (event) => {
-    event.preventDefault();
+  // ---- checkout ----
+  const handlePay = async () => {
     setError("");
     setSuccess(null);
+    verifyingRef.current = false;
 
-    const token = localStorage.getItem("token");
     const templateId = getId(template?.templateId);
-
-    if (!token) {
-      navigate("/login", { replace: true });
-      return;
-    }
-
-    if (!templateId) {
-      setError("Invalid template. Please select a template again.");
-      return;
-    }
-
-    if (!siteName.trim()) {
-      setError("Website name is required.");
-      return;
-    }
-
-    if (siteName.trim().length > 150) {
-      setError("Website name must be 150 characters or fewer.");
-      return;
-    }
-
-    if (!selectedThemeId) {
-      setError("Please select a theme.");
-      return;
-    }
-
-    if (
-      subdomain.trim() &&
-      !/^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$/.test(
-        subdomain.trim().toLowerCase()
-      )
-    ) {
-      setError(
-        "Invalid subdomain. Use lowercase letters, numbers and hyphens."
-      );
-      return;
-    }
-
-    // Never submit using an old or failed quote.
+    if (!templateId) return setError("Invalid template.");
+    if (!selectedThemeId) return setError("Please select a theme.");
     if (quoteLoading || !quote) {
-      setError("Please wait for the server to calculate the price.");
-      return;
+      return setError("Please wait for the price to be calculated.");
     }
 
-    setLoading(true);
-
+    setPaying(true);
     try {
-      const response = await axios.post(
-        `${API}/payments/checkout`,
+      // 1. Create Razorpay order (backend stores `payments` row with status='created')
+      const { data: order } = await axios.post(
+        `${API}/payments`,
         {
           templateId,
           themeId: selectedThemeId,
-          pageIds: additionalPageIds, // default pages are added by the server
-          siteName: siteName.trim(),
-          subdomain: subdomain.trim() ? subdomain.trim().toLowerCase() : null,
+          additionalPageIds,
         },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: authHeaders({ "Content-Type": "application/json" }) }
       );
 
-      setSuccess(response.data);
+      // 2. Load Razorpay SDK
+      const ok = await loadRazorpay();
+      if (!ok) throw new Error("Razorpay checkout failed to load.");
+
+      // 3. Open checkout
+      const rzp = new window.Razorpay({
+        key: order.keyId,
+        amount: order.amountMinor,
+        currency: order.currency,
+        order_id: order.orderId,
+        name: template?.name || "Template purchase",
+        description: "Website template",
+        theme: { color: "#1976d2" },
+        handler: async (response) => {
+          if (verifyingRef.current) return;
+          verifyingRef.current = true;
+
+          try {
+            // 4. Verify + capture server-side
+            const { data: verified } = await axios.post(
+              `${API}/payments/verify`,
+              {
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              },
+              { headers: authHeaders({ "Content-Type": "application/json" }) }
+            );
+
+            setSuccess({
+              siteId: verified.siteId,
+              invoiceNumber: verified.invoiceNumber,
+              paymentId: order.id,
+              amount: order.totalAmount,
+              currency: order.currency,
+              alreadyProcessed: verified.alreadyProcessed,
+            });
+          } catch (err) {
+            setError(
+              getErrorMessage(
+                err,
+                "Payment verification failed. Contact support with your payment ID."
+              )
+            );
+          } finally {
+            setPaying(false);
+          }
+        },
+        modal: {
+          ondismiss: () => setPaying(false),
+        },
+      });
+
+      rzp.on("payment.failed", (resp) => {
+        setError(
+          resp?.error?.description ||
+            resp?.error?.reason ||
+            "Payment failed. Please try again."
+        );
+        setPaying(false);
+      });
+
+      rzp.open();
     } catch (err) {
-      setError(getErrorMessage(err, "Checkout failed. Please try again."));
-    } finally {
-      setLoading(false);
+      setError(getErrorMessage(err, "Payment could not start."));
+      setPaying(false);
     }
   };
 
   const canPay =
-    !loading &&
+    !paying &&
     !quoteLoading &&
     Boolean(quote) &&
     Boolean(template) &&
     Boolean(selectedThemeId);
 
-  // ---------- UI ----------
+  // ---- UI ----
   return (
     <Container maxWidth="lg" sx={{ py: 6 }}>
       <Paper
@@ -329,19 +353,22 @@ export default function Payment() {
             background: "linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%)",
           }}
         >
-          <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
-            Payment
+          <Typography variant="h4" fontWeight={700} gutterBottom>
+            Checkout
           </Typography>
-
-          <Typography variant="body1" color="text.secondary">
-            Choose one theme. Default pages are included; add extra pages if
-            you need them.
+          <Typography color="text.secondary">
+            Choose one theme. Default pages are included; add extra pages if you
+            need them.
           </Typography>
         </Box>
 
         <Box sx={{ p: { xs: 3, md: 5 } }}>
           {error && (
-            <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError("")}>
+            <Alert
+              severity="error"
+              sx={{ mb: 3 }}
+              onClose={() => setError("")}
+            >
               {error}
             </Alert>
           )}
@@ -360,9 +387,9 @@ export default function Payment() {
                 >
                   Purchase successful
                 </Typography>
-
                 <Typography variant="body1" sx={{ mb: 2 }}>
-                  Your website has been submitted for provisioning.
+                  Your website has been created. You can view and manage it in
+                  “My Sites”.
                 </Typography>
 
                 <Stack
@@ -378,34 +405,16 @@ export default function Payment() {
                       variant="outlined"
                     />
                   )}
-
-                  {success.paymentId != null && (
+                  {success.invoiceNumber && (
                     <Chip
-                      label={`Payment ID: ${success.paymentId}`}
+                      label={`Invoice: ${success.invoiceNumber}`}
                       color="success"
                       variant="outlined"
                     />
                   )}
-
-                  {success.invoiceId != null && (
-                    <Chip
-                      label={`Invoice ID: ${success.invoiceId}`}
-                      color="success"
-                      variant="outlined"
-                    />
-                  )}
-
-                  {success.transactionId && (
-                    <Chip
-                      label={`Transaction: ${success.transactionId}`}
-                      color="success"
-                      variant="outlined"
-                    />
-                  )}
-
                   {success.amount != null && (
                     <Chip
-                      label={`Amount: ${formatPrice(
+                      label={`Paid: ${formatPrice(
                         success.amount,
                         success.currency || currency
                       )}`}
@@ -427,7 +436,6 @@ export default function Payment() {
                   >
                     View your site
                   </Button>
-
                   <Button variant="outlined" onClick={() => navigate("/mysite")}>
                     My sites
                   </Button>
@@ -436,14 +444,16 @@ export default function Payment() {
             </Card>
           ) : (
             <Grid container spacing={4}>
-              {/* LEFT: template and price summary */}
-              <Grid item xs={12} md={5}>
-                <Card variant="outlined" sx={{ height: "100%", borderRadius: 3 }}>
+              {/* LEFT: summary */}
+              <Grid size={{ xs: 12, md: 5 }}>
+                <Card
+                  variant="outlined"
+                  sx={{ height: "100%", borderRadius: 3 }}
+                >
                   <CardContent sx={{ p: 3 }}>
                     <Typography variant="overline" color="text.secondary">
                       Selected template
                     </Typography>
-
                     <Typography variant="h5" fontWeight={700} sx={{ mb: 1 }}>
                       {template?.name || "Template preview"}
                     </Typography>
@@ -458,7 +468,6 @@ export default function Payment() {
                       {template?.language && (
                         <Chip label={template.language} size="small" />
                       )}
-
                       {template?.validityDays && (
                         <Chip
                           label={`${template.validityDays} days`}
@@ -490,14 +499,16 @@ export default function Payment() {
                           <Typography color="text.secondary">
                             Template price
                           </Typography>
-                          <Typography variant="caption" color="text.secondary">
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                          >
                             Includes {defaultPages.length} default page
                             {defaultPages.length === 1 ? "" : "s"}
                           </Typography>
                         </Box>
-
                         <Typography fontWeight={600}>
-                          {formatPrice(baseAmount, currency)}
+                          {formatPrice(templatePrice, currency)}
                         </Typography>
                       </Box>
 
@@ -511,9 +522,8 @@ export default function Payment() {
                         <Typography color="text.secondary">
                           Additional pages ({additionalPageIds.length})
                         </Typography>
-
                         <Typography fontWeight={600}>
-                          {formatPrice(pagesAmount, currency)}
+                          {formatPrice(extrasAmount, currency)}
                         </Typography>
                       </Box>
 
@@ -527,26 +537,32 @@ export default function Payment() {
                         }}
                       >
                         <Typography fontWeight={700}>Total</Typography>
-
                         <Typography fontWeight={700}>
                           {formatPrice(total, currency)}
                         </Typography>
                       </Box>
 
                       {quoteLoading && (
-                        <Typography variant="caption" color="text.secondary">
-                          Calculating server price...
-                        </Typography>
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          alignItems="center"
+                        >
+                          <CircularProgress size={14} />
+                          <Typography variant="caption" color="text.secondary">
+                            Calculating server price…
+                          </Typography>
+                        </Stack>
                       )}
                     </Stack>
                   </CardContent>
                 </Card>
               </Grid>
 
-              {/* RIGHT: theme, pages and billing */}
-              <Grid item xs={12} md={7}>
+              {/* RIGHT: theme, pages, pay */}
+              <Grid size={{ xs: 12, md: 7 }}>
                 <Stack spacing={3}>
-                  {/* Theme selection (single) */}
+                  {/* Theme */}
                   <Card variant="outlined" sx={{ borderRadius: 3 }}>
                     <CardContent sx={{ p: 3 }}>
                       <Typography variant="h6" fontWeight={700} gutterBottom>
@@ -560,10 +576,9 @@ export default function Payment() {
                       ) : (
                         <RadioGroup
                           value={String(themeId)}
-                          onChange={(event) => {
+                          onChange={(e) => {
                             setError("");
-                            setQuote(null);
-                            setThemeId(event.target.value);
+                            setThemeId(e.target.value);
                           }}
                         >
                           {themes.map((theme) => (
@@ -578,30 +593,34 @@ export default function Payment() {
                                   alignItems="center"
                                 >
                                   <Box
+                                    aria-hidden
                                     sx={{
                                       width: 36,
                                       height: 22,
                                       borderRadius: 1,
                                       border: "1px solid #d1d5db",
-                                      background: theme.background || "#fff",
-                                      position: "relative",
-                                      overflow: "hidden",
+                                      backgroundColor: theme.background || "#fff",
+                                      color: theme.color || "#111",
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      fontSize: 10,
+                                      fontWeight: 700,
+                                      lineHeight: 1,
                                     }}
                                   >
-                                    <Box
-                                      sx={{
-                                        position: "absolute",
-                                        right: 0,
-                                        top: 0,
-                                        bottom: 0,
-                                        width: "40%",
-                                        background: theme.color || "#000",
-                                      }}
-                                    />
+                                    Aa
                                   </Box>
-
                                   <Typography>
                                     {theme.name || `Theme ${theme.themeId}`}
+                                    {isDefaultTheme(theme) && (
+                                      <Chip
+                                        size="small"
+                                        label="Default"
+                                        color="primary"
+                                        sx={{ ml: 1 }}
+                                      />
+                                    )}
                                   </Typography>
                                 </Stack>
                               }
@@ -612,13 +631,12 @@ export default function Payment() {
                     </CardContent>
                   </Card>
 
-                  {/* Default pages (locked) */}
+                  {/* Default pages */}
                   <Card variant="outlined" sx={{ borderRadius: 3 }}>
                     <CardContent sx={{ p: 3 }}>
                       <Typography variant="h6" fontWeight={700} gutterBottom>
                         Included pages
                       </Typography>
-
                       {defaultPages.length === 0 ? (
                         <Typography variant="body2" color="text.secondary">
                           This template has no default pages.
@@ -639,26 +657,18 @@ export default function Payment() {
                                 sx={{ flex: 1, mr: 1 }}
                                 control={<Checkbox checked disabled />}
                                 label={
-                                  <Box>
-                                    <Typography fontWeight={600}>
-                                      {page.title ||
-                                        page.name ||
-                                        `Page ${page.pageKey}`}
-                                    </Typography>
-
-                                    {page.description && (
-                                      <Typography
-                                        variant="caption"
-                                        color="text.secondary"
-                                      >
-                                        {page.description}
-                                      </Typography>
-                                    )}
-                                  </Box>
+                                  <Typography fontWeight={600}>
+                                    {page.title ||
+                                      page.name ||
+                                      `Page ${page.pageKey}`}
+                                  </Typography>
                                 }
                               />
-
-                              <Chip label="Included" size="small" color="success" />
+                              <Chip
+                                label="Included"
+                                size="small"
+                                color="success"
+                              />
                             </Box>
                           ))}
                         </Stack>
@@ -666,16 +676,15 @@ export default function Payment() {
                     </CardContent>
                   </Card>
 
-                  {/* Additional pages (paid) */}
+                  {/* Additional pages */}
                   <Card variant="outlined" sx={{ borderRadius: 3 }}>
                     <CardContent sx={{ p: 3 }}>
                       <Typography variant="h6" fontWeight={700} gutterBottom>
                         Add more pages
                       </Typography>
-
                       {additionalPages.length === 0 ? (
                         <Typography variant="body2" color="text.secondary">
-                          No additional pages are available for this template.
+                          No additional pages available for this template.
                         </Typography>
                       ) : (
                         <Stack divider={<Divider flexItem />} spacing={1}>
@@ -696,29 +705,19 @@ export default function Payment() {
                                     checked={additionalPageIds.includes(
                                       page.pageKey
                                     )}
-                                    onChange={() => toggleExtraPage(page.pageKey)}
+                                    onChange={() =>
+                                      toggleExtraPage(page.pageKey)
+                                    }
                                   />
                                 }
                                 label={
-                                  <Box>
-                                    <Typography fontWeight={600}>
-                                      {page.title ||
-                                        page.name ||
-                                        `Page ${page.pageKey}`}
-                                    </Typography>
-
-                                    {page.description && (
-                                      <Typography
-                                        variant="caption"
-                                        color="text.secondary"
-                                      >
-                                        {page.description}
-                                      </Typography>
-                                    )}
-                                  </Box>
+                                  <Typography fontWeight={600}>
+                                    {page.title ||
+                                      page.name ||
+                                      `Page ${page.pageKey}`}
+                                  </Typography>
                                 }
                               />
-
                               <Typography
                                 fontWeight={600}
                                 sx={{ whiteSpace: "nowrap" }}
@@ -732,66 +731,54 @@ export default function Payment() {
                     </CardContent>
                   </Card>
 
-                  {/* Billing and checkout */}
+                  {/* Pay */}
                   <Card variant="outlined" sx={{ borderRadius: 3 }}>
                     <CardContent sx={{ p: 3 }}>
                       <Typography variant="h6" fontWeight={700} gutterBottom>
-                        Website details
+                        Payment
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mb: 2 }}
+                      >
+                        You will be redirected to Razorpay to complete the
+                        payment securely.
                       </Typography>
 
-                      <Box component="form" onSubmit={handleSubmit} noValidate>
-                        <Stack spacing={2.5}>
-                          <TextField
-                            fullWidth
-                            label="Website name"
-                            value={siteName}
-                            onChange={(event) => setSiteName(event.target.value)}
-                            placeholder="My Portfolio Site"
-                            inputProps={{ maxLength: 150 }}
-                            required
-                          />
+                      <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        spacing={2}
+                        justifyContent="space-between"
+                      >
+                        <Button
+                          variant="outlined"
+                          onClick={() => navigate("/templates")}
+                          disabled={paying}
+                        >
+                          Cancel
+                        </Button>
 
-                          <TextField
-                            fullWidth
-                            label="Subdomain (optional)"
-                            value={subdomain}
-                            onChange={(event) =>
-                              setSubdomain(event.target.value.toLowerCase().trim())
-                            }
-                            placeholder="myportfolio"
-                            helperText="Use lowercase letters, numbers and hyphens. Example: myportfolio"
-                          />
-
-                          <Box
-                            sx={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                              gap: 2,
-                            }}
-                          >
-                            <Button
-                              variant="outlined"
-                              onClick={() => navigate("/viewtemp")}
-                              disabled={loading}
-                            >
-                              Cancel
-                            </Button>
-
-                            <Button
-                              type="submit"
-                              variant="contained"
-                              disabled={!canPay}
-                            >
-                              {loading
-                                ? "Processing..."
-                                : quoteLoading
-                                  ? "Calculating..."
-                                  : `Continue — ${formatPrice(total, currency)}`}
-                            </Button>
-                          </Box>
-                        </Stack>
-                      </Box>
+                        <Button
+                          variant="contained"
+                          size="large"
+                          onClick={handlePay}
+                          disabled={!canPay}
+                          startIcon={
+                            paying ? (
+                              <CircularProgress size={18} color="inherit" />
+                            ) : null
+                          }
+                        >
+                          {paying
+                            ? "Processing..."
+                            : quoteLoading
+                            ? "Calculating..."
+                            : canPay
+                            ? `Pay ${formatPrice(total, currency)}`
+                            : "Waiting for price…"}
+                        </Button>
+                      </Stack>
                     </CardContent>
                   </Card>
                 </Stack>

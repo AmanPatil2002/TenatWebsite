@@ -45,7 +45,7 @@ const menuItems = [
   { text: "Add Theme", icon: <ViewQuiltIcon />, path: "/admin/theme" },
   { text: "Add Pages", icon: <NoteAddIcon />, path: "/admin/page" },
   { text: "Add Templates", icon: <DevicesOtherIcon />, path: "/admin/templates" },
-  { text: "Templates Management", icon: <FolderOpenIcon />, path: "/admin/viewtemplates" },
+  { text: "View Templates", icon: <FolderOpenIcon />, path: "/admin/viewtemplates" },
   { text: "FAQ", icon: <HelpOutlineIcon />, path: "/admin/faq" },
   { text: "Contact", icon: <ContactMailIcon />, path: "/admin/contact" },
   { text: "View Users", icon: <PeopleIcon />, path: "/admin/users" },

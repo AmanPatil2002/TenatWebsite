@@ -1,31 +1,28 @@
 const express = require("express");
-const router = express.Router();
-
 const authenticateToken = require("../middleware/authenticate");
 const { requirePlatformAdmin } = require("../middleware/siteAccess");
-
 const {
+  quotePayment,
   createPayment,
-  confirmPayment,
+  verifyPayment,
+  razorpayWebhook,
   getMyPayments,
   getPayment,
   getAllPayments,
-  refundPayment,
+  getInvoices,
+  getInvoice,
 } = require("../controller/paymentController");
 
-// Admin routes first so they are not swallowed by /:id.
-router.get("/admin/all", authenticateToken, requirePlatformAdmin, getAllPayments);
-router.patch(
-  "/admin/:id/refund",
-  authenticateToken,
-  requirePlatformAdmin,
-  refundPayment,
-);
+const router = express.Router();
 
-// Client routes.
+router.post("/webhook", razorpayWebhook);
+router.post("/verify", authenticateToken, verifyPayment);
+router.post("/quote", authenticateToken, quotePayment);
 router.get("/my", authenticateToken, getMyPayments);
+router.get("/invoices/my", authenticateToken, getInvoices);
+router.get("/invoices/:id", authenticateToken, getInvoice);
+router.get("/admin/all", authenticateToken, requirePlatformAdmin, getAllPayments);
 router.post("/", authenticateToken, createPayment);
-router.post("/:transactionId/confirm", authenticateToken, confirmPayment);
 router.get("/:id", authenticateToken, getPayment);
 
 module.exports = router;

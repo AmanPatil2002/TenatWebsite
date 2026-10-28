@@ -1,5 +1,10 @@
-
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import axios from "axios";
 import {
   Alert,
@@ -24,9 +29,9 @@ import {
 import {
   AddPhotoAlternateOutlined,
   CloudUploadOutlined,
-  // DeleteOutline,
   SaveOutlined,
 } from "@mui/icons-material";
+import DeleteIcon from "@mui/icons-material/Delete";
 
 const API_URL = (
   import.meta.env.VITE_API_URL || "http://localhost:5000"
@@ -41,7 +46,7 @@ const IMAGE_UPLOAD_URL = `${API_URL}/uploads/ckeditor`;
 const EMPTY_FORM = {
   categoryId: "",
   name: "",
-  language: "English",
+  language: "",
   shortDescription: "",
   description: "",
   thumbnailUrl: "",
@@ -70,9 +75,9 @@ const authConfig = (extraHeaders = {}) => {
 
 const getId = (item) =>
   item?.id ??
-  item?.categoryId ??
+  item?.pagesId ??
   item?.themeId ??
-  item?.pageId ??
+  item?.categoryId ??
   item?.templateId;
 
 const getName = (item) =>
@@ -93,9 +98,7 @@ const getArray = (response) => {
 
 const parsePhotos = (photos) => {
   if (Array.isArray(photos)) {
-    return photos.filter(
-      (photo) => typeof photo === "string" && photo.trim()
-    );
+    return photos.filter((photo) => typeof photo === "string" && photo.trim());
   }
 
   if (typeof photos !== "string" || !photos.trim()) {
@@ -107,7 +110,7 @@ const parsePhotos = (photos) => {
 
     if (Array.isArray(parsed)) {
       return parsed.filter(
-        (photo) => typeof photo === "string" && photo.trim()
+        (photo) => typeof photo === "string" && photo.trim(),
       );
     }
 
@@ -117,25 +120,14 @@ const parsePhotos = (photos) => {
 
     return [];
   } catch {
-    return /^https?:\/\//i.test(photos.trim())
-      ? [photos.trim()]
-      : [];
+    return /^https?:\/\//i.test(photos.trim()) ? [photos.trim()] : [];
   }
 };
 
 const getPagePrice = (page) =>
-  Number(
-    page?.price ??
-      page?.pagePrice ??
-      page?.amount ??
-      0
-  ) || 0;
+  Number(page?.price ?? page?.pagePrice ?? page?.amount ?? 0) || 0;
 
-function MultiplePhotoUpload({
-  value = [],
-  onChange,
-  disabled = false,
-}) {
+function MultiplePhotoUpload({ value = [], onChange, disabled = false }) {
   const inputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
@@ -149,18 +141,14 @@ function MultiplePhotoUpload({
 
       if (!files.length) return;
 
-      const invalidFile = files.find(
-        (file) => !file.type.startsWith("image/")
-      );
+      const invalidFile = files.find((file) => !file.type.startsWith("image/"));
 
       if (invalidFile) {
         setError("Please select image files only.");
         return;
       }
 
-      const oversizedFile = files.find(
-        (file) => file.size > 10 * 1024 * 1024
-      );
+      const oversizedFile = files.find((file) => file.size > 10 * 1024 * 1024);
 
       if (oversizedFile) {
         setError("Each image must be 10 MB or smaller.");
@@ -180,7 +168,7 @@ function MultiplePhotoUpload({
           const response = await axios.post(
             IMAGE_UPLOAD_URL,
             body,
-            authConfig()
+            authConfig(),
           );
 
           const data = response.data;
@@ -196,7 +184,7 @@ function MultiplePhotoUpload({
             !/^https?:\/\/\S+$/i.test(imageUrl.trim())
           ) {
             throw new Error(
-              `The upload response did not contain a valid URL for "${file.name}".`
+              `The upload response did not contain a valid URL for "${file.name}".`,
             );
           }
 
@@ -211,13 +199,13 @@ function MultiplePhotoUpload({
           err.response?.data?.message ||
             err.response?.data?.error ||
             err.message ||
-            "Failed to upload photos."
+            "Failed to upload photos.",
         );
       } finally {
         setUploading(false);
       }
     },
-    [onChange, photos]
+    [onChange, photos],
   );
 
   const removePhoto = (index) => {
@@ -231,8 +219,8 @@ function MultiplePhotoUpload({
       </Typography>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Select multiple images. Each image is uploaded and its URL is saved
-        with the template.
+        Select multiple images. Each image is uploaded and its URL is saved with
+        the template.
       </Typography>
 
       <input
@@ -248,11 +236,7 @@ function MultiplePhotoUpload({
       <Button
         variant="outlined"
         startIcon={
-          uploading ? (
-            <CircularProgress size={18} />
-          ) : (
-            <CloudUploadOutlined />
-          )
+          uploading ? <CircularProgress size={18} /> : <CloudUploadOutlined />
         }
         onClick={() => inputRef.current?.click()}
         disabled={disabled || uploading}
@@ -308,7 +292,7 @@ function MultiplePhotoUpload({
                     disabled={disabled || uploading}
                     sx={{ minWidth: 36 }}
                   >
-                    <DeleteOutline fontSize="small" />
+                    <DeleteIcon fontSize="small" />
                   </Button>
                 </Stack>
               </Paper>
@@ -339,12 +323,13 @@ export default function AddTemplate() {
     setError("");
 
     try {
-      const [categoryResponse, themeResponse, pageResponse] =
-        await Promise.all([
+      const [categoryResponse, themeResponse, pageResponse] = await Promise.all(
+        [
           axios.get(CATEGORIES_URL, authConfig()),
           axios.get(THEMES_URL, authConfig()),
           axios.get(PAGES_URL, authConfig()),
-        ]);
+        ],
+      );
 
       setCategories(getArray(categoryResponse));
       setThemes(getArray(themeResponse));
@@ -354,7 +339,7 @@ export default function AddTemplate() {
 
       setError(
         err.response?.data?.message ||
-          "Unable to load categories, themes, or pages. Check your API routes."
+          "Unable to load categories, themes, or pages. Check your API routes.",
       );
     } finally {
       setLoading(false);
@@ -402,18 +387,14 @@ export default function AddTemplate() {
   const selectedPages = useMemo(
     () =>
       pages.filter((page) =>
-        form.pageIds.map(String).includes(String(getId(page)))
+        form.pageIds.map(String).includes(String(getId(page))),
       ),
-    [pages, form.pageIds]
+    [pages, form.pageIds],
   );
 
   const calculatedPagePrice = useMemo(
-    () =>
-      selectedPages.reduce(
-        (total, page) => total + getPagePrice(page),
-        0
-      ),
-    [selectedPages]
+    () => selectedPages.reduce((total, page) => total + getPagePrice(page), 0),
+    [selectedPages],
   );
 
   const handleSubmit = async (event) => {
@@ -431,8 +412,8 @@ export default function AddTemplate() {
       return;
     }
 
-    if (form.price === "" || !Number.isFinite(Number(form.price))) {
-      setError("Please enter a valid template price.");
+    if (form.price === "" || !(Number(form.price) > 0)) {
+      setError("Please enter a template price greater than 0.");
       return;
     }
 
@@ -472,12 +453,10 @@ export default function AddTemplate() {
       const response = await axios.post(
         TEMPLATES_URL,
         payload,
-        authConfig({ "Content-Type": "application/json" })
+        authConfig({ "Content-Type": "application/json" }),
       );
 
-      setSuccess(
-        response.data?.message || "Template created successfully."
-      );
+      setSuccess(response.data?.message || "Template created successfully.");
 
       setForm({ ...EMPTY_FORM });
     } catch (err) {
@@ -491,7 +470,7 @@ export default function AddTemplate() {
           (Array.isArray(responseData?.errors)
             ? responseData.errors.join(", ")
             : "") ||
-          "Failed to create template. Please check the form and try again."
+          "Failed to create template. Please check the form and try again.",
       );
     } finally {
       setSaving(false);
@@ -522,26 +501,18 @@ export default function AddTemplate() {
       </Typography>
 
       <Typography color="text.secondary" sx={{ mb: 3 }}>
-        Create a template, upload its photos, and select its category,
-        themes, and pages.
+        Create a template, upload its photos, and select its category, themes,
+        and pages.
       </Typography>
 
       {error && (
-        <Alert
-          severity="error"
-          sx={{ mb: 2 }}
-          onClose={() => setError("")}
-        >
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>
           {error}
         </Alert>
       )}
 
       {success && (
-        <Alert
-          severity="success"
-          sx={{ mb: 2 }}
-          onClose={() => setSuccess("")}
-        >
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess("")}>
           {success}
         </Alert>
       )}
@@ -560,38 +531,48 @@ export default function AddTemplate() {
             Basic Information
           </Typography>
 
-          <FormControl fullWidth required>
-            <InputLabel id="category-label">Category</InputLabel>
-            <Select
-              labelId="category-label"
-              name="categoryId"
-              value={form.categoryId}
-              label="Category"
-              onChange={handleChange}
-            >
-              {categories.map((category) => (
-                <MenuItem
-                  key={getId(category)}
-                  value={getId(category)}
+          <Grid
+            container
+            spacing={{ xs: 2, md: 3 }}
+            columns={{ xs: 4, sm: 8, md: 12 }}
+          >
+            <Grid size={{ xs: 2, sm: 4, md: 6 }}>
+              <FormControl fullWidth required>
+                <InputLabel id="category-label">Category</InputLabel>
+                <Select
+                  labelId="category-label"
+                  name="categoryId"
+                  value={form.categoryId}
+                  label="Category"
+                  onChange={handleChange}
                 >
-                  {getName(category)}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+                  {categories.map((category) => (
+                    <MenuItem key={getId(category)} value={getId(category)}>
+                      {getName(category)}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid size={{ xs: 2, sm: 4, md: 6 }}>
+              <TextField
+                label="Template Name"
+                name="name"
+                value={form.name}
+                onChange={handleChange}
+                required
+                fullWidth
+                inputProps={{ maxLength: 150 }}
+              />
+            </Grid>
+          </Grid>
 
-          <TextField
-            label="Template Name"
-            name="name"
-            value={form.name}
-            onChange={handleChange}
-            required
-            fullWidth
-            inputProps={{ maxLength: 150 }}
-          />
-
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
+          <Grid
+            container
+            spacing={{ xs: 2, md: 3 }}
+            columns={{ xs: 4, sm: 8, md: 12 }}
+          >
+            <Grid size={{ xs: 2, sm: 4, md: 6 }}>
               <TextField
                 label="Language"
                 name="language"
@@ -601,7 +582,7 @@ export default function AddTemplate() {
               />
             </Grid>
 
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 2, sm: 4, md: 6 }}>
               <TextField
                 label="Currency"
                 name="currency"
@@ -681,74 +662,146 @@ export default function AddTemplate() {
           <Typography variant="h6" fontWeight={700}>
             Themes and Pages
           </Typography>
+          <Grid
+            container
+            spacing={{ xs: 2, md: 3 }}
+            columns={{ xs: 4, sm: 8, md: 12 }}
+          >
+            <Grid size={{ xs: 2, sm: 4, md: 6 }}>
+              <FormControl fullWidth>
+                <InputLabel id="themes-label">Themes</InputLabel>
+                <Select
+                  labelId="themes-label"
+                  multiple
+                  name="themeIds"
+                  value={form.themeIds}
+                  label="Themes"
+                  onChange={handleThemeChange}
+                  renderValue={(selected) => {
+                    const chosen = themes.filter((theme) =>
+                      selected.map(String).includes(String(getId(theme))),
+                    );
 
-          <FormControl fullWidth>
-            <InputLabel id="themes-label">Themes</InputLabel>
-            <Select
-              labelId="themes-label"
-              multiple
-              name="themeIds"
-              value={form.themeIds}
-              label="Themes"
-              onChange={handleThemeChange}
-              renderValue={(selected) =>
-                themes
-                  .filter((theme) =>
-                    selected.map(String).includes(String(getId(theme)))
-                  )
-                  .map(getName)
-                  .join(", ")
-              }
-            >
-              {themes.map((theme) => (
-                <MenuItem key={getId(theme)} value={String(getId(theme))}>
-                  {getName(theme)}
-                </MenuItem>
-              ))}
-            </Select>
-            <FormHelperText>
-              Select one or more themes.
-            </FormHelperText>
-          </FormControl>
+                    if (!chosen.length) return "";
 
-          <FormControl fullWidth>
-            <InputLabel id="pages-label">Pages</InputLabel>
-            <Select
-              labelId="pages-label"
-              multiple
-              name="pageIds"
-              value={form.pageIds}
-              label="Pages"
-              onChange={handlePageChange}
-              renderValue={(selected) =>
-                pages
-                  .filter((page) =>
-                    selected.map(String).includes(String(getId(page)))
-                  )
-                  .map(getName)
-                  .join(", ")
-              }
-            >
-              {pages.map((page) => (
-                <MenuItem key={getId(page)} value={String(getId(page))}>
-                  {getName(page)}
-                  {getPagePrice(page) > 0
-                    ? ` — ${form.currency} ${getPagePrice(page).toFixed(2)}`
-                    : ""}
-                </MenuItem>
-              ))}
-            </Select>
-            <FormHelperText>
-              Select the pages included in this template.
-            </FormHelperText>
-          </FormControl>
+                    return (
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        alignItems="center"
+                        flexWrap="wrap"
+                        useFlexGap
+                      >
+                        {chosen.map((theme) => (
+                          <Stack
+                            key={getId(theme)}
+                            direction="row"
+                            spacing={0.75}
+                            alignItems="center"
+                          >
+                            <Box
+                              aria-hidden
+                              sx={{
+                                width: 18,
+                                height: 18,
+                                minWidth: 18,
+                                borderRadius: 0.5,
+                                backgroundColor: theme.background || "#fff",
+                                color: theme.color || "#111",
+                                border: "1px solid",
+                                borderColor: "divider",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: 10,
+                                fontWeight: 700,
+                                lineHeight: 1,
+                              }}
+                            >
+                              Aa
+                            </Box>
+                            <Typography variant="body2" component="span">
+                              {getName(theme)}
+                            </Typography>
+                          </Stack>
+                        ))}
+                      </Stack>
+                    );
+                  }}
+                >
+                  {themes.map((theme) => (
+                    <MenuItem key={getId(theme)} value={String(getId(theme))}>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Box
+                          aria-hidden
+                          sx={{
+                            width: 50,
+                            height: 35,
+                            minWidth: 20,
+                            borderRadius: 0.5,
+                            backgroundColor: theme.background || "#fff",
+                            color: theme.color || "#111",
+                            border: "1px solid",
+                            borderColor: "divider",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            lineHeight: 1,
+                          }}
+                        >
+                          Theme
+                        </Box>
+                        <span>{getName(theme)}</span>
+                      </Stack>
+                    </MenuItem>
+                  ))}
+                </Select>
+                <FormHelperText>Select one or more themes.</FormHelperText>
+              </FormControl>
+            </Grid>
+            <Grid size={{ xs: 2, sm: 4, md: 6 }}>
+              <FormControl fullWidth>
+                <InputLabel id="pages-label">Pages</InputLabel>
+                <Select
+                  labelId="pages-label"
+                  multiple
+                  name="pageIds"
+                  value={form.pageIds}
+                  label="Pages"
+                  onChange={handlePageChange}
+                  renderValue={(selected) =>
+                    pages
+                      .filter((page) =>
+                        selected.map(String).includes(String(getId(page))),
+                      )
+                      .map(getName)
+                      .join(", ")
+                  }
+                >
+                  {pages.map((page) => (
+                    <MenuItem key={getId(page)} value={String(getId(page))}>
+                      {getName(page)}
+                      {getPagePrice(page) > 0
+                        ? ` — ${form.currency} ${getPagePrice(page).toFixed(2)}`
+                        : ""}
+                    </MenuItem>
+                  ))}
+                </Select>
+                <FormHelperText>
+                  Select the pages included in this template.
+                </FormHelperText>
+              </FormControl>
 
-          {form.pageIds.length > 0 && (
-            <Alert severity="info">
-              Selected page total: {form.currency}{" "}
-              {calculatedPagePrice.toFixed(2)}
-            </Alert>
-          )}
+              {form.pageIds.length > 0 && (
+                <Alert severity="info">
+                  Selected page total: {form.currency}{" "}
+                  {calculatedPagePrice.toFixed(2)}
+                </Alert>
+              )}
+            </Grid>
+          </Grid>
 
           <Divider />
 
@@ -756,8 +809,12 @@ export default function AddTemplate() {
             Pricing and Publishing
           </Typography>
 
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
+          <Grid
+            container
+            spacing={{ xs: 2, md: 3 }}
+            columns={{ xs: 6, sm: 12, md: 12 }}
+          >
+            <Grid size={{ xs: 2, sm: 4, md: 4 }}>
               <TextField
                 label="Template Price"
                 name="price"
@@ -770,7 +827,7 @@ export default function AddTemplate() {
               />
             </Grid>
 
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 2, sm: 4, md: 4 }}>
               <TextField
                 label="Validity (days)"
                 name="validityDays"
@@ -782,22 +839,23 @@ export default function AddTemplate() {
                 inputProps={{ min: 1, step: 1 }}
               />
             </Grid>
+            <Grid size={{ xs: 2, sm: 4, md: 4 }}>
+              <FormControl fullWidth required>
+                <InputLabel id="status-label">Status</InputLabel>
+                <Select
+                  labelId="status-label"
+                  name="status"
+                  value={form.status}
+                  label="Status"
+                  onChange={handleChange}
+                >
+                  <MenuItem value="draft">Draft</MenuItem>
+                  <MenuItem value="published">Published</MenuItem>
+                  <MenuItem value="archived">Archived</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
           </Grid>
-
-          <FormControl fullWidth required>
-            <InputLabel id="status-label">Status</InputLabel>
-            <Select
-              labelId="status-label"
-              name="status"
-              value={form.status}
-              label="Status"
-              onChange={handleChange}
-            >
-              <MenuItem value="draft">Draft</MenuItem>
-              <MenuItem value="published">Published</MenuItem>
-              <MenuItem value="archived">Archived</MenuItem>
-            </Select>
-          </FormControl>
 
           <Divider />
 

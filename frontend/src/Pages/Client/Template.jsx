@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -19,6 +18,7 @@ import {
   DialogTitle,
   Divider,
   Grid,
+  IconButton,
   InputAdornment,
   MenuItem,
   Paper,
@@ -31,14 +31,15 @@ import {
 } from "@mui/material";
 
 import SearchIcon from "@mui/icons-material/Search";
+import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
+import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 
-const API = (
-  import.meta.env.VITE_API_URL || "http://localhost:5000"
-).replace(/\/+$/, "");
+const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(
+  /\/+$/,
+  "",
+);
 
-const PLACEHOLDER_IMAGE =
-  "https://placehold.co/900x520?text=Template+Preview";
-
+const PLACEHOLDER_IMAGE = "https://placehold.co/900x520?text=Template+Preview";
 const PREVIEW_WIDTHS = ["100%", 768, 390];
 
 const getAuthConfig = () => {
@@ -46,22 +47,15 @@ const getAuthConfig = () => {
     localStorage.getItem("token") ||
     localStorage.getItem("authToken") ||
     localStorage.getItem("accessToken");
-
-  return token
-    ? { headers: { Authorization: `Bearer ${token}` } }
-    : {};
+  return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
 };
 
 const getArray = (response) => {
   const data = response?.data;
-
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.data)) return data.data;
   if (Array.isArray(data?.templates)) return data.templates;
   if (Array.isArray(data?.categories)) return data.categories;
-  if (Array.isArray(data?.pages)) return data.pages;
-  if (Array.isArray(data?.themes)) return data.themes;
-
   return [];
 };
 
@@ -77,63 +71,332 @@ const formatPrice = (price, currency = "INR") => {
   }
 };
 
-const formatJson = (value) => {
-  if (value == null || value === "") {
-    return "No content defined";
-  }
-
-  if (typeof value === "string") {
-    try {
-      return JSON.stringify(JSON.parse(value), null, 2);
-    } catch {
-      return value;
-    }
-  }
-
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-};
-
-// Supports arrays, JSON-encoded arrays, and legacy single URLs.
 const parsePhotos = (photos) => {
   if (Array.isArray(photos)) {
-    return photos.filter(
-      (photo) => typeof photo === "string" && photo.trim()
-    );
+    return photos.filter((p) => typeof p === "string" && p.trim());
   }
-
-  if (typeof photos !== "string" || !photos.trim()) {
-    return [];
-  }
-
+  if (typeof photos !== "string" || !photos.trim()) return [];
   try {
     const parsed = JSON.parse(photos);
-
     if (Array.isArray(parsed)) {
-      return parsed.filter(
-        (photo) => typeof photo === "string" && photo.trim()
-      );
+      return parsed.filter((p) => typeof p === "string" && p.trim());
     }
-
-    if (typeof parsed === "string" && parsed.trim()) {
-      return [parsed.trim()];
-    }
-
+    if (typeof parsed === "string" && parsed.trim()) return [parsed.trim()];
     return [];
   } catch {
-    return /^https?:\/\/\S+$/i.test(photos.trim())
-      ? [photos.trim()]
-      : [];
+    return /^https?:\/\/\S+$/i.test(photos.trim()) ? [photos.trim()] : [];
   }
 };
 
 const getErrorMessage = (error, fallback) =>
-  error?.response?.data?.message ||
-  error?.response?.data?.error ||
-  fallback;
+  error?.response?.data?.message || error?.response?.data?.error || fallback;
+
+const isDefaultPage = (p) =>
+  p?.isDefault === 1 || p?.isDefault === true || p?.isDefault === "1";
+
+const isDefaultTheme = (t) =>
+  t?.isDefault === 1 || t?.isDefault === true || t?.isDefault === "1";
+
+/* ---------------- Photo slider (no extra dependency) ---------------- */
+
+function PhotoSlider({ photos, alt = "Template" }) {
+  const [index, setIndex] = useState(0);
+  const safePhotos = photos?.length ? photos : [];
+
+  useEffect(() => {
+    setIndex(0);
+  }, [safePhotos.length]);
+
+  if (!safePhotos.length) return null;
+
+  const go = (delta) => {
+    setIndex((prev) => {
+      const next = prev + delta;
+      if (next < 0) return safePhotos.length - 1;
+      if (next >= safePhotos.length) return 0;
+      return next;
+    });
+  };
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2 }}>
+      <Typography variant="h6" fontWeight={700} sx={{ mb: 1.5 }}>
+        Template Photos
+      </Typography>
+
+      <Box
+        sx={{
+          position: "relative",
+          width: "100%",
+          maxWidth: 900,
+          mx: "auto",
+          overflow: "hidden",
+          borderRadius: 2,
+          border: "1px solid",
+          borderColor: "divider",
+          bgcolor: "#eef2f7",
+          aspectRatio: "16 / 9",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Box
+          component="img"
+          src={safePhotos[index]}
+          alt={`${alt} photo ${index + 1}`}
+          loading="lazy"
+          onError={(e) => {
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = PLACEHOLDER_IMAGE;
+          }}
+          sx={{
+            maxWidth: "100%",
+            maxHeight: "100%",
+            display: "block",
+            objectFit: "contain",
+          }}
+        />
+
+        {safePhotos.length > 1 && (
+          <>
+            <IconButton
+              aria-label="Previous photo"
+              onClick={() => go(-1)}
+              sx={{
+                position: "absolute",
+                top: "50%",
+                left: 8,
+                transform: "translateY(-50%)",
+                bgcolor: "rgba(255,255,255,0.85)",
+                "&:hover": { bgcolor: "rgba(255,255,255,1)" },
+              }}
+            >
+              <ArrowBackIosNewIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              aria-label="Next photo"
+              onClick={() => go(1)}
+              sx={{
+                position: "absolute",
+                top: "50%",
+                right: 8,
+                transform: "translateY(-50%)",
+                bgcolor: "rgba(255,255,255,0.85)",
+                "&:hover": { bgcolor: "rgba(255,255,255,1)" },
+              }}
+            >
+              <ArrowForwardIosIcon fontSize="small" />
+            </IconButton>
+
+            <Box
+              sx={{
+                position: "absolute",
+                bottom: 8,
+                right: 12,
+                bgcolor: "rgba(0,0,0,0.6)",
+                color: "#fff",
+                px: 1,
+                py: 0.25,
+                borderRadius: 1,
+                fontSize: 12,
+              }}
+            >
+              {index + 1} / {safePhotos.length}
+            </Box>
+          </>
+        )}
+      </Box>
+
+      {safePhotos.length > 1 && (
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ mt: 1.5, overflowX: "auto", py: 0.5 }}
+        >
+          {safePhotos.map((url, i) => (
+            <Box
+              key={`${url}-${i}`}
+              component="img"
+              src={url}
+              alt={`${alt} thumbnail ${i + 1}`}
+              onClick={() => setIndex(i)}
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = PLACEHOLDER_IMAGE;
+              }}
+              sx={{
+                width: 84,
+                height: 56,
+                flex: "0 0 auto",
+                objectFit: "cover",
+                borderRadius: 1,
+                cursor: "pointer",
+                border: i === index ? "2px solid" : "1px solid",
+                borderColor: i === index ? "primary.main" : "divider",
+                opacity: i === index ? 1 : 0.75,
+                transition: "all .15s",
+                "&:hover": { opacity: 1 },
+              }}
+            />
+          ))}
+        </Stack>
+      )}
+    </Paper>
+  );
+}
+
+/* ----------------------- Theme-aware preview ------------------------ */
+
+function ThemePagePreview({ theme, pages = [] }) {
+  const [activePageId, setActivePageId] = useState("");
+
+  const background = theme?.background || "#ffffff";
+  const color = theme?.color || "#222222";
+
+  const getPageId = (page, index) =>
+    String(page.pageId ?? page.id ?? `page-${index}`);
+
+  const selectedPageId = pages.some(
+    (page, index) => getPageId(page, index) === String(activePageId)
+  )
+    ? String(activePageId)
+    : pages.length > 0
+      ? getPageId(pages[0], 0)
+      : "";
+
+  const activePage = pages.find(
+    (page, index) => getPageId(page, index) === selectedPageId
+  );
+
+  const html = activePage?.page ?? "";
+
+  const srcDoc = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+        <style>
+          * {
+            box-sizing: border-box;
+          }
+
+          html {
+            scroll-behavior: smooth;
+          }
+
+          body {
+            margin: 0;
+            padding: 16px;
+            background: ${background};
+            color: ${color};
+            font-family: Arial, Helvetica, sans-serif;
+          }
+
+          img {
+            max-width: 100%;
+            height: auto;
+          }
+
+          table {
+            max-width: 100%;
+          }
+
+          @media (max-width: 600px) {
+            body {
+              padding: 8px;
+            }
+          }
+        </style>
+      </head>
+
+      <body>
+        ${html || "<p>No page content available.</p>"}
+      </body>
+    </html>
+  `;
+
+  return (
+    <Box sx={{ width: "100%", minWidth: 0 }}>
+      {pages.length > 0 && (
+        <Tabs
+          value={selectedPageId}
+          onChange={(event, newValue) => {
+            setActivePageId(newValue);
+          }}
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
+          aria-label="Preview website pages"
+          sx={{
+            mb: 2,
+            borderBottom: 1,
+            borderColor: "divider",
+            "& .MuiTab-root": {
+              textTransform: "none",
+              fontWeight: 600,
+              minHeight: 48,
+              color,
+            },
+            "& .Mui-selected": {
+              color: `${color} !important`,
+            },
+            "& .MuiTabs-indicator": {
+              backgroundColor: color,
+              height: 3,
+            },
+          }}
+        >
+          {pages.map((page, index) => {
+            const id = getPageId(page, index);
+
+            return (
+              <Tab
+                key={id}
+                value={id}
+                label={page.title || "Untitled Page"}
+                id={`preview-tab-${id}`}
+                aria-controls={`preview-panel-${id}`}
+              />
+            );
+          })}
+        </Tabs>
+      )}
+
+      <Box
+        role="tabpanel"
+        id={
+          activePage
+            ? `preview-panel-${selectedPageId}`
+            : "preview-panel-empty"
+        }
+        aria-labelledby={
+          activePage ? `preview-tab-${selectedPageId}` : undefined
+        }
+        sx={{ width: "100%" }}
+      >
+        <iframe
+          key={selectedPageId}
+          title={activePage?.title || "Theme page preview"}
+          srcDoc={srcDoc}
+          sandbox=""
+          style={{
+            width: "100%",
+            minHeight: 700,
+            border: `1px solid ${color}`,
+            borderRadius: 8,
+            background,
+            display: "block",
+          }}
+        />
+      </Box>
+    </Box>
+  );
+}
+
+/* ------------------------------ Page ------------------------------- */
 
 export default function Template() {
   const navigate = useNavigate();
@@ -149,99 +412,73 @@ export default function Template() {
   const [categoryWarning, setCategoryWarning] = useState("");
 
   const [selected, setSelected] = useState(null);
-  const [content, setContent] = useState({
-    pages: [],
-    themes: [],
-    menuItems: [],
-  });
-
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
   const [tabIndex, setTabIndex] = useState(0);
+  const [previewThemeId, setPreviewThemeId] = useState(null);
   const [purchasedTemplateIds, setPurchasedTemplateIds] = useState([]);
 
-  // Load categories and purchase information.
+  // Categories + purchase state
   useEffect(() => {
     let cancelled = false;
-
-    const loadInitialData = async () => {
+    const load = async () => {
       try {
         const categoryRequest = axios.get(`${API}/categories`);
-
         const token =
           localStorage.getItem("token") ||
           localStorage.getItem("authToken") ||
           localStorage.getItem("accessToken");
-
         const purchaseRequest = token
-          ? axios.get(`${API}/site`, getAuthConfig()).catch(() => null)
+          ? axios.get(`${API}/sites/my`, getAuthConfig()).catch(() => null)
           : Promise.resolve(null);
 
-        const [categoryResponse, purchaseResponse] = await Promise.all([
+        const [catRes, purchaseRes] = await Promise.all([
           categoryRequest,
           purchaseRequest,
         ]);
-
         if (cancelled) return;
 
-        setCategories(getArray(categoryResponse));
-
-        if (purchaseResponse) {
+        setCategories(getArray(catRes));
+        if (purchaseRes) {
           setPurchasedTemplateIds(
-            getArray(purchaseResponse)
+            getArray(purchaseRes)
               .map((site) => Number(site.templateId))
-              .filter((id) => Number.isFinite(id))
+              .filter((id) => Number.isFinite(id)),
           );
         }
       } catch (loadError) {
         if (!cancelled) {
           setCategoryWarning(
-            getErrorMessage(
-              loadError,
-              "Categories could not be loaded. You can still browse templates."
-            )
+            getErrorMessage(loadError, "Categories could not be loaded."),
           );
         }
       }
     };
-
-    loadInitialData();
-
+    load();
     return () => {
       cancelled = true;
     };
   }, []);
 
-  // The template list route returns the full list and does not implement query filters.
+  // Templates list
   useEffect(() => {
     let cancelled = false;
-
-    const loadTemplates = async () => {
+    const load = async () => {
       setLoading(true);
       setError("");
-
       try {
         const response = await axios.get(`${API}/templates`);
-
-        if (!cancelled) {
-          setTemplates(getArray(response));
-        }
+        if (!cancelled) setTemplates(getArray(response));
       } catch (loadError) {
         if (!cancelled) {
           setTemplates([]);
-          setError(
-            getErrorMessage(loadError, "Could not load templates.")
-          );
+          setError(getErrorMessage(loadError, "Could not load templates."));
         }
       } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
     };
-
-    loadTemplates();
-
+    load();
     return () => {
       cancelled = true;
     };
@@ -250,89 +487,67 @@ export default function Template() {
   const activeCategory = useMemo(
     () =>
       categories.find(
-        (category) =>
-          String(category.categoryId ?? category.id) === String(categoryId)
+        (c) => String(c.categoryId ?? c.id) === String(categoryId),
       ),
-    [categories, categoryId]
+    [categories, categoryId],
   );
 
   const visible = useMemo(() => {
-    const query = search.trim().toLowerCase();
-
+    const q = search.trim().toLowerCase();
     return templates
-      .filter((template) => {
-        if (template.status !== "published") return false;
-        if (
-          categoryId &&
-          String(template.categoryId) !== String(categoryId)
-        ) {
+      .filter((t) => {
+        if (t.status !== "published") return false;
+        if (categoryId && String(t.categoryId) !== String(categoryId))
           return false;
-        }
-
         return (
-          !query ||
-          [
-            template.name,
-            template.shortDescription,
-            template.description,
-            template.categoryName,
-          ].some((value) =>
-            String(value || "").toLowerCase().includes(query)
+          !q ||
+          [t.name, t.shortDescription, t.description, t.categoryName].some(
+            (v) =>
+              String(v || "")
+                .toLowerCase()
+                .includes(q),
           )
         );
       })
-      .sort((first, second) => {
+      .sort((a, b) => {
         if (sort === "priceLow" || sort === "priceHigh") {
-          const difference =
-            Number(first.price || 0) - Number(second.price || 0);
-          return sort === "priceLow" ? difference : -difference;
+          const diff = Number(a.price || 0) - Number(b.price || 0);
+          return sort === "priceLow" ? diff : -diff;
         }
-
-        const firstDate = Date.parse(first.createdAt || "");
-        const secondDate = Date.parse(second.createdAt || "");
-        if (Number.isFinite(firstDate) && Number.isFinite(secondDate)) {
-          return secondDate - firstDate;
-        }
-
-        return Number(second.templateId || 0) - Number(first.templateId || 0);
+        const aDate = Date.parse(a.createdAt || "");
+        const bDate = Date.parse(b.createdAt || "");
+        if (Number.isFinite(aDate) && Number.isFinite(bDate))
+          return bDate - aDate;
+        return Number(b.templateId || 0) - Number(a.templateId || 0);
       });
   }, [categoryId, search, sort, templates]);
 
-  // Open the template details and retrieve included content.
   const openTemplate = useCallback(async (template) => {
     setSelected(template);
     setDetailLoading(true);
     setDetailError("");
     setTabIndex(0);
-
-    setContent({
-      pages: [],
-      themes: [],
-      menuItems: [],
-    });
+    // Preselect the template's default theme (fallback to first)
+    const defTheme =
+      (template.themes || []).find(isDefaultTheme) ||
+      (template.themes || [])[0];
+    setPreviewThemeId(
+      defTheme?.themeId ?? template.themes?.[0]?.themeId ?? null,
+    );
 
     try {
       const response = await axios.get(
-        `${API}/templates/${template.templateId}/content`
+        `${API}/templates/${template.templateId}`,
       );
-
-      const data = response?.data?.data || response?.data || {};
-
-      setContent({
-        pages: Array.isArray(data.pages) ? data.pages : [],
-        themes: Array.isArray(data.themes) ? data.themes : [],
-        menuItems: Array.isArray(data.menuItems)
-          ? data.menuItems
-          : [],
-      });
-    } catch (loadError) {
-      console.error("Failed to load template content:", loadError);
-
+      const full = response?.data ?? template;
+      setSelected(full);
+      const def =
+        (full.themes || []).find(isDefaultTheme) || (full.themes || [])[0];
+      setPreviewThemeId(def?.themeId ?? null);
+    } catch (err) {
+      console.error("Failed to load template detail:", err);
       setDetailError(
-        getErrorMessage(
-          loadError,
-          "Included pages and themes could not be loaded."
-        )
+        getErrorMessage(err, "Full template details couldn't be loaded."),
       );
     } finally {
       setDetailLoading(false);
@@ -347,15 +562,42 @@ export default function Template() {
   const isPurchased = (templateId) =>
     purchasedTemplateIds.includes(Number(templateId));
 
+  const goBuy = () => {
+    if (!selected) return;
+    navigate("/payment", {
+      state: {
+        template: selected,
+        themeId: previewThemeId,
+      },
+    });
+  };
+
+  // Card thumbnail: prefer thumbnailUrl, then first photo, then placeholder
+  const cardImage = (t) => {
+    if (t?.thumbnailUrl) return t.thumbnailUrl;
+    const photos = parsePhotos(t?.photos);
+    if (photos[0]) return photos[0];
+    return PLACEHOLDER_IMAGE;
+  };
+
+  const selectedThemes = Array.isArray(selected?.themes) ? selected.themes : [];
+  const selectedPages = Array.isArray(selected?.pages) ? selected.pages : [];
+
+  // Slider photos: prefer `photos`, fall back to thumbnailUrl
+  const sliderPhotos = useMemo(() => {
+    const photos = parsePhotos(selected?.photos);
+    if (photos.length) return photos;
+    if (selected?.thumbnailUrl) return [selected.thumbnailUrl];
+    return [];
+  }, [selected]);
+
+  const previewTheme =
+    selectedThemes.find((t) => String(t.themeId) === String(previewThemeId)) ||
+    selectedThemes[0];
+
   return (
-    <Box
-      sx={{
-        bgcolor: "#f7f8fb",
-        minHeight: "100vh",
-        pb: 8,
-      }}
-    >
-      {/* Header and search */}
+    <Box sx={{ bgcolor: "#f7f8fb", minHeight: "100vh", pb: 8 }}>
+      {/* Header */}
       <Box
         sx={{
           bgcolor: "#fff",
@@ -372,26 +614,18 @@ export default function Template() {
           >
             {activeCategory?.name || "Website templates"}
           </Typography>
-
-          <Typography
-            color="text.secondary"
-            sx={{ maxWidth: 700, mb: 3 }}
-          >
+          <Typography color="text.secondary" sx={{ maxWidth: 700, mb: 3 }}>
             {(typeof activeCategory?.content === "string" &&
               activeCategory.content) ||
               "Browse published templates, preview their included pages and themes, then purchase one to create your own site."}
           </Typography>
-
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={2}
-          >
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
             <TextField
               fullWidth
               size="small"
               placeholder="Search templates"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
               slotProps={{
                 input: {
                   startAdornment: (
@@ -402,28 +636,23 @@ export default function Template() {
                 },
               }}
             />
-
             <TextField
               select
               size="small"
               label="Sort by"
               value={sort}
-              onChange={(event) => setSort(event.target.value)}
+              onChange={(e) => setSort(e.target.value)}
               sx={{ minWidth: 190 }}
             >
               <MenuItem value="newest">Newest</MenuItem>
-              <MenuItem value="priceLow">
-                Price: low to high
-              </MenuItem>
-              <MenuItem value="priceHigh">
-                Price: high to low
-              </MenuItem>
+              <MenuItem value="priceLow">Price: low to high</MenuItem>
+              <MenuItem value="priceHigh">Price: high to low</MenuItem>
             </TextField>
           </Stack>
         </Container>
       </Box>
 
-      {/* Categories and template cards */}
+      {/* Categories + grid */}
       <Container maxWidth="lg" sx={{ mt: 4 }}>
         {categoryWarning && (
           <Alert
@@ -434,17 +663,12 @@ export default function Template() {
             {categoryWarning}
           </Alert>
         )}
-
         <Grid container spacing={3}>
           <Grid size={{ xs: 12, md: 3 }}>
             <Paper variant="outlined" sx={{ p: 2 }}>
-              <Typography
-                variant="overline"
-                color="text.secondary"
-              >
+              <Typography variant="overline" color="text.secondary">
                 Categories
               </Typography>
-
               <Stack spacing={0.5} sx={{ mt: 1 }}>
                 <Button
                   variant={categoryId === "" ? "contained" : "text"}
@@ -453,25 +677,21 @@ export default function Template() {
                 >
                   All templates
                 </Button>
-
-                {categories.map((category) => (
+                {categories.map((c) => (
                   <Button
-                    key={category.categoryId}
+                    key={c.categoryId}
                     variant={
-                      String(categoryId) ===
-                      String(category.categoryId)
+                      String(categoryId) === String(c.categoryId)
                         ? "contained"
                         : "text"
                     }
-                    onClick={() =>
-                      setCategoryId(String(category.categoryId))
-                    }
+                    onClick={() => setCategoryId(String(c.categoryId))}
                     sx={{
                       justifyContent: "flex-start",
                       textAlign: "left",
                     }}
                   >
-                    {category.name}
+                    {c.name}
                   </Button>
                 ))}
               </Stack>
@@ -488,20 +708,18 @@ export default function Template() {
                 {error}
               </Alert>
             )}
-
             <Typography color="text.secondary" sx={{ mb: 2 }}>
               {loading
                 ? "Loading templates…"
-                : `${visible.length} template${visible.length === 1 ? "" : "s"}`}
+                : `${visible.length} template${
+                    visible.length === 1 ? "" : "s"
+                  }`}
             </Typography>
 
             <Grid container spacing={3}>
               {loading
-                ? Array.from({ length: 6 }).map((_, index) => (
-                    <Grid
-                      size={{ xs: 12, sm: 6, lg: 4 }}
-                      key={index}
-                    >
+                ? Array.from({ length: 6 }).map((_, i) => (
+                    <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={i}>
                       <Skeleton variant="rounded" height={300} />
                     </Grid>
                   ))
@@ -529,23 +747,18 @@ export default function Template() {
                         >
                           <CardMedia
                             component="img"
-                            height="190"
-                            image={
-                              template.thumbnailUrl ||
-                              PLACEHOLDER_IMAGE
-                            }
+                            height="280"
+                            image={cardImage(template)}
                             alt={template.name || "Template"}
-                            onError={(event) => {
-                              event.currentTarget.onerror = null;
-                              event.currentTarget.src =
-                                PLACEHOLDER_IMAGE;
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = PLACEHOLDER_IMAGE;
                             }}
                             sx={{
                               objectFit: "cover",
                               bgcolor: "#eef2f7",
                             }}
                           />
-
                           <CardContent>
                             <Typography
                               variant="h6"
@@ -557,64 +770,12 @@ export default function Template() {
                             >
                               {template.name}
                             </Typography>
-
-                            {template.shortDescription && (
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                                sx={{
-                                  mb: 1.5,
-                                  display: "-webkit-box",
-                                  WebkitLineClamp: 2,
-                                  WebkitBoxOrient: "vertical",
-                                  overflow: "hidden",
-                                }}
-                              >
-                                {template.shortDescription}
-                              </Typography>
-                            )}
-
                             <Typography
                               fontWeight={700}
                               sx={{ whiteSpace: "nowrap" }}
                             >
-                              {formatPrice(
-                                template.price,
-                                template.currency
-                              )}
+                              {formatPrice(template.price, template.currency)}
                             </Typography>
-
-                            <Stack
-                              direction="row"
-                              spacing={1}
-                              flexWrap="wrap"
-                              useFlexGap
-                              sx={{ mt: 2 }}
-                            >
-                              {template.validityDays && (
-                                <Chip
-                                  size="small"
-                                  variant="outlined"
-                                  label={`${template.validityDays} days`}
-                                />
-                              )}
-
-                              {parsePhotos(template.photos).length > 0 && (
-                                <Chip
-                                  size="small"
-                                  variant="outlined"
-                                  label={`${parsePhotos(template.photos).length} photos`}
-                                />
-                              )}
-
-                              {isPurchased(template.templateId) && (
-                                <Chip
-                                  size="small"
-                                  color="success"
-                                  label="Purchased"
-                                />
-                              )}
-                            </Stack>
                           </CardContent>
                         </CardActionArea>
                       </Card>
@@ -627,10 +788,7 @@ export default function Template() {
                 variant="outlined"
                 sx={{ p: 5, textAlign: "center", mt: 2 }}
               >
-                <Typography variant="h6">
-                  No templates found
-                </Typography>
-
+                <Typography variant="h6">No templates found</Typography>
                 <Typography color="text.secondary">
                   Try another search or category.
                 </Typography>
@@ -640,19 +798,15 @@ export default function Template() {
         </Grid>
       </Container>
 
-      {/* Full-screen template details */}
-      <Dialog
-        fullScreen
-        open={Boolean(selected)}
-        onClose={closeTemplate}
-      >
+      {/* Detail dialog */}
+      <Dialog fullScreen open={Boolean(selected)} onClose={closeTemplate}>
         {selected && (
           <>
             <DialogTitle component="div" sx={{ pb: 0 }}>
               <Stack
                 direction={{ xs: "column", md: "row" }}
                 spacing={1.5}
-                alignItems={{ xs: "stretch", md: "center" }}
+                sx={{ alignItems: { md: "center" } }}
               >
                 <Button
                   onClick={closeTemplate}
@@ -660,49 +814,29 @@ export default function Template() {
                 >
                   Back
                 </Button>
-
                 <Typography
                   variant="h6"
                   fontWeight={700}
-                  sx={{
-                    flexGrow: 1,
-                    overflowWrap: "anywhere",
-                  }}
+                  sx={{ flexGrow: 1, overflowWrap: "anywhere" }}
                 >
                   {selected.name}
                 </Typography>
-
-                {selected.demoUrl && (
-                  <Tabs
-                    value={tabIndex}
-                    onChange={(_, value) => setTabIndex(value)}
-                    variant="scrollable"
-                  >
-                    <Tab label="Desktop" />
-                    <Tab label="Tablet" />
-                    <Tab label="Mobile" />
-                  </Tabs>
-                )}
-
                 <Button
                   variant="contained"
-                  disabled={
-                    detailLoading || isPurchased(selected.templateId)
-                  }
-                  onClick={() =>
-                    navigate("/payment", {
-                      state: { template: selected },
-                    })
-                  }
+                  disabled={detailLoading || isPurchased(selected.templateId)}
+                  onClick={goBuy}
                 >
                   {isPurchased(selected.templateId)
                     ? "Already purchased"
-                    : `Buy for ${formatPrice(selected.price, selected.currency)}`}
+                    : `Buy for ${formatPrice(
+                        selected.price,
+                        selected.currency,
+                      )}`}
                 </Button>
               </Stack>
             </DialogTitle>
 
-            <DialogContent dividers>
+            <DialogContent dividers sx={{ px: { xs: 1, sm: 2, md: 3 } }}>
               {detailLoading ? (
                 <Box
                   sx={{
@@ -714,123 +848,164 @@ export default function Template() {
                   <CircularProgress />
                 </Box>
               ) : (
-                <Container maxWidth="xl" sx={{ py: 2 }}>
-                  {detailError && (
-                    <Alert
-                      severity="warning"
-                      sx={{ mb: 2 }}
-                      onClose={() => setDetailError("")}
-                    >
-                      {detailError}
-                    </Alert>
-                  )}
-
-                  {/* Main preview */}
-                  <Paper
-                    variant="outlined"
-                    sx={{
-                      p: 1,
-                      bgcolor: "#eef1f5",
-                      display: "flex",
-                      justifyContent: "center",
-                      minHeight: 260,
-                      overflow: "hidden",
-                    }}
+                <Container maxWidth="xl" sx={{ py: 1 }}>
+                  <Grid
+                    container
+                    spacing={{ xs: 2, md: 2 }}
+                    columns={{ xs: 12, sm: 12, md: 12 }}
                   >
-                    {selected.demoUrl ? (
-                      <Box
-                        component="iframe"
-                        src={selected.demoUrl}
-                        title={`${selected.name} demo`}
-                        sx={{
-                          width: PREVIEW_WIDTHS[tabIndex],
-                          maxWidth: "100%",
-                          height: { xs: "55vh", md: "68vh" },
-                          border: 0,
-                          bgcolor: "#fff",
-                          borderRadius: 1,
-                        }}
-                      />
-                    ) : (
-                      <Box
-                        component="img"
-                        src={
-                          selected.thumbnailUrl ||
-                          PLACEHOLDER_IMAGE
-                        }
-                        alt={selected.name}
-                        onError={(event) => {
-                          event.currentTarget.onerror = null;
-                          event.currentTarget.src =
-                            PLACEHOLDER_IMAGE;
-                        }}
-                        sx={{
-                          maxWidth: "100%",
-                          maxHeight: "68vh",
-                          objectFit: "contain",
-                        }}
-                      />
-                    )}
-                  </Paper>
+                    <Grid size={{ xs: 12, sm: 12, md: 8 }}>
+                      {detailError && (
+                        <Alert
+                          severity="warning"
+                          sx={{ mb: 2 }}
+                          onClose={() => setDetailError("")}
+                        >
+                          {detailError}
+                        </Alert>
+                      )}
 
-                  {/* Additional uploaded photos */}
-                  {parsePhotos(selected.photos).length > 0 && (
-                    <Paper
-                      variant="outlined"
-                      sx={{ p: 2.5, mt: 3 }}
-                    >
-                      <Typography
-                        variant="h6"
-                        fontWeight={700}
-                        sx={{ mb: 2 }}
+                      {/* Main preview (only if demoUrl exists) */}
+                      {selected.demoUrl && (
+                        <Paper
+                          variant="outlined"
+                          sx={{
+                            p: 1,
+                            bgcolor: "#eef1f5",
+                            display: "flex",
+                            justifyContent: "center",
+                            minHeight: 260,
+                            overflow: "hidden",
+                            mb: 3,
+                          }}
+                        >
+                          <Box
+                            component="iframe"
+                            src={selected.demoUrl}
+                            title={`${selected.name} demo`}
+                            sx={{
+                              width: PREVIEW_WIDTHS[tabIndex],
+                              maxWidth: "100%",
+                              height: { xs: "55vh", md: "68vh" },
+                              border: 0,
+                              bgcolor: "#fff",
+                              borderRadius: 1,
+                            }}
+                          />
+                        </Paper>
+                      )}
+
+                      {/* Photo slider (replaces thumbnail in detail view) */}
+                      {sliderPhotos.length > 0 && (
+                        <Box sx={{ mb: 3 }}>
+                          <PhotoSlider
+                            photos={sliderPhotos}
+                            alt={selected.name}
+                          />
+                        </Box>
+                      )}
+                    </Grid>
+
+                    {/* Right: theme picker + pages list */}
+                    <Grid size={{ xs: 12, sm: 12, md: 4 }}>
+                      <Grid
+                        container
+                        spacing={{ xs: 2, md: 2 }}
+                        columns={{ xs: 12, sm: 12, md: 12 }}
                       >
-                        Template Photos
-                      </Typography>
+                        <Grid size={{ xs: 12, sm: 6, md: 6 }}>
+                          <Paper variant="outlined" sx={{ p: 2.5, mb: 2 }}>
+                            <Typography variant="h6" fontWeight={400}>
+                              Available Themes
+                            </Typography>
+                            <Divider sx={{ my: 1.5 }} />
+                            {selectedThemes.length > 0 ? (
+                              selectedThemes.map((theme, i) => (
+                                <Box
+                                  key={theme.themeId ?? i}
+                                  sx={{
+                                    py: 1,
+                                    borderBottom:
+                                      i < selectedThemes.length - 1
+                                        ? "1px dashed #e5e7eb"
+                                        : "none",
+                                  }}
+                                >
+                                  <Box
+                                    sx={{
+                                      width: "100%",
+                                      height: 40,
+                                      borderRadius: 1,
+                                      backgroundColor:
+                                        theme.background || "#fff",
+                                      color: theme.color || "#111",
+                                      border: "1px solid",
+                                      borderColor: "divider",
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      fontSize: 12,
+                                      fontWeight: 700,
+                                    }}
+                                  >
+                                    {theme.name}
+                                  </Box>
+                                </Box>
+                              ))
+                            ) : (
+                              <Typography color="text.secondary">
+                                No themes listed for this template.
+                              </Typography>
+                            )}
+                          </Paper>
+                        </Grid>
 
-                      <Grid container spacing={2}>
-                        {parsePhotos(selected.photos).map(
-                          (photo, index) => (
-                            <Grid
-                              size={{ xs: 12, sm: 6, md: 4, lg: 3 }}
-                              key={`${photo}-${index}`}
-                            >
-                              <Box
-                                component="img"
-                                src={photo}
-                                alt={`${selected.name} photo ${index + 1}`}
-                                loading="lazy"
-                                onError={(event) => {
-                                  event.currentTarget.style.display =
-                                    "none";
-                                }}
-                                sx={{
-                                  width: "100%",
-                                  height: 200,
-                                  display: "block",
-                                  objectFit: "cover",
-                                  borderRadius: 2,
-                                  bgcolor: "#eef2f7",
-                                  border: "1px solid #e5e7eb",
-                                }}
-                              />
-                            </Grid>
-                          )
-                        )}
+                        <Grid size={{ xs: 12, sm: 6, md: 6 }}>
+                          <Paper variant="outlined" sx={{ p: 2.5 }}>
+                            <Typography variant="h6" fontWeight={700}>
+                              Included Pages
+                            </Typography>
+                            <Divider sx={{ my: 1.5 }} />
+                            {selectedPages.length > 0 ? (
+                              selectedPages.map((p, i) => (
+                                <Box
+                                  key={p.pagesId ?? i}
+                                  sx={{
+                                    py: 1,
+                                    borderBottom:
+                                      i < selectedPages.length - 1
+                                        ? "1px dashed #e5e7eb"
+                                        : "none",
+                                  }}
+                                >
+                                  <Stack
+                                    direction="row"
+                                    justifyContent="space-between"
+                                    alignItems="center"
+                                  >
+                                    <Typography fontWeight={600}>
+                                      {p.title || "Untitled page"}
+                                    </Typography>
+                                  </Stack>
+                                </Box>
+                              ))
+                            ) : (
+                              <Typography color="text.secondary">
+                                No pages listed for this template.
+                              </Typography>
+                            )}
+                          </Paper>
+                        </Grid>
                       </Grid>
-                    </Paper>
-                  )}
+                    </Grid>
+                  </Grid>
 
-                  <Grid container spacing={3} sx={{ mt: 0 }}>
-                    {/* Template information */}
+                  <Grid size={{ xs: 12, sm: 12, md: 12 }}>
+                    {/* Left: description + live preview */}
                     <Grid size={{ xs: 12, lg: 8 }}>
-                      <Typography
-                        variant="h5"
-                        fontWeight={700}
-                        sx={{ mt: 3 }}
-                      >
+                      <Typography variant="h5" fontWeight={700}>
                         {selected.name}
                       </Typography>
-
                       {selected.shortDescription && (
                         <Typography
                           variant="h6"
@@ -841,38 +1016,15 @@ export default function Template() {
                         </Typography>
                       )}
 
-                      <Typography
-                        color="text.secondary"
-                        sx={{
-                          mt: 1,
-                          whiteSpace: "pre-wrap",
-                          overflowWrap: "anywhere",
-                        }}
-                      >
-                        {selected.description ||
-                          "Explore the included pages, themes, and preview for this template."}
-                      </Typography>
-
-                      <Paper
-                        variant="outlined"
-                        sx={{ p: 2.5, mt: 3 }}
-                      >
-                        <Typography variant="h6" fontWeight={700}>
-                          Details
-                        </Typography>
-
-                        <Divider sx={{ my: 1.5 }} />
-
-                        <Grid container spacing={2}>
+                      <Paper variant="outlined" sx={{ p: 2.5, mt: 3 }}>
+                        <Grid
+                          container
+                          spacing={{ xs: 2, md: 2 }}
+                          columns={{ xs: 12, sm: 12, md: 12 }}
+                        >
                           {[
-                            [
-                              "Category",
-                              selected.categoryName || "General",
-                            ],
-                            [
-                              "Language",
-                              selected.language || "Not specified",
-                            ],
+                            ["Category", selected.categoryName || "General"],
+                            ["Language", selected.language || "Not specified"],
                             [
                               "Access period",
                               selected.validityDays
@@ -881,23 +1033,16 @@ export default function Template() {
                             ],
                             [
                               "Price",
-                              formatPrice(
-                                selected.price,
-                                selected.currency
-                              ),
+                              formatPrice(selected.price, selected.currency),
                             ],
                           ].map(([label, value]) => (
-                            <Grid
-                              size={{ xs: 12, sm: 6 }}
-                              key={label}
-                            >
+                            <Grid size={{ xs: 6, sm: 6, md: 3 }} key={label}>
                               <Typography
                                 variant="caption"
                                 color="text.secondary"
                               >
                                 {label}
                               </Typography>
-
                               <Typography
                                 fontWeight={700}
                                 sx={{ overflowWrap: "anywhere" }}
@@ -907,159 +1052,132 @@ export default function Template() {
                             </Grid>
                           ))}
                         </Grid>
+
+                        <Divider sx={{ my: 1.5 }} />
+                        <Typography variant="h6" fontWeight={700}>
+                          Description
+                        </Typography>
+                        <Typography
+                          color="text.secondary"
+                          sx={{
+                            mt: 1,
+                            whiteSpace: "pre-wrap",
+                            overflowWrap: "anywhere",
+                          }}
+                        >
+                          {selected.description ||
+                            "Explore the included pages, themes, and preview for this template."}
+                        </Typography>
                       </Paper>
 
-                      {/* Menu items, when supplied by the content API */}
-                      {content.menuItems.length > 0 && (
-                        <Paper
-                          variant="outlined"
-                          sx={{ p: 2.5, mt: 3 }}
-                        >
-                          <Typography
-                            variant="h6"
-                            fontWeight={700}
-                          >
-                            Menu Items
-                          </Typography>
-
-                          <Divider sx={{ my: 1.5 }} />
-
-                          <Stack
-                            direction="row"
-                            flexWrap="wrap"
-                            gap={1}
-                          >
-                            {content.menuItems.map((item, index) => (
-                              <Chip
-                                key={item.id ?? index}
-                                label={
-                                  item.title ||
-                                  item.label ||
-                                  item.name ||
-                                  `Menu item ${index + 1}`
-                                }
-                                variant="outlined"
-                              />
-                            ))}
-                          </Stack>
-                        </Paper>
-                      )}
-                    </Grid>
-
-                    {/* Included pages and themes */}
-                    <Grid size={{ xs: 12, lg: 4 }}>
+                      {/* Theme-aware live preview of default pages */}
                       <Paper
                         variant="outlined"
-                        sx={{ p: 2.5, mb: 2, mt: { xs: 0, lg: 2 } }}
+                        sx={{ p: { xs: 1.5, sm: 2.5 }, mt: 3 }}
                       >
                         <Typography variant="h6" fontWeight={700}>
-                          Included Pages
+                          View Pages preview with selected theme
                         </Typography>
-
-                        <Divider sx={{ my: 1.5 }} />
-
-                        {content.pages.length > 0 ? (
-                          content.pages.map((page, index) => (
-                            <Box
-                              key={page.id ?? page.pageId ?? index}
-                              sx={{ py: 1 }}
+                        <br />
+                        <Grid
+                          container
+                          spacing={{ xs: 2, md: 2 }}
+                          columns={{ xs: 4, sm: 8, md: 12 }}
+                        >
+                          <Grid size={{ xs: 12, sm: 12, md: 3 }}>
+                            <Paper
+                              variant="outlined"
+                              sx={{ p: { xs: 1.5, sm: 2.5 }, mb: 2 }}
                             >
-                              <Typography fontWeight={600}>
-                                {page.parentId ? "↳ " : ""}
-                                {page.title ||
-                                  page.name ||
-                                  page.pageName ||
-                                  "Untitled page"}
+                              <Typography variant="h6" fontWeight={400}>
+                                Apply Themes
                               </Typography>
-
-                              {page.slug && (
-                                <Typography
-                                  variant="body2"
-                                  color="text.secondary"
-                                  sx={{ overflowWrap: "anywhere" }}
-                                >
-                                  /{page.slug}
+                              <Divider sx={{ my: 1.5 }} />
+                              {selectedThemes.length > 0 ? (
+                                <Stack spacing={1}>
+                                  {selectedThemes.map((theme, i) => {
+                                    const active =
+                                      String(theme.themeId) ===
+                                      String(previewThemeId);
+                                    return (
+                                      <Paper
+                                        key={theme.themeId ?? i}
+                                        variant="outlined"
+                                        onClick={() =>
+                                          setPreviewThemeId(theme.themeId)
+                                        }
+                                        sx={{
+                                          p: 0,
+                                          cursor: "pointer",
+                                          borderColor: active
+                                            ? "primary.main"
+                                            : "divider",
+                                          borderWidth: active ? 2 : 1,
+                                          transition: "all .15s",
+                                          "&:hover": {
+                                            borderColor: "primary.light",
+                                          },
+                                        }}
+                                      >
+                                        <Stack
+                                          direction="row"
+                                          spacing={1.5}
+                                          alignItems="center"
+                                          flexWrap="wrap"
+                                        >
+                                          <Box
+                                            sx={{
+                                              width: "100%",
+                                              height: 40,
+                                              borderRadius: 1,
+                                              backgroundColor:
+                                                theme.background || "#fff",
+                                              color: theme.color || "#111",
+                                              border: "1px solid",
+                                              borderColor: "divider",
+                                              display: "inline-flex",
+                                              alignItems: "center",
+                                              justifyContent: "center",
+                                              fontSize: 12,
+                                              fontWeight: 700,
+                                            }}
+                                          >
+                                            <Typography
+                                              variant="body2"
+                                              fontWeight={700}
+                                              sx={{
+                                                color: theme.color || "#111111",
+                                              }}
+                                            >
+                                              {theme.name || `Theme ${i + 1}`}
+                                            </Typography>
+                                          </Box>
+                                          {isDefaultTheme(theme) && (
+                                            <Chip
+                                              size="small"
+                                              label="Default"
+                                              color="primary"
+                                            />
+                                          )}
+                                        </Stack>
+                                      </Paper>
+                                    );
+                                  })}
+                                </Stack>
+                              ) : (
+                                <Typography color="text.secondary">
+                                  No themes listed for this template.
                                 </Typography>
                               )}
-                            </Box>
-                          ))
-                        ) : (
-                          <Typography color="text.secondary">
-                            No pages listed for this template.
-                          </Typography>
-                        )}
-                      </Paper>
-
-                      <Paper variant="outlined" sx={{ p: 2.5 }}>
-                        <Typography variant="h6" fontWeight={700}>
-                          Available Themes
-                        </Typography>
-
-                        <Divider sx={{ my: 1.5 }} />
-
-                        {content.themes.length > 0 ? (
-                          <Stack spacing={1}>
-                            {content.themes.map((theme, index) => (
-                              <Paper
-                                key={theme.id ?? theme.themeId ?? index}
-                                variant="outlined"
-                                sx={{ p: 1.5 }}
-                              >
-                                <Stack
-                                  direction="row"
-                                  spacing={1}
-                                  alignItems="center"
-                                  flexWrap="wrap"
-                                >
-                                  <Typography fontWeight={600}>
-                                    {theme.name ||
-                                      theme.title ||
-                                      "Unnamed theme"}
-                                  </Typography>
-
-                                  {(theme.isDefault === true ||
-                                    theme.isDefault === 1 ||
-                                    theme.isDefault === "1") && (
-                                    <Chip
-                                      size="small"
-                                      label="Default"
-                                      color="primary"
-                                    />
-                                  )}
-                                </Stack>
-
-                                {theme.type && (
-                                  <Typography
-                                    variant="body2"
-                                    color="text.secondary"
-                                    sx={{
-                                      textTransform: "capitalize",
-                                    }}
-                                  >
-                                    {theme.type}
-                                  </Typography>
-                                )}
-
-                                <Box
-                                  component="pre"
-                                  sx={{
-                                    whiteSpace: "pre-wrap",
-                                    overflowWrap: "anywhere",
-                                    fontSize: 12,
-                                    mb: 0,
-                                    mt: 1,
-                                  }}
-                                >
-                                  {formatJson(theme.settings)}
-                                </Box>
-                              </Paper>
-                            ))}
-                          </Stack>
-                        ) : (
-                          <Typography color="text.secondary">
-                            No themes listed for this template.
-                          </Typography>
-                        )}
+                            </Paper>
+                          </Grid>
+                          <Grid size={{ xs: 12, sm: 12, md: 9 }}>
+                            <ThemePagePreview
+                              theme={previewTheme}
+                              pages={selectedPages}
+                            />
+                          </Grid>
+                        </Grid>
                       </Paper>
                     </Grid>
                   </Grid>

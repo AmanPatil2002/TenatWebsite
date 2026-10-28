@@ -17,10 +17,9 @@ import {
   Divider,
 } from "@mui/material";
 
-const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(
-  /\/+$/,
-  ""
-);
+const API_URL = (
+  import.meta.env.VITE_API_URL || "http://localhost:5000"
+).replace(/\/+$/, "");
 
 const PLACEHOLDER_IMG = "https://placehold.co/600x340?text=No+Preview";
 
@@ -46,19 +45,20 @@ const getThumbnail = (site) => {
 
   const firstPage = getArray(site?.pages, "pages")[0];
   const pageImg =
-    firstPage?.thumbnailUrl ||
-    firstPage?.previewImage ||
-    firstPage?.image;
+    firstPage?.thumbnailUrl || firstPage?.previewImage || firstPage?.image;
   if (typeof pageImg === "string" && pageImg.trim()) return pageImg;
 
   return PLACEHOLDER_IMG;
 };
 
 const getThemeName = (site) =>
-  site?.theme?.name || site?.theme?.title || site?.themeName || "";
+  site?.theme?.name ||
+  site?.theme?.title ||
+  site?.themeName ||
+  site?.templateName ||
+  "";
 
-const getPages = (site) =>
-  getArray(site?.pages, "pages").filter(Boolean);
+const getPages = (site) => getArray(site?.pages, "pages").filter(Boolean);
 
 const getDomain = (site) =>
   site?.subdomain || site?.customDomain || site?.domain || "";
@@ -116,7 +116,8 @@ export default function MySite() {
       }
 
       try {
-        const res = await axios.get(`${API_URL}/site`, {
+        // ✅ FIX: backend route is mounted at /sites and exposes /my
+        const res = await axios.get(`${API_URL}/sites/my`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -187,10 +188,17 @@ export default function MySite() {
                 const themeName = getThemeName(site);
                 const pages = getPages(site);
                 const domain = getDomain(site);
-                const isUsable = status === "active" || status === "published";
+                const isUsable =
+                  status === "active" || status === "published";
+
+                // Fall back through several possible id fields the backend
+                // might use (`id`, `siteId`, `sitesId`).
+                const siteId =
+                  site.id ?? site.siteId ?? site.sitesId ?? null;
+                const cardKey = siteId ?? site.name ?? `site-${Math.random()}`;
 
                 return (
-                  <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={site.id}>
+                  <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={cardKey}>
                     <Card
                       variant="outlined"
                       sx={{
@@ -212,7 +220,11 @@ export default function MySite() {
                       />
 
                       <CardContent
-                        sx={{ flexGrow: 1, display: "flex", flexDirection: "column" }}
+                        sx={{
+                          flexGrow: 1,
+                          display: "flex",
+                          flexDirection: "column",
+                        }}
                       >
                         <Stack spacing={1} sx={{ flexGrow: 1 }}>
                           <Typography variant="h6" noWrap title={site.name}>
@@ -263,7 +275,10 @@ export default function MySite() {
                           <Typography
                             variant="caption"
                             color="text.secondary"
-                            sx={{ textTransform: "uppercase", letterSpacing: 1 }}
+                            sx={{
+                              textTransform: "uppercase",
+                              letterSpacing: 1,
+                            }}
                           >
                             Pages ({pages.length})
                           </Typography>
@@ -280,7 +295,12 @@ export default function MySite() {
                             >
                               {pages.slice(0, 6).map((page, idx) => (
                                 <Chip
-                                  key={page.id ?? `${page.name}-${idx}`}
+                                  key={
+                                    page.id ??
+                                    page.pageId ??
+                                    page.pagesId ??
+                                    `${page.name || page.title || "page"}-${idx}`
+                                  }
                                   label={page.name || page.title || "Page"}
                                   size="small"
                                   variant="outlined"
@@ -297,7 +317,7 @@ export default function MySite() {
                           )}
                         </Stack>
 
-                        {isUsable && (
+                        {isUsable && siteId != null && (
                           <Stack
                             direction={{ xs: "column", sm: "row" }}
                             spacing={1}
@@ -306,7 +326,7 @@ export default function MySite() {
                             <Button
                               fullWidth
                               variant="contained"
-                              onClick={() => navigate(`/mysite/${site.id}`)}
+                              onClick={() => navigate(`/mysite/${siteId}`)}
                             >
                               Manage pages &amp; theme
                             </Button>
@@ -314,7 +334,7 @@ export default function MySite() {
                               fullWidth
                               variant="outlined"
                               onClick={() =>
-                                navigate(`/mysite/${site.id}/preview`)
+                                navigate(`/mysite/${siteId}/preview`)
                               }
                             >
                               View site
