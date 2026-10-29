@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
@@ -82,16 +82,6 @@ const authHeaders = (extra = {}) => {
   };
 };
 
-const loadRazorpay = () =>
-  new Promise((resolve) => {
-    if (window.Razorpay) return resolve(true);
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-
 export default function Payment() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -104,7 +94,6 @@ export default function Payment() {
 
   const currency = template?.currency || "INR";
 
-  // Normalize pages once so all downstream logic uses the same field names.
   const normalizedPages = useMemo(
     () =>
       pages
@@ -145,9 +134,6 @@ export default function Payment() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(null);
 
-  // Tracks whether the Razorpay handler already fired — prevents double-verify
-  const verifyingRef = useRef(false);
-
   // Auth guard
   useEffect(() => {
     if (!getToken()) {
@@ -187,12 +173,7 @@ export default function Payment() {
       try {
         const { data } = await axios.post(
           `${API}/payments/quote`,
-          {
-            templateId,
-            themeId: selectedThemeId,
-            // FIX: correct field name
-            additionalPageIds,
-          },
+          { templateId, themeId: selectedThemeId, additionalPageIds },
           { headers: authHeaders({ "Content-Type": "application/json" }) }
         );
         if (!cancelled) setQuote(data);
@@ -234,11 +215,11 @@ export default function Payment() {
     );
   };
 
-  // ---- checkout ----
+  // ---- purchase: one call saves payment, pages, invoice and site ----
   const handlePay = async () => {
+    if (paying) return;
     setError("");
     setSuccess(null);
-    verifyingRef.current = false;
 
     const templateId = getId(template?.templateId);
     if (!templateId) return setError("Invalid template.");
@@ -249,82 +230,28 @@ export default function Payment() {
 
     setPaying(true);
     try {
-      // 1. Create Razorpay order (backend stores `payments` row with status='created')
-      const { data: order } = await axios.post(
+      const { data } = await axios.post(
         `${API}/payments`,
         {
           templateId,
           themeId: selectedThemeId,
           additionalPageIds,
+          method: "manual",
         },
         { headers: authHeaders({ "Content-Type": "application/json" }) }
       );
 
-      // 2. Load Razorpay SDK
-      const ok = await loadRazorpay();
-      if (!ok) throw new Error("Razorpay checkout failed to load.");
-
-      // 3. Open checkout
-      const rzp = new window.Razorpay({
-        key: order.keyId,
-        amount: order.amountMinor,
-        currency: order.currency,
-        order_id: order.orderId,
-        name: template?.name || "Template purchase",
-        description: "Website template",
-        theme: { color: "#1976d2" },
-        handler: async (response) => {
-          if (verifyingRef.current) return;
-          verifyingRef.current = true;
-
-          try {
-            // 4. Verify + capture server-side
-            const { data: verified } = await axios.post(
-              `${API}/payments/verify`,
-              {
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-              },
-              { headers: authHeaders({ "Content-Type": "application/json" }) }
-            );
-
-            setSuccess({
-              siteId: verified.siteId,
-              invoiceNumber: verified.invoiceNumber,
-              paymentId: order.id,
-              amount: order.totalAmount,
-              currency: order.currency,
-              alreadyProcessed: verified.alreadyProcessed,
-            });
-          } catch (err) {
-            setError(
-              getErrorMessage(
-                err,
-                "Payment verification failed. Contact support with your payment ID."
-              )
-            );
-          } finally {
-            setPaying(false);
-          }
-        },
-        modal: {
-          ondismiss: () => setPaying(false),
-        },
+      setSuccess({
+        siteId: data.siteId,
+        invoiceNumber: data.invoiceNumber,
+        paymentId: data.id,
+        transactionId: data.transactionId,
+        amount: data.totalAmount,
+        currency: data.currency,
       });
-
-      rzp.on("payment.failed", (resp) => {
-        setError(
-          resp?.error?.description ||
-            resp?.error?.reason ||
-            "Payment failed. Please try again."
-        );
-        setPaying(false);
-      });
-
-      rzp.open();
     } catch (err) {
-      setError(getErrorMessage(err, "Payment could not start."));
+      setError(getErrorMessage(err, "Purchase could not be completed."));
+    } finally {
       setPaying(false);
     }
   };
@@ -412,9 +339,16 @@ export default function Payment() {
                       variant="outlined"
                     />
                   )}
+                  {success.transactionId && (
+                    <Chip
+                      label={`Transaction: ${success.transactionId}`}
+                      color="success"
+                      variant="outlined"
+                    />
+                  )}
                   {success.amount != null && (
                     <Chip
-                      label={`Paid: ${formatPrice(
+                      label={`Total: ${formatPrice(
                         success.amount,
                         success.currency || currency
                       )}`}
@@ -559,7 +493,7 @@ export default function Payment() {
                 </Card>
               </Grid>
 
-              {/* RIGHT: theme, pages, pay */}
+              {/* RIGHT: theme, pages, confirm */}
               <Grid size={{ xs: 12, md: 7 }}>
                 <Stack spacing={3}>
                   {/* Theme */}
@@ -731,19 +665,19 @@ export default function Payment() {
                     </CardContent>
                   </Card>
 
-                  {/* Pay */}
+                  {/* Confirm */}
                   <Card variant="outlined" sx={{ borderRadius: 3 }}>
                     <CardContent sx={{ p: 3 }}>
                       <Typography variant="h6" fontWeight={700} gutterBottom>
-                        Payment
+                        Confirm purchase
                       </Typography>
                       <Typography
                         variant="body2"
                         color="text.secondary"
                         sx={{ mb: 2 }}
                       >
-                        You will be redirected to Razorpay to complete the
-                        payment securely.
+                        Your order will be saved and your website created
+                        immediately.
                       </Typography>
 
                       <Stack
@@ -775,7 +709,7 @@ export default function Payment() {
                             : quoteLoading
                             ? "Calculating..."
                             : canPay
-                            ? `Pay ${formatPrice(total, currency)}`
+                            ? `Confirm ${formatPrice(total, currency)}`
                             : "Waiting for price…"}
                         </Button>
                       </Stack>

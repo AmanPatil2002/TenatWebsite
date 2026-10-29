@@ -17,8 +17,8 @@ const fromMinor = (value) => {
 };
 
 async function buildQuote(connection, { templateId, themeId, additionalPageIds }) {
-  const [[template]] = await connection.query(
-    `SELECT templateId, name, price, currency
+    const [[template]] = await connection.query(
+    `SELECT templateId, name, price, currency, validityDays
        FROM template WHERE templateId = ? AND status = 'published' FOR UPDATE`,
     [templateId],
   );

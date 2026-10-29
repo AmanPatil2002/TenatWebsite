@@ -21,11 +21,14 @@ import {
 } from "@mui/material";
 import axios from "axios";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_URL = (
+  import.meta.env.VITE_API_URL || "http://localhost:5000"
+).replace(/\/+$/, "");
 
 const STATUS_COLOR = {
+  created: "default",
+  authorized: "warning",
   captured: "success",
-  pending: "warning",
   failed: "error",
   refunded: "default",
 };
@@ -33,7 +36,7 @@ const STATUS_COLOR = {
 const formatMoney = (amount, currency) => {
   const n = Number(amount) || 0;
   try {
-    return new Intl.NumberFormat(undefined, {
+    return new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency: currency || "INR",
     }).format(n);
@@ -46,6 +49,9 @@ const formatDate = (value) =>
   value
     ? new Date(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
     : "—";
+
+const isDefaultPage = (page) =>
+  page.isDefault === true || page.isDefault === "true" || Number(page.isDefault) === 1;
 
 // JSON_ARRAYAGG returns NULL when there are no rows, and some drivers return a string
 const asArray = (value) => {
@@ -65,16 +71,21 @@ function PaymentRow({ p, admin, open, onToggle }) {
   const pages = asArray(p.pages);
   const colSpan = admin ? 9 : 8;
 
+  // The API returns only the total and per-page prices, so derive the split here.
+  const pagesAmount = pages.reduce((sum, pg) => sum + Number(pg.price || 0), 0);
+  const templateAmount = Math.max(Number(p.amount || 0) - pagesAmount, 0);
+  const additionalCount = pages.filter((pg) => !isDefaultPage(pg)).length;
+
   return (
     <Fragment>
       <TableRow hover>
-        <TableCell sx={{ whiteSpace: "nowrap" }}>{formatDate(p.paidAt)}</TableCell>
+        <TableCell sx={{ whiteSpace: "nowrap" }}>{formatDate(p.paidAt || p.createdAt)}</TableCell>
         {admin && (
           <TableCell>
             {p.userName || "—"}
-            {p.userEmail && (
+            {p.email && (
               <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-                {p.userEmail}
+                {p.email}
               </Typography>
             )}
           </TableCell>
@@ -115,10 +126,10 @@ function PaymentRow({ p, admin, open, onToggle }) {
                     Theme: <strong>{p.themeName || "—"}</strong>
                   </Typography>
                   <Typography variant="body2">
-                    Template price: {formatMoney(p.baseAmount, p.currency)}
+                    Template price: {formatMoney(templateAmount, p.currency)}
                   </Typography>
                   <Typography variant="body2">
-                    Pages subtotal: {formatMoney(p.pagesAmount, p.currency)}
+                    Additional pages ({additionalCount}): {formatMoney(pagesAmount, p.currency)}
                   </Typography>
                   <Typography variant="body2" sx={{ fontWeight: 700, mt: 0.5 }}>
                     Total: {formatMoney(p.amount, p.currency)}
@@ -136,14 +147,22 @@ function PaymentRow({ p, admin, open, onToggle }) {
                   ) : (
                     <Table size="small">
                       <TableBody>
-                        {pages.map((pg) => (
-                          <TableRow key={pg.pagesId}>
-                            <TableCell sx={{ pl: 0 }}>{pg.title || `Page #${pg.pagesId}`}</TableCell>
-                            <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
-                              {formatMoney(pg.price, p.currency)}
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {[...pages]
+                          .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
+                          .map((pg) => (
+                            <TableRow key={pg.pagesId}>
+                              <TableCell sx={{ pl: 0 }}>
+                                {pg.title || `Page #${pg.pagesId}`}
+                              </TableCell>
+                              <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                                {isDefaultPage(pg) ? (
+                                  <Chip size="small" label="Included" color="success" />
+                                ) : (
+                                  formatMoney(pg.price, p.currency)
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
                       </TableBody>
                     </Table>
                   )}
@@ -157,8 +176,8 @@ function PaymentRow({ p, admin, open, onToggle }) {
   );
 }
 
-// Client:  <PaymentsView />            -> GET /payments/my
-// Admin:   <PaymentsView admin />      -> GET /payments
+// Client:  <PaymentsView />        -> GET /payments/my
+// Admin:   <PaymentsView admin />  -> GET /payments/admin/all
 export default function PaymentsView({ admin = false }) {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -168,7 +187,10 @@ export default function PaymentsView({ admin = false }) {
   const [openId, setOpenId] = useState(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token =
+      localStorage.getItem("token") ||
+      localStorage.getItem("authToken") ||
+      localStorage.getItem("accessToken");
     if (!token) {
       setError("Please log in first.");
       setLoading(false);
@@ -176,8 +198,10 @@ export default function PaymentsView({ admin = false }) {
     }
 
     let cancelled = false;
+    setLoading(true);
+    setError("");
     axios
-      .get(`${API_URL}/payments${admin ? "" : "/my"}`, {
+      .get(`${API_URL}/payments/${admin ? "admin/all" : "my"}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((res) => {
@@ -212,7 +236,7 @@ export default function PaymentsView({ admin = false }) {
         p.templateName,
         p.themeName,
         p.userName,
-        p.userEmail,
+        p.email,
         ...pageTitles,
       ]
         .filter(Boolean)
@@ -326,18 +350,15 @@ export default function PaymentsView({ admin = false }) {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {filtered.map((p) => {
-                  const key = p.paymentId ?? p.transactionId;
-                  return (
-                    <PaymentRow
-                      key={key}
-                      p={p}
-                      admin={admin}
-                      open={openId === key}
-                      onToggle={() => setOpenId(openId === key ? null : key)}
-                    />
-                  );
-                })}
+                {filtered.map((p) => (
+                  <PaymentRow
+                    key={p.id}
+                    p={p}
+                    admin={admin}
+                    open={openId === p.id}
+                    onToggle={() => setOpenId(openId === p.id ? null : p.id)}
+                  />
+                ))}
               </TableBody>
             </Table>
           </TableContainer>

@@ -18,12 +18,11 @@ import AddTemplate from "./Mycomponent/AddTemplate";
 import AddCategory from "./Mycomponent/AddCategory";
 import Payment from "./Mycomponent/Payment";
 import Template from "./Pages/Client/Template";
-// import ViewPayment from "./Mycomponent/ViewPayment";
+import ViewPayment from "./Mycomponent/ViewPayment";
 import AddContact from "./Mycomponent/AddContact";
 import AddFaq from "./Mycomponent/AddFaq";
-import Preview from "./Mycomponent/Preview";
 import ViewTemplate from "./Mycomponent/ViewTemplate";
-// import SitePreview from "./Pages/Client/SitePreview";
+import MySiteView from "./Mycomponent/MySiteView";
 import AddTheme from "./Mycomponent/AddTheme";
 import AddPages from "./Mycomponent/AddPages";
 
@@ -40,12 +39,11 @@ function App() {
             <Route path="/contact" element={<Contact />} />
             <Route path="/review" element={<Review />} />
             <Route path="/myaccount" element={<Myaccount />} />
-            <Route path="/viewtemp" element={<Template />} />
-            <Route path="/preview" element={<Preview />} />
+              <Route path="/templates" element={<Template />} />
             <Route path="/payment" element={<Payment />} />
             <Route path="/mysite" element={<MySite />} />
-            {/* <Route path="/mysite/:siteId/preview" element={<SitePreview />} /> */}
-
+            <Route path="/mysite/:siteId" element={<MySiteView />} />
+            <Route path="/mysite/:siteId/preview" element={<MySiteView />} />
           </Route>
         </Route>
 
@@ -63,7 +61,7 @@ function App() {
             <Route path="users" element={<ViewUser />} />
             <Route path="usereview" element={<ViewReview />} />
             <Route path="admindashboard" element={<AdminDashboard />} />
-            {/* <Route path="invoice" element={<ViewPayment />} /> */}
+            <Route path="invoice" element={<ViewPayment />} />
             <Route path="faq" element={<AddFaq />} />
             <Route path="contact" element={<AddContact />} />
           </Route>

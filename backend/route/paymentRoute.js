@@ -4,8 +4,6 @@ const { requirePlatformAdmin } = require("../middleware/siteAccess");
 const {
   quotePayment,
   createPayment,
-  verifyPayment,
-  razorpayWebhook,
   getMyPayments,
   getPayment,
   getAllPayments,
@@ -15,8 +13,6 @@ const {
 
 const router = express.Router();
 
-router.post("/webhook", razorpayWebhook);
-router.post("/verify", authenticateToken, verifyPayment);
 router.post("/quote", authenticateToken, quotePayment);
 router.get("/my", authenticateToken, getMyPayments);
 router.get("/invoices/my", authenticateToken, getInvoices);

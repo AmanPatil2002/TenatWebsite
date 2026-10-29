@@ -46,8 +46,7 @@ function Header() {
     ...(isAuthenticated
       ? [
           { name: "Contact", path: "/contact" },
-          { name: "Template", path: "/viewtemp" },
-          { name: "My Account", path: "/myaccount" },
+          { name: "Template", path: "/templates" },
           ...(role === "admin"
             ? [{ name: "Admin", path: "/admin/admindashboard" }]
             : []),

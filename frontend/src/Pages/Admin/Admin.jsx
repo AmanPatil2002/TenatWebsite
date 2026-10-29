@@ -50,6 +50,7 @@ const menuItems = [
   { text: "Contact", icon: <ContactMailIcon />, path: "/admin/contact" },
   { text: "View Users", icon: <PeopleIcon />, path: "/admin/users" },
   { text: "View Review", icon: <RateReviewIcon />, path: "/admin/usereview" },
+  { text: "View Payment", icon: <RateReviewIcon />, path: "/admin/invoice" },
 ];
 
 export default function Admin() {

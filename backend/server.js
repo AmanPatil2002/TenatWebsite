@@ -23,16 +23,7 @@ const allowedOrigins = process.env.CLIENT_URL
   : true;
 
 app.use(cors({ origin: allowedOrigins }));
-app.use(
-  express.json({
-    limit: "10mb",
-    verify: (req, res, buffer) => {
-      if (req.originalUrl.split("?")[0] === "/payments/webhook") {
-        req.rawBody = Buffer.from(buffer);
-      }
-    },
-  }),
-);
+app.use(express.json({ limit: "10mb" }));
 
 app.use("/auth", authRoute);
 app.use("/review", reviewRoute);
