@@ -1,5 +1,10 @@
 import "./App.css";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 import Register from "./Pages/Register";
 import Login from "./Pages/Login";
 import ProtectedRoutes from "./utils/ProtectedRoutes";
@@ -25,6 +30,13 @@ import ViewTemplate from "./Mycomponent/ViewTemplate";
 import MySiteView from "./Mycomponent/MySiteView";
 import AddTheme from "./Mycomponent/AddTheme";
 import AddPages from "./Mycomponent/AddPages";
+import SiteAdminAccess from "./Mycomponent/SiteAdminAccess"; // adjust path if different
+import SiteAdminLogin from "./Pages/Client/SiteAdminLogin";
+import SiteAdminLayout from "./Mycomponent/SiteAdminLayout";
+import SiteAdminDashboard from "./Mycomponent/SiteAdminDashboard";
+import SiteAdminManagePages from "./Mycomponent/SiteAdminManagePages";
+import SiteAdminEmployees from "./Mycomponent/SiteAdminEmployees";
+import SiteAdminPageData from "./Mycomponent/SiteAdminPageData";
 
 function App() {
   return (
@@ -32,6 +44,19 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+
+        {/* Site admin (client's own admin area) */}
+        <Route path="/site-admin/:siteId/login" element={<SiteAdminLogin />} />
+        <Route path="/site-admin/:siteId/preview" element={<MySiteView />} />
+        <Route path="/site-admin/:siteId" element={<SiteAdminLayout />}>
+          <Route index element={<Navigate to="panel" replace />} />
+          <Route path="panel" element={<SiteAdminDashboard />} />
+          <Route path="manage" element={<SiteAdminManagePages />} />
+          <Route path="employees" element={<SiteAdminEmployees />} />
+          <Route path="page-data" element={<SiteAdminPageData />} />
+        </Route>
+
+        {/* Client */}
         <Route element={<Layout />}>
           <Route path="/" element={<Home />} />
           <Route path="/home" element={<Home />} />
@@ -39,7 +64,7 @@ function App() {
             <Route path="/contact" element={<Contact />} />
             <Route path="/review" element={<Review />} />
             <Route path="/myaccount" element={<Myaccount />} />
-              <Route path="/templates" element={<Template />} />
+            <Route path="/templates" element={<Template />} />
             <Route path="/payment" element={<Payment />} />
             <Route path="/mysite" element={<MySite />} />
             <Route path="/mysite/:siteId" element={<MySiteView />} />
@@ -47,6 +72,7 @@ function App() {
           </Route>
         </Route>
 
+        {/* Admin */}
         <Route element={<ProtectedRoutes role="admin" />}>
           <Route path="/admin" element={<Admin />}>
             <Route path="theme" element={<AddTheme />} />
@@ -62,6 +88,7 @@ function App() {
             <Route path="usereview" element={<ViewReview />} />
             <Route path="admindashboard" element={<AdminDashboard />} />
             <Route path="invoice" element={<ViewPayment />} />
+            <Route path="site-admins" element={<SiteAdminAccess />} />
             <Route path="faq" element={<AddFaq />} />
             <Route path="contact" element={<AddContact />} />
           </Route>

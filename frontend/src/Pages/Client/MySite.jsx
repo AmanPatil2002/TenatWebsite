@@ -146,15 +146,26 @@ export default function MySite() {
                           </Typography>
                         </Stack>
 
-                        <Button
-                          fullWidth
-                          variant="contained"
-                          disabled={!usable}
-                          onClick={() => navigate(`/mysite/${site.id}`)}
-                          sx={{ mt: 2 }}
-                        >
-                          Open site
-                        </Button>
+                        <Stack spacing={1} sx={{ mt: 2 }}>
+                          <Button
+                            fullWidth
+                            variant="contained"
+                            disabled={!usable}
+                            onClick={() => navigate(`/mysite/${site.id}`)}
+                          >
+                            Open site
+                          </Button>
+                          <Button
+                            fullWidth
+                            variant="outlined"
+                            disabled={!usable}
+                            onClick={() =>
+                              navigate(`/site-admin/${site.id}/login`)
+                            }
+                          >
+                            Manage pages
+                          </Button>
+                        </Stack>
                       </CardContent>
                     </Card>
                   </Grid>

@@ -12,4 +12,4 @@ function ProtectedRoute({ role }) {
   return <Outlet />
 }
 
-export default ProtectedRoute
+export default ProtectedRoute;

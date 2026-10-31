@@ -224,8 +224,82 @@ CREATE TABLE sites (
   CONSTRAINT fkSitePayment  FOREIGN KEY (paymentId)  REFERENCES payments(id)
 ) ENGINE=InnoDB;
 
+-- A separate page-manager login is granted by the platform admin per site.
+-- These credentials never provide access to purchased theme settings.
+CREATE TABLE `admin` (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  siteId        BIGINT UNSIGNED NOT NULL,
+  userId        BIGINT UNSIGNED NOT NULL,
+  email         VARCHAR(190) NOT NULL,
+  passwordHash  VARCHAR(255) NOT NULL,
+  createdAt     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uqSiteAdminSite (siteId),
+  INDEX idxSiteAdminUser (userId),
+  CONSTRAINT fkSiteAdminSite FOREIGN KEY (siteId) REFERENCES sites(id) ON DELETE CASCADE,
+  CONSTRAINT fkSiteAdminUser FOREIGN KEY (userId) REFERENCES users(userId) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 -- ---------------------------------------------------------------------
--- 13. faq  (admin CRUD)
+-- 13. site_pages : editable, site-specific copies of purchased pages.
+--     Custom pages have no sourcePagesId and never modify the shared library.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS sitepages (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  siteId        BIGINT UNSIGNED NOT NULL,
+  sourcePagesId BIGINT UNSIGNED NULL,
+  title         VARCHAR(150) NOT NULL,
+  page          TEXT NOT NULL,
+  sortOrder     INT UNSIGNED NOT NULL DEFAULT 0,
+  createdAt     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uqSiteSourcePage (siteId, sourcePagesId),
+  UNIQUE KEY uqSitePageSite (id, siteId),
+  INDEX idxSitePagesOrder (siteId, sortOrder, id),
+  CONSTRAINT fkSitePagesSite FOREIGN KEY (siteId) REFERENCES sites(id) ON DELETE CASCADE,
+  CONSTRAINT fkSitePagesSource FOREIGN KEY (sourcePagesId) REFERENCES pages(pagesId) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE siteemployees (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  siteId        BIGINT UNSIGNED NOT NULL,
+  name          VARCHAR(150) NOT NULL,
+  email         VARCHAR(190) NULL,
+  phone         VARCHAR(30) NULL,
+  jobTitle      VARCHAR(120) NOT NULL,
+  status        ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  createdAt     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idxSiteEmployees (siteId, status, name),
+  CONSTRAINT fkSiteEmployeeSite FOREIGN KEY (siteId) REFERENCES sites(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE siteentries (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  siteId        BIGINT UNSIGNED NOT NULL,
+  sitePageId    BIGINT UNSIGNED NOT NULL,
+  name          VARCHAR(190) NOT NULL,
+  description   TEXT NULL,
+  price         DECIMAL(10,2) NULL,
+  imageUrl      VARCHAR(1000) NULL,
+  status        ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  customFields  JSON NULL,
+  createdAt     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idxSiteEntriesPage (siteId, sitePageId, status),
+  CONSTRAINT fkSiteEntryPage FOREIGN KEY (sitePageId, siteId)
+    REFERENCES sitepages(id, siteId) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+INSERT IGNORE INTO sitepages (siteId, sourcePagesId, title, page, sortOrder)
+SELECT s.id, p.pagesId, p.title, p.page, tp.sortOrder
+  FROM sites s
+  JOIN payments pay ON pay.id = s.paymentId AND pay.status = 'captured'
+  JOIN paymentpages pp ON pp.paymentId = pay.id
+  JOIN pages p ON p.pagesId = pp.pagesId
+  JOIN templatepages tp ON tp.templateId = pp.templateId AND tp.pagesId = pp.pagesId;
+
+-- ---------------------------------------------------------------------
+-- 14. faq  (admin CRUD)
 -- ---------------------------------------------------------------------
 CREATE TABLE faq (
   faqId      BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -237,7 +311,7 @@ CREATE TABLE faq (
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
--- 14. acontact  (admin CRUD)
+-- 15. acontact  (admin CRUD)
 -- ---------------------------------------------------------------------
 CREATE TABLE acontact (
   contactId  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -313,5 +387,3 @@ JOIN pages         p   ON p.pagesId = pp.pagesId
 JOIN templatepages tp  ON tp.templateId = pp.templateId AND tp.pagesId = pp.pagesId
 JOIN theme         th  ON th.themeId = s.themeId
 WHERE s.status = 'active' AND s.expiresAt > NOW();
-
-

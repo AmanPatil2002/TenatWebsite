@@ -258,7 +258,7 @@ function ThemePagePreview({ theme, pages = [] }) {
     String(page.pageId ?? page.id ?? `page-${index}`);
 
   const selectedPageId = pages.some(
-    (page, index) => getPageId(page, index) === String(activePageId)
+    (page, index) => getPageId(page, index) === String(activePageId),
   )
     ? String(activePageId)
     : pages.length > 0
@@ -266,7 +266,7 @@ function ThemePagePreview({ theme, pages = [] }) {
       : "";
 
   const activePage = pages.find(
-    (page, index) => getPageId(page, index) === selectedPageId
+    (page, index) => getPageId(page, index) === selectedPageId,
   );
 
   const html = activePage?.page ?? "";
@@ -368,9 +368,7 @@ function ThemePagePreview({ theme, pages = [] }) {
       <Box
         role="tabpanel"
         id={
-          activePage
-            ? `preview-panel-${selectedPageId}`
-            : "preview-panel-empty"
+          activePage ? `preview-panel-${selectedPageId}` : "preview-panel-empty"
         }
         aria-labelledby={
           activePage ? `preview-tab-${selectedPageId}` : undefined
@@ -919,39 +917,53 @@ export default function Template() {
                               Available Themes
                             </Typography>
                             <Divider sx={{ my: 1.5 }} />
+
                             {selectedThemes.length > 0 ? (
-                              selectedThemes.map((theme, i) => (
-                                <Box
-                                  key={theme.themeId ?? i}
-                                  sx={{
-                                    py: 1,
-                                    borderBottom:
-                                      i < selectedThemes.length - 1
-                                        ? "1px dashed #e5e7eb"
-                                        : "none",
-                                  }}
-                                >
+                              <Box
+                                sx={{
+                                  maxHeight: 400, // adjust to taste
+                                  overflowY: "auto",
+
+                                  scrollbarWidth: "none", // Firefox
+                                  msOverflowStyle: "none", // old Edge / IE
+                                  "&::-webkit-scrollbar": {
+                                    display: "none",
+                                  },
+                                }}
+                              >
+                                {selectedThemes.map((theme, i) => (
                                   <Box
+                                    key={theme.themeId ?? i}
                                     sx={{
-                                      width: "100%",
-                                      height: 40,
-                                      borderRadius: 1,
-                                      backgroundColor:
-                                        theme.background || "#fff",
-                                      color: theme.color || "#111",
-                                      border: "1px solid",
-                                      borderColor: "divider",
-                                      display: "inline-flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontSize: 12,
-                                      fontWeight: 700,
+                                      py: 1,
+                                      borderBottom:
+                                        i < selectedThemes.length - 1
+                                          ? "1px dashed #e5e7eb"
+                                          : "none",
                                     }}
                                   >
-                                    {theme.name}
+                                    <Box
+                                      sx={{
+                                        width: "90%",
+                                        height: 40,
+                                        borderRadius: 1,
+                                        backgroundColor:
+                                          theme.background || "#fff",
+                                        color: theme.color || "#111",
+                                        border: "1px solid",
+                                        borderColor: "divider",
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontSize: 12,
+                                        fontWeight: 700,
+                                      }}
+                                    >
+                                      {theme.name}
+                                    </Box>
                                   </Box>
-                                </Box>
-                              ))
+                                ))}
+                              </Box>
                             ) : (
                               <Typography color="text.secondary">
                                 No themes listed for this template.
@@ -967,7 +979,19 @@ export default function Template() {
                             </Typography>
                             <Divider sx={{ my: 1.5 }} />
                             {selectedPages.length > 0 ? (
-                              selectedPages.map((p, i) => (
+                              <Box
+                                sx={{
+                                  maxHeight: 400, // adjust to taste
+                                  overflowY: "auto",
+                                  
+                                  scrollbarWidth: "none", // Firefox
+                                  msOverflowStyle: "none", // old Edge / IE
+                                  "&::-webkit-scrollbar": {
+                                    display: "none",
+                                  },
+                                }}
+                              >
+                              {selectedPages.map((p, i) => (
                                 <Box
                                   key={p.pagesId ?? i}
                                   sx={{
@@ -988,7 +1012,8 @@ export default function Template() {
                                     </Typography>
                                   </Stack>
                                 </Box>
-                              ))
+                              ))}
+                              </Box>
                             ) : (
                               <Typography color="text.secondary">
                                 No pages listed for this template.

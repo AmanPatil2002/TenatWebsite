@@ -28,6 +28,17 @@ const provisionSite = async (connection, payment) => {
     ],
   );
 
+  await connection.query(
+    `INSERT INTO sitepages (siteId, sourcePagesId, title, page, sortOrder)
+     SELECT ?, p.pagesId, p.title, p.page, tp.sortOrder
+       FROM paymentpages pp
+       JOIN pages p ON p.pagesId = pp.pagesId
+       JOIN templatepages tp
+         ON tp.templateId = pp.templateId AND tp.pagesId = pp.pagesId
+      WHERE pp.paymentId = ?`,
+    [site.insertId, payment.id],
+  );
+
   return { siteId: site.insertId, invoiceNumber };
 };
 

@@ -1,10 +1,12 @@
 const crypto = require("crypto");
 const db = require("../config/db").promise();
 const { withTx, HttpError, sendError } = require("../utils/tx");
-const { buildQuote, fromMinor } = require("../utils/pricing");
+const { buildQuote, buildPagesSnapshot, fromMinor } = require("../utils/pricing");
 const { provisionSite } = require("../utils/provision");
+const { sendPaymentEmail } = require("../utils/mailer");
 
 const ID_PATTERN = /^[1-9]\d{0,19}$/;
+// must match the payments.status ENUM
 const STATUSES = new Set(["created", "authorized", "captured", "failed", "refunded"]);
 
 const isId = (value) => {
@@ -13,6 +15,9 @@ const isId = (value) => {
   return BigInt(value) <= 18446744073709551615n;
 };
 
+const isAdmin = (req) => ["admin", "superadmin"].includes(req.user?.role);
+
+// mysql2 already parses JSON columns into objects; handle the string case too.
 const parsePages = (row) => {
   if (typeof row.pages === "string") {
     try {
@@ -26,20 +31,13 @@ const parsePages = (row) => {
   return row;
 };
 
-// sortOrder comes from templatepages (paymentpages has no sortOrder column)
+// pages comes straight from the payments.pages JSON snapshot (no joins needed)
 const PAYMENT_COLUMNS = `
   p.id, p.transactionId, p.userId, p.templateId, t.name AS templateName,
-  p.themeId, th.name AS themeName, p.amount, p.currency, p.method,
-  p.status, p.paidAt, p.createdAt,
-  (SELECT i.invoiceNumber FROM invoices i WHERE i.paymentId = p.id LIMIT 1) AS invoiceNumber,
-  (SELECT JSON_ARRAYAGG(JSON_OBJECT(
-     'pagesId', pp.pagesId, 'title', pg.title, 'isDefault', pp.isDefault,
-     'price', pp.price, 'sortOrder', tp.sortOrder
-   ))
-   FROM paymentpages pp
-   JOIN pages pg ON pg.pagesId = pp.pagesId
-   JOIN templatepages tp ON tp.templateId = pp.templateId AND tp.pagesId = pp.pagesId
-   WHERE pp.paymentId = p.id) AS pages
+  p.themeId, th.name AS themeName,
+  p.templatePriceSnapshot, p.baseAmount, p.pagesAmount, p.amount,
+  p.currency, p.method, p.status, p.pages, p.paidAt, p.createdAt,
+  (SELECT i.invoiceNumber FROM invoices i WHERE i.paymentId = p.id LIMIT 1) AS invoiceNumber
 `;
 
 const getUserId = (req) => req.user?.userId;
@@ -62,14 +60,20 @@ const quotePayment = async (req, res) => {
 
   try {
     const result = await withTx(async (connection) => {
-      const { template, pages, totalMinor } = await buildQuote(connection, input);
+      const { template, pages, baseMinor, pagesMinor, totalMinor } = await buildQuote(
+        connection,
+        input,
+      );
       return {
         templateId: template.templateId,
         templateName: template.name,
-        templatePrice: template.price,
+        templatePrice: fromMinor(baseMinor),
+        baseAmount: fromMinor(baseMinor),
+        pagesAmount: fromMinor(pagesMinor),
         currency: template.currency,
         pages: pages.map((p) => ({
           pagesId: p.pagesId,
+          title: p.title,
           isDefault: p.isDefault,
           price: fromMinor(p.minor),
           sortOrder: p.sortOrder,
@@ -84,7 +88,8 @@ const quotePayment = async (req, res) => {
   }
 };
 
-// POST /payments  -> saves payment + paymentpages, then invoice + site
+// POST /payments -> saves payment (with pages snapshot) + paymentpages, then invoice + site,
+// then emails the client a payment confirmation (after commit)
 const createPayment = async (req, res) => {
   const userId = getUserId(req);
   const input = readOrderInput(req);
@@ -92,28 +97,48 @@ const createPayment = async (req, res) => {
 
   const method =
     typeof req.body?.method === "string" && req.body.method.trim()
-      ? req.body.method.trim().slice(0, 30)
+      ? req.body.method.trim().slice(0, 30) // payments.method is VARCHAR(30)
       : "manual";
 
   try {
     const result = await withTx(async (connection) => {
-      const { template, pages, totalMinor } = await buildQuote(connection, input);
+      const { template, pages, baseMinor, pagesMinor, totalMinor } = await buildQuote(
+        connection,
+        input,
+      );
 
       const [[user]] = await connection.query(
-        "SELECT userId, name FROM users WHERE userId = ? AND status = 'active'",
+        "SELECT userId, name, email FROM users WHERE userId = ? AND status = 'active'",
         [userId],
       );
       if (!user) throw new HttpError(403, "User account is not active");
 
+      // TXN-<13 digit ms>-<16 hex> = 34 chars, fits VARCHAR(64)
       const transactionId = `TXN-${Date.now()}-${crypto.randomBytes(8).toString("hex")}`;
+      const baseAmount = fromMinor(baseMinor);
+      const pagesAmount = fromMinor(pagesMinor);
       const amount = fromMinor(totalMinor);
+      const pagesSnapshot = JSON.stringify(buildPagesSnapshot(pages));
 
       const [paymentRow] = await connection.query(
         `INSERT INTO payments
-           (transactionId, userId, templateId, themeId, amount, currency,
-            method, status, paidAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'captured', CURRENT_TIMESTAMP)`,
-        [transactionId, userId, input.templateId, input.themeId, amount, template.currency, method],
+           (transactionId, userId, templateId, themeId,
+            templatePriceSnapshot, pages, baseAmount, pagesAmount, amount,
+            currency, method, status, paidAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'captured', CURRENT_TIMESTAMP)`,
+        [
+          transactionId,
+          userId,
+          input.templateId,
+          input.themeId,
+          baseAmount, // templatePriceSnapshot: template price at purchase time
+          pagesSnapshot,
+          baseAmount,
+          pagesAmount,
+          amount,
+          template.currency,
+          method,
+        ],
       );
       const paymentId = paymentRow.insertId;
 
@@ -139,14 +164,36 @@ const createPayment = async (req, res) => {
       return {
         id: paymentId,
         transactionId,
+        templatePriceSnapshot: baseAmount,
+        baseAmount,
+        pagesAmount,
         totalAmount: amount,
         currency: template.currency,
         status: "captured",
         ...provisioned,
+        // internal only: used for the email, stripped before responding
+        _mail: {
+          to: user.email,
+          name: user.name,
+          templateName: template.name,
+          pages: pages.map((p) => ({ title: p.title })),
+        },
       };
     });
 
-    return res.status(201).json({ message: "Payment saved", ...result });
+    const { _mail, ...payload } = result;
+
+    // fire-and-forget: an email failure must not fail an already committed payment
+    if (_mail?.to) {
+      sendPaymentEmail({
+        ..._mail,
+        transactionId: payload.transactionId,
+        amount: payload.totalAmount,
+        currency: payload.currency,
+      }).catch((err) => console.error("Payment email failed:", err));
+    }
+
+    return res.status(201).json({ message: "Payment saved", ...payload });
   } catch (error) {
     return sendError(res, error);
   }
@@ -158,7 +205,7 @@ const getMyPayments = async (req, res) => {
       `SELECT ${PAYMENT_COLUMNS}
          FROM payments p
          JOIN template t ON t.templateId = p.templateId
-         JOIN theme th ON th.themeId = p.themeId
+         LEFT JOIN theme th ON th.themeId = p.themeId
         WHERE p.userId = ? ORDER BY p.createdAt DESC`,
       [getUserId(req)],
     );
@@ -175,12 +222,12 @@ const getPayment = async (req, res) => {
       `SELECT ${PAYMENT_COLUMNS}
          FROM payments p
          JOIN template t ON t.templateId = p.templateId
-         JOIN theme th ON th.themeId = p.themeId
+         LEFT JOIN theme th ON th.themeId = p.themeId
         WHERE p.id = ?`,
       [req.params.id],
     );
     if (!rows.length) return res.status(404).json({ message: "Payment not found" });
-    if (String(rows[0].userId) !== String(getUserId(req)) && req.user?.role !== "admin") {
+    if (String(rows[0].userId) !== String(getUserId(req)) && !isAdmin(req)) {
       return res.status(403).json({ message: "Forbidden" });
     }
     return res.json(parsePages(rows[0]));
@@ -207,7 +254,7 @@ const getAllPayments = async (req, res) => {
       `SELECT ${PAYMENT_COLUMNS}, u.name AS userName, u.email
          FROM payments p
          JOIN template t ON t.templateId = p.templateId
-         JOIN theme th ON th.themeId = p.themeId
+         LEFT JOIN theme th ON th.themeId = p.themeId
          JOIN users u ON u.userId = p.userId
          ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
         ORDER BY p.createdAt DESC`,
@@ -236,7 +283,8 @@ const getInvoice = async (req, res) => {
   if (!isId(req.params.id)) return res.status(400).json({ message: "Invalid invoice id" });
   try {
     const [[invoice]] = await db.query(
-      `SELECT i.*, p.transactionId, p.method, p.currency, p.paidAt,
+      `SELECT i.*, p.transactionId, p.method, p.currency, p.paidAt, p.pages,
+              p.templatePriceSnapshot, p.baseAmount, p.pagesAmount,
               t.name AS templateName
          FROM invoices i
          JOIN payments p ON p.id = i.paymentId
@@ -245,18 +293,11 @@ const getInvoice = async (req, res) => {
       [req.params.id],
     );
     if (!invoice) return res.status(404).json({ message: "Invoice not found" });
-    if (String(invoice.userId) !== String(getUserId(req)) && req.user?.role !== "admin") {
+    if (String(invoice.userId) !== String(getUserId(req)) && !isAdmin(req)) {
       return res.status(403).json({ message: "Forbidden" });
     }
-    const [lines] = await db.query(
-      `SELECT pg.title, pp.isDefault, pp.price
-         FROM paymentpages pp
-         JOIN pages pg ON pg.pagesId = pp.pagesId
-         JOIN templatepages tp ON tp.templateId = pp.templateId AND tp.pagesId = pp.pagesId
-        WHERE pp.paymentId = ? ORDER BY tp.sortOrder, pg.title`,
-      [invoice.paymentId],
-    );
-    return res.json({ ...invoice, pages: lines });
+    // invoice lines come from the payment's pages snapshot
+    return res.json(parsePages(invoice));
   } catch (error) {
     return sendError(res, error);
   }

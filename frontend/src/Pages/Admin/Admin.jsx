@@ -34,6 +34,7 @@ import PeopleIcon from "@mui/icons-material/People";
 import RateReviewIcon from "@mui/icons-material/RateReview";
 import LogoutIcon from "@mui/icons-material/Logout";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
+import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 import AdminDashboard from "../../Mycomponent/AdminDashboard";
 
 const FULL_WIDTH = 250;
@@ -51,6 +52,7 @@ const menuItems = [
   { text: "View Users", icon: <PeopleIcon />, path: "/admin/users" },
   { text: "View Review", icon: <RateReviewIcon />, path: "/admin/usereview" },
   { text: "View Payment", icon: <RateReviewIcon />, path: "/admin/invoice" },
+  { text: "Site Admin Access", icon: <ManageAccountsIcon />, path: "/admin/site-admins" },
 ];
 
 export default function Admin() {

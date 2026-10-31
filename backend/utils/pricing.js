@@ -1,5 +1,7 @@
 const { HttpError } = require("./tx");
 
+// payments.amount is DECIMAL(12,2); toMinor allows at most 8 whole digits,
+// so this ceiling always fits the column.
 const MAX_AMOUNT_MINOR = 9999999999n;
 
 const toMinor = (value) => {
@@ -17,14 +19,14 @@ const fromMinor = (value) => {
 };
 
 async function buildQuote(connection, { templateId, themeId, additionalPageIds }) {
-    const [[template]] = await connection.query(
+  const [[template]] = await connection.query(
     `SELECT templateId, name, price, currency, validityDays
        FROM template WHERE templateId = ? AND status = 'published' FOR UPDATE`,
     [templateId],
   );
   if (!template) throw new HttpError(404, "Template is not available");
-  if (template.currency !== "INR") {
-    throw new HttpError(400, "Razorpay checkout currently supports INR templates only");
+  if (!/^[A-Z]{3}$/.test(String(template.currency))) {
+    throw new HttpError(400, "Template has an invalid currency");
   }
 
   const [[theme]] = await connection.query(
@@ -36,7 +38,7 @@ async function buildQuote(connection, { templateId, themeId, additionalPageIds }
   if (!theme) throw new HttpError(400, "Theme does not belong to this template");
 
   const [availablePages] = await connection.query(
-    `SELECT tp.pagesId, tp.isDefault, tp.sortOrder, p.pagePrice
+    `SELECT tp.pagesId, tp.isDefault, tp.sortOrder, p.title, p.pagePrice
        FROM templatepages tp
        JOIN pages p ON p.pagesId = tp.pagesId
       WHERE tp.templateId = ? ORDER BY tp.sortOrder, tp.pagesId`,
@@ -56,17 +58,32 @@ async function buildQuote(connection, { templateId, themeId, additionalPageIds }
     .filter((page) => Boolean(page.isDefault) || additionalPageIds.includes(String(page.pagesId)))
     .map((page) => ({
       pagesId: String(page.pagesId),
+      title: page.title,
       isDefault: Boolean(page.isDefault),
       sortOrder: page.sortOrder,
       minor: page.isDefault ? 0n : toMinor(page.pagePrice),
     }));
 
-  const totalMinor = toMinor(template.price) + pages.reduce((sum, page) => sum + page.minor, 0n);
+  const baseMinor = toMinor(template.price); // -> baseAmount / templatePriceSnapshot
+  const pagesMinor = pages.reduce((sum, page) => sum + page.minor, 0n); // -> pagesAmount
+  const totalMinor = baseMinor + pagesMinor; // -> amount
+
   if (totalMinor <= 0n || totalMinor > MAX_AMOUNT_MINOR) {
     throw new HttpError(400, "Order total is outside the supported amount range");
   }
 
-  return { template, pages, totalMinor };
+  return { template, pages, baseMinor, pagesMinor, totalMinor };
 }
 
-module.exports = { buildQuote, toMinor, fromMinor };
+// What gets stored in payments.pages (JSON): a frozen copy of the order's pages,
+// so history stays correct even if page titles or prices change later.
+const buildPagesSnapshot = (pages) =>
+  pages.map((page) => ({
+    pagesId: page.pagesId,
+    title: page.title,
+    isDefault: page.isDefault,
+    price: fromMinor(page.minor),
+    sortOrder: page.sortOrder,
+  }));
+
+module.exports = { buildQuote, buildPagesSnapshot, toMinor, fromMinor };

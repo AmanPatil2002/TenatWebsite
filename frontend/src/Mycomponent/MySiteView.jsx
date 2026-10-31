@@ -6,24 +6,22 @@ import {
   Box,
   Button,
   CircularProgress,
-  Stack,
   Tab,
   Tabs,
   ToggleButton,
   ToggleButtonGroup,
 } from "@mui/material";
 import LaptopIcon from "@mui/icons-material/Laptop";
-import TvIcon from "@mui/icons-material/Tv";
+import TabletAndroidIcon from "@mui/icons-material/TabletAndroid";
 import PhoneAndroidIcon from "@mui/icons-material/PhoneAndroid";
 
 const API_URL = (
   import.meta.env.VITE_API_URL || "http://localhost:5000"
 ).replace(/\/+$/, "");
 
-// tv = full width, laptop = fixed laptop width, phone = phone width
 const DEVICE_WIDTHS = {
-  tv: "100%",
-  laptop: 1280,
+  laptop: "100%",
+  tablet: 768,
   phone: 390,
 };
 
@@ -32,7 +30,60 @@ const getToken = () =>
   localStorage.getItem("authToken") ||
   localStorage.getItem("accessToken");
 
-const buildSrcDoc = (html, background, color) => `<!DOCTYPE html>
+const escapeHtml = (value) =>
+  String(value ?? "").replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character]);
+
+const readCustomFields = (value) => {
+  if (value && typeof value === "object" && !Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? parsed
+        : {};
+    } catch {
+      return {};
+    }
+  }
+  return {};
+};
+
+const renderSiteEntries = (entries, currency, pageTitle) => {
+  if (!Array.isArray(entries) || !entries.length) return "";
+  const cards = entries
+    .map((entry) => {
+      const image =
+        typeof entry.imageUrl === "string" &&
+        /^https?:\/\/\S+$/i.test(entry.imageUrl)
+          ? `<img src="${escapeHtml(entry.imageUrl)}" alt="${escapeHtml(entry.name)}" style="width:100%;max-height:240px;object-fit:cover;border-radius:8px" />`
+          : "";
+      const description = entry.description
+        ? `<p>${escapeHtml(entry.description)}</p>`
+        : "";
+      const price =
+        entry.price !== null && entry.price !== undefined
+          ? `<p><strong>${escapeHtml(currency || "")} ${escapeHtml(entry.price)}</strong></p>`
+          : "";
+      const fields = Object.entries(readCustomFields(entry.customFields))
+        .map(
+          ([name, value]) =>
+            `<p><strong>${escapeHtml(name)}:</strong> ${escapeHtml(value)}</p>`,
+        )
+        .join("");
+      return `<article style="border:1px solid #ddd;border-radius:12px;padding:16px;min-width:220px;max-width:320px">${image}<h3>${escapeHtml(entry.name)}</h3>${description}${price}${fields}</article>`;
+    })
+    .join("");
+
+  return `<section style="margin-top:32px"><h2>${escapeHtml(pageTitle)} items</h2><div style="display:flex;flex-wrap:wrap;gap:16px">${cards}</div></section>`;
+};
+
+const buildSrcDoc = (html, background, color, entries, currency, pageTitle) => `<!DOCTYPE html>
 <html>
   <head>
     <meta charset="UTF-8" />
@@ -51,22 +102,29 @@ const buildSrcDoc = (html, background, color) => `<!DOCTYPE html>
       table { max-width: 100%; }
     </style>
   </head>
-  <body>${html || "<p>This page has no content yet.</p>"}</body>
+  <body>${html || "<p>This page has no content yet.</p>"}${renderSiteEntries(entries, currency, pageTitle)}</body>
 </html>`;
 
 export default function MySiteView() {
   const { siteId } = useParams();
   const navigate = useNavigate();
+  const siteAdminMode = window.location.pathname.startsWith("/site-admin/");
 
-  const [site, setSite] = useState(null);
+  const [site, setSite] = useState({ color: "#222222", background: "#ffffff" });
   const [pages, setPages] = useState([]);
   const [activeId, setActiveId] = useState("");
-  const [devices, setDevices] = useState("tv");
+  const [devices, setDevices] = useState("laptop");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const handleDevices = (_, value) => {
+    if (value) setDevices(value); // ignore deselect so one is always active
+  };
+
   useEffect(() => {
-    const token = getToken();
+    const token = siteAdminMode
+      ? localStorage.getItem("siteAdminToken")
+      : getToken();
     if (!token) {
       navigate("/login", { replace: true });
       return;
@@ -74,34 +132,44 @@ export default function MySiteView() {
 
     let cancelled = false;
     const headers = { Authorization: `Bearer ${token}` };
+    const pagesUrl = siteAdminMode
+      ? `${API_URL}/sites/client-admin/${siteId}/pages`
+      : `${API_URL}/sites/${siteId}/pages`;
 
     const load = async () => {
       setLoading(true);
       setError("");
       try {
         const [pagesRes, sitesRes] = await Promise.all([
-          axios.get(`${API_URL}/sites/${siteId}/pages`, { headers }),
-          axios.get(`${API_URL}/sites/my`, { headers }).catch(() => null),
+          axios.get(pagesUrl, { headers }),
+          siteAdminMode
+            ? Promise.resolve(null)
+            : axios.get(`${API_URL}/sites/my`, { headers }).catch(() => null),
         ]);
         if (cancelled) return;
 
-        const list = Array.isArray(pagesRes.data?.pages) ? pagesRes.data.pages : [];
+        const list = Array.isArray(pagesRes.data?.pages)
+          ? pagesRes.data.pages
+          : [];
         const meta = Array.isArray(sitesRes?.data)
           ? sitesRes.data.find((s) => String(s.id) === String(siteId))
           : null;
 
         setPages(list);
-        setActiveId(list[0] ? String(list[0].pagesId) : "");
+        setActiveId(
+          list[0] ? String(list[0].sitePageId ?? list[0].pagesId) : "",
+        );
         setSite({
-          color: meta?.color || list[0]?.color || "#222222",
-          background: meta?.background || list[0]?.background || "#ffffff",
+          color: meta?.color || pagesRes.data?.color || "#222222",
+          background: meta?.background || pagesRes.data?.background || "#ffffff",
+          currency: pagesRes.data?.currency || "INR",
         });
       } catch (err) {
         if (cancelled) return;
         setError(
           err.response?.status === 401
             ? "Your session has expired. Please log in again."
-            : err.response?.data?.message || "Could not load this site."
+            : err.response?.data?.message || "Could not load this site.",
         );
       } finally {
         if (!cancelled) setLoading(false);
@@ -112,54 +180,61 @@ export default function MySiteView() {
     return () => {
       cancelled = true;
     };
-  }, [siteId, navigate]);
+  }, [siteId, navigate, siteAdminMode]);
 
   const activePage = useMemo(
-    () => pages.find((p) => String(p.pagesId) === String(activeId)),
-    [pages, activeId]
+    () =>
+      pages.find(
+        (p) => String(p.sitePageId ?? p.pagesId) === String(activeId),
+      ),
+    [pages, activeId],
   );
 
-  const handleDevices = (_, value) => {
-    if (value) setDevices(value); // ignore deselect so one is always active
-  };
-
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", height: "100vh", bgcolor: "#fff" }}>
-      {/* Top bar: device toggle on the left of the My sites button */}
-      <Stack
-        direction="row"
-        spacing={2}
-        sx={{ alignItems: "center", px: 2, py: 1, borderBottom: 1, borderColor: "divider" }}
-      >
-        <ToggleButtonGroup
-          size="small"
-          exclusive
-          value={devices}
-          onChange={handleDevices}
-          aria-label="device"
-        >
-          <ToggleButton value="laptop" aria-label="laptop">
-            <LaptopIcon />
-          </ToggleButton>
-          <ToggleButton value="tv" aria-label="tv">
-            <TvIcon />
-          </ToggleButton>
-          <ToggleButton value="phone" aria-label="phone">
-            <PhoneAndroidIcon />
-          </ToggleButton>
-        </ToggleButtonGroup>
+    <Box sx={{ bgcolor: "#f7f7f8", minHeight: "100vh", width: "100%" }}>
+      <Box
+  sx={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    width: "100%",
+  }}
+>
+  <Button onClick={() => navigate(siteAdminMode ? `/site-admin/${siteId}/panel` : "/mysite")}>
+    ← Back
+  </Button>
 
-        <Button onClick={() => navigate("/mysite")}>← My sites</Button>
-      </Stack>
+  <ToggleButtonGroup
+    size="small"
+    exclusive
+    value={devices}
+    onChange={handleDevices}
+    aria-label="device"
+  >
+    <ToggleButton value="laptop" aria-label="laptop">
+      <LaptopIcon />
+    </ToggleButton>
+    <ToggleButton value="tablet" aria-label="tablet">
+      <TabletAndroidIcon />
+    </ToggleButton>
+    <ToggleButton value="phone" aria-label="phone">
+      <PhoneAndroidIcon />
+    </ToggleButton>
+  </ToggleButtonGroup>
+</Box>
 
       {loading ? (
-        <Box sx={{ display: "grid", placeItems: "center", flex: 1 }}>
+        <Box sx={{ display: "grid", placeItems: "center", minHeight: 300 }}>
           <CircularProgress />
         </Box>
       ) : error ? (
-        <Alert severity="error" sx={{ m: 2 }}>{error}</Alert>
+        <Alert severity="error" sx={{ m: 2 }}>
+          {error}
+        </Alert>
       ) : pages.length === 0 ? (
-        <Alert severity="info" sx={{ m: 2 }}>This site has no pages yet.</Alert>
+        <Alert severity="info" sx={{ m: 2 }}>
+          This site has no pages yet.
+        </Alert>
       ) : (
         <>
           <Tabs
@@ -168,12 +243,12 @@ export default function MySiteView() {
             variant="scrollable"
             scrollButtons="auto"
             allowScrollButtonsMobile
-            sx={{ borderBottom: 1, borderColor: "divider" }}
+            sx={{ borderBottom: 1, borderColor: "divider", bgcolor: "#fff" }}
           >
             {pages.map((p) => (
               <Tab
-                key={p.pagesId}
-                value={String(p.pagesId)}
+                key={p.sitePageId ?? p.pagesId}
+                value={String(p.sitePageId ?? p.pagesId)}
                 label={p.title}
                 sx={{ textTransform: "none", fontWeight: 600 }}
               />
@@ -182,11 +257,10 @@ export default function MySiteView() {
 
           <Box
             sx={{
-              flex: 1,
-              minHeight: 0,
               display: "flex",
               justifyContent: "center",
-              bgcolor: devices === "tv" ? "transparent" : "#e5e7eb",
+              bgcolor: devices === "laptop" ? "transparent" : "#e5e7eb",
+              p: devices === "laptop" ? 0 : { xs: 1, sm: 2 },
             }}
           >
             <Box
@@ -194,14 +268,22 @@ export default function MySiteView() {
               key={`${activeId}-${devices}`}
               title={activePage?.title || "Page preview"}
               sandbox=""
-              srcDoc={buildSrcDoc(activePage?.page, site?.background, site?.color)}
+              srcDoc={buildSrcDoc(
+                activePage?.page,
+                site.background,
+                site.color,
+                activePage?.entries,
+                site.currency,
+                activePage?.title || "Site",
+              )}
               sx={{
                 width: DEVICE_WIDTHS[devices],
                 maxWidth: "100%",
-                height: "100%",
-                border: 0,
+                height: "calc(100vh - 110px)",
+                border: devices === "laptop" ? 0 : "1px solid #d1d5db",
+                borderRadius: devices === "laptop" ? 0 : 1,
+                bgcolor: site.background || "#fff",
                 display: "block",
-                bgcolor: site?.background || "#fff",
               }}
             />
           </Box>

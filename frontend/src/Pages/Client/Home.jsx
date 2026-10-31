@@ -71,7 +71,7 @@ function Hero() {
       <Container maxWidth="lg" sx={{ position: 'relative' }}>
         <Grid container spacing={6} sx={{ alignItems: 'center' }}>
           <Grid size={{ xs: 12, md: 7 }}>
-            <Typography variant="h1" gutterBottom sx={{ color: c.ink }}>
+            <Typography variant="h2" gutterBottom sx={{ color: c.ink }}>
               Launch a high-performing site without starting from scratch
             </Typography>
             <Typography variant="h6" color="text.secondary" fontWeight={400} sx={{ mb: 5, maxWidth: 560 }}>

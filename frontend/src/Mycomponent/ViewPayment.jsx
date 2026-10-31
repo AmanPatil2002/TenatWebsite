@@ -1,214 +1,242 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import axios from "axios";
 import {
   Alert,
   Box,
   Button,
-  Chip,
   CircularProgress,
-  Collapse,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   Divider,
-  MenuItem,
+  IconButton,
   Paper,
   Stack,
   Table,
   TableBody,
   TableCell,
   TableContainer,
+  TableFooter,
   TableHead,
+  TablePagination,
   TableRow,
-  TextField,
   Typography,
 } from "@mui/material";
-import axios from "axios";
+import { useTheme } from "@mui/material/styles";
+import CloseIcon from "@mui/icons-material/Close";
+import FirstPageIcon from "@mui/icons-material/FirstPage";
+import KeyboardArrowLeft from "@mui/icons-material/KeyboardArrowLeft";
+import KeyboardArrowRight from "@mui/icons-material/KeyboardArrowRight";
+import LastPageIcon from "@mui/icons-material/LastPage";
 
 const API_URL = (
   import.meta.env.VITE_API_URL || "http://localhost:5000"
 ).replace(/\/+$/, "");
 
-const STATUS_COLOR = {
-  created: "default",
-  authorized: "warning",
-  captured: "success",
-  failed: "error",
-  refunded: "default",
-};
-
 const formatMoney = (amount, currency) => {
-  const n = Number(amount) || 0;
+  const value = Number(amount) || 0;
   try {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency: currency || "INR",
-    }).format(n);
+    }).format(value);
   } catch {
-    return `${n.toFixed(2)} ${currency || ""}`.trim();
+    return `${value.toFixed(2)} ${currency || ""}`.trim();
   }
 };
 
 const formatDate = (value) =>
   value
-    ? new Date(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
+    ? new Date(value).toLocaleString(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      })
     : "—";
 
-const isDefaultPage = (page) =>
-  page.isDefault === true || page.isDefault === "true" || Number(page.isDefault) === 1;
-
-// JSON_ARRAYAGG returns NULL when there are no rows, and some drivers return a string
-const asArray = (value) => {
+const getPages = (value) => {
   if (Array.isArray(value)) return value;
-  if (typeof value === "string") {
-    try {
-      const parsed = JSON.parse(value);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
+  if (typeof value !== "string" || !value.trim()) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
   }
-  return [];
 };
 
-function PaymentRow({ p, admin, open, onToggle }) {
-  const pages = asArray(p.pages);
-  const colSpan = admin ? 9 : 8;
-
-  // The API returns only the total and per-page prices, so derive the split here.
-  const pagesAmount = pages.reduce((sum, pg) => sum + Number(pg.price || 0), 0);
-  const templateAmount = Math.max(Number(p.amount || 0) - pagesAmount, 0);
-  const additionalCount = pages.filter((pg) => !isDefaultPage(pg)).length;
+function TablePaginationActions({ count, page, rowsPerPage, onPageChange }) {
+  const theme = useTheme();
+  const lastPage = Math.max(0, Math.ceil(count / rowsPerPage) - 1);
 
   return (
-    <Fragment>
-      <TableRow hover>
-        <TableCell sx={{ whiteSpace: "nowrap" }}>{formatDate(p.paidAt || p.createdAt)}</TableCell>
-        {admin && (
-          <TableCell>
-            {p.userName || "—"}
-            {p.email && (
-              <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-                {p.email}
-              </Typography>
-            )}
-          </TableCell>
+    <Box sx={{ flexShrink: 0, ml: 2.5 }}>
+      <IconButton
+        onClick={(event) => onPageChange(event, 0)}
+        disabled={page === 0}
+        aria-label="first page"
+      >
+        {theme.direction === "rtl" ? <LastPageIcon /> : <FirstPageIcon />}
+      </IconButton>
+      <IconButton
+        onClick={(event) => onPageChange(event, page - 1)}
+        disabled={page === 0}
+        aria-label="previous page"
+      >
+        {theme.direction === "rtl" ? (
+          <KeyboardArrowRight />
+        ) : (
+          <KeyboardArrowLeft />
         )}
-        <TableCell>
-          {p.templateName || `#${p.templateId}`}
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-            {p.themeName ? `Theme: ${p.themeName}` : "No theme"} · {pages.length} page
-            {pages.length === 1 ? "" : "s"}
-          </Typography>
-        </TableCell>
-        <TableCell sx={{ fontFamily: "monospace", fontSize: "0.8rem" }}>{p.transactionId}</TableCell>
-        <TableCell>{p.invoiceNumber || "—"}</TableCell>
-        <TableCell>{p.method || "—"}</TableCell>
-        <TableCell>
-          <Chip size="small" label={p.status} color={STATUS_COLOR[p.status] || "default"} />
-        </TableCell>
-        <TableCell align="right" sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
-          {formatMoney(p.amount, p.currency)}
-        </TableCell>
-        <TableCell align="right">
-          <Button size="small" onClick={onToggle}>
-            {open ? "Hide" : "Details"}
-          </Button>
-        </TableCell>
-      </TableRow>
-
-      <TableRow>
-        <TableCell colSpan={colSpan} sx={{ py: 0, borderBottom: open ? undefined : "none" }}>
-          <Collapse in={open} timeout="auto" unmountOnExit>
-            <Box sx={{ py: 2, px: { xs: 0, sm: 2 } }}>
-              <Stack direction={{ xs: "column", md: "row" }} spacing={3}>
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Purchase
-                  </Typography>
-                  <Typography variant="body2">
-                    Theme: <strong>{p.themeName || "—"}</strong>
-                  </Typography>
-                  <Typography variant="body2">
-                    Template price: {formatMoney(templateAmount, p.currency)}
-                  </Typography>
-                  <Typography variant="body2">
-                    Additional pages ({additionalCount}): {formatMoney(pagesAmount, p.currency)}
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700, mt: 0.5 }}>
-                    Total: {formatMoney(p.amount, p.currency)}
-                  </Typography>
-                </Box>
-
-                <Box sx={{ flex: 2 }}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Pages purchased
-                  </Typography>
-                  {pages.length === 0 ? (
-                    <Typography variant="body2" color="text.secondary">
-                      No pages recorded for this payment.
-                    </Typography>
-                  ) : (
-                    <Table size="small">
-                      <TableBody>
-                        {[...pages]
-                          .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
-                          .map((pg) => (
-                            <TableRow key={pg.pagesId}>
-                              <TableCell sx={{ pl: 0 }}>
-                                {pg.title || `Page #${pg.pagesId}`}
-                              </TableCell>
-                              <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
-                                {isDefaultPage(pg) ? (
-                                  <Chip size="small" label="Included" color="success" />
-                                ) : (
-                                  formatMoney(pg.price, p.currency)
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </Box>
-              </Stack>
-            </Box>
-          </Collapse>
-        </TableCell>
-      </TableRow>
-    </Fragment>
+      </IconButton>
+      <IconButton
+        onClick={(event) => onPageChange(event, page + 1)}
+        disabled={page >= lastPage}
+        aria-label="next page"
+      >
+        {theme.direction === "rtl" ? (
+          <KeyboardArrowLeft />
+        ) : (
+          <KeyboardArrowRight />
+        )}
+      </IconButton>
+      <IconButton
+        onClick={(event) => onPageChange(event, lastPage)}
+        disabled={page >= lastPage}
+        aria-label="last page"
+      >
+        {theme.direction === "rtl" ? <FirstPageIcon /> : <LastPageIcon />}
+      </IconButton>
+    </Box>
   );
 }
 
-// Client:  <PaymentsView />        -> GET /payments/my
-// Admin:   <PaymentsView admin />  -> GET /payments/admin/all
-export default function PaymentsView({ admin = false }) {
+function InvoiceDialog({ payment, admin, onClose }) {
+  if (!payment) return null;
+
+  const pages = getPages(payment.pages).sort(
+    (a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0),
+  );
+
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle sx={{ pr: 7 }}>
+        Invoice
+        <IconButton
+          aria-label="Close invoice"
+          onClick={onClose}
+          sx={{ position: "absolute", right: 8, top: 8 }}
+        >
+          <CloseIcon />
+        </IconButton>
+      </DialogTitle>
+      <DialogContent dividers>
+        <Stack spacing={1.5}>
+          <Box>
+            <Typography variant="caption" color="text.secondary">
+              Invoice number
+            </Typography>
+            <Typography fontWeight={600}>
+              {payment.invoiceNumber || "Invoice unavailable"}
+            </Typography>
+          </Box>
+          {admin && (
+            <Box>
+              <Typography variant="caption" color="text.secondary">
+                Purchased user
+              </Typography>
+              <Typography>{payment.userName || "—"}</Typography>
+              {payment.email && (
+                <Typography variant="body2" color="text.secondary">
+                  {payment.email}
+                </Typography>
+              )}
+            </Box>
+          )}
+          <Box>
+            <Typography variant="caption" color="text.secondary">
+              Purchased template
+            </Typography>
+            <Typography>{payment.templateName || `#${payment.templateId}`}</Typography>
+          </Box>
+          <Divider />
+          <Box>
+            <Typography variant="caption" color="text.secondary">
+              Pages
+            </Typography>
+            {pages.length ? (
+              <Stack component="ul" spacing={0.5} sx={{ my: 0, pl: 2.5 }}>
+                {pages.map((page, index) => (
+                  <Typography component="li" variant="body2" key={page.pagesId || index}>
+                    {page.title || `Page #${page.pagesId}`}
+                  </Typography>
+                ))}
+              </Stack>
+            ) : (
+              <Typography variant="body2">No pages recorded</Typography>
+            )}
+          </Box>
+          <Divider />
+          <Stack direction="row" justifyContent="space-between" spacing={2}>
+            <Typography variant="body2" color="text.secondary">
+              Date of purchase
+            </Typography>
+            <Typography variant="body2" textAlign="right">
+              {formatDate(payment.paidAt || payment.createdAt)}
+            </Typography>
+          </Stack>
+          <Stack direction="row" justifyContent="space-between" spacing={2}>
+            <Typography fontWeight={700}>Total</Typography>
+            <Typography fontWeight={700}>
+              {formatMoney(payment.amount, payment.currency)}
+            </Typography>
+          </Stack>
+        </Stack>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// The admin invoice page shows all purchases; pass admin={false} for a client's own payments.
+export default function ViewPayment({ admin = true }) {
   const [payments, setPayments] = useState([]);
+  const [selectedPayment, setSelectedPayment] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [search, setSearch] = useState("");
-  const [openId, setOpenId] = useState(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const token =
+    localStorage.getItem("token") ||
+    localStorage.getItem("authToken") ||
+    localStorage.getItem("accessToken");
+  const loadError = error || (!token ? "Please log in first." : "");
+  const visiblePayments =
+    rowsPerPage > 0
+      ? payments.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+      : payments;
+  const emptyRows =
+    rowsPerPage > 0
+      ? Math.max(0, (page + 1) * rowsPerPage - payments.length)
+      : 0;
 
   useEffect(() => {
-    const token =
-      localStorage.getItem("token") ||
-      localStorage.getItem("authToken") ||
-      localStorage.getItem("accessToken");
-    if (!token) {
-      setError("Please log in first.");
-      setLoading(false);
-      return;
-    }
+    if (!token) return undefined;
 
     let cancelled = false;
-    setLoading(true);
-    setError("");
     axios
       .get(`${API_URL}/payments/${admin ? "admin/all" : "my"}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      .then((res) => {
-        if (!cancelled) setPayments(Array.isArray(res.data) ? res.data : []);
+      .then((response) => {
+        if (!cancelled) {
+          setPayments(Array.isArray(response.data) ? response.data : []);
+        }
       })
-      .catch((err) => {
-        if (!cancelled) setError(err.response?.data?.message || "Could not load payments.");
+      .catch((requestError) => {
+        if (!cancelled) {
+          setError(
+            requestError.response?.data?.message || "Could not load purchases.",
+          );
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -217,153 +245,132 @@ export default function PaymentsView({ admin = false }) {
     return () => {
       cancelled = true;
     };
-  }, [admin]);
-
-  const statuses = useMemo(
-    () => [...new Set(payments.map((p) => p.status).filter(Boolean))],
-    [payments]
-  );
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return payments.filter((p) => {
-      if (statusFilter !== "all" && p.status !== statusFilter) return false;
-      if (!q) return true;
-      const pageTitles = asArray(p.pages).map((pg) => pg.title);
-      return [
-        p.transactionId,
-        p.invoiceNumber,
-        p.templateName,
-        p.themeName,
-        p.userName,
-        p.email,
-        ...pageTitles,
-      ]
-        .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(q));
-    });
-  }, [payments, statusFilter, search]);
-
-  // Revenue of captured payments, grouped by currency
-  const totals = useMemo(() => {
-    const map = {};
-    filtered
-      .filter((p) => p.status === "captured")
-      .forEach((p) => {
-        map[p.currency] = (map[p.currency] || 0) + Number(p.amount || 0);
-      });
-    return Object.entries(map);
-  }, [filtered]);
+  }, [admin, token]);
 
   return (
-    <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, minHeight: "100vh", backgroundColor: "#f5f5f5" }}>
-      <Paper elevation={1} sx={{ p: { xs: 2, sm: 3 }, maxWidth: 1200, mx: "auto" }}>
-        <Typography
-          variant="h5"
-          sx={{ fontWeight: "bold", mb: 0.5, fontSize: { xs: "1.2rem", sm: "1.5rem" } }}
-        >
-          {admin ? "All payments" : "My payments"}
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          {admin
-            ? "Every purchase made on the platform."
-            : "Your template purchases, with the theme and pages you chose."}
+    <Box sx={{ p: { xs: 1.5, sm: 3 }, minHeight: "100vh", bgcolor: "#f5f5f5" }}>
+      <Paper
+        elevation={1}
+        sx={{ p: { xs: 2, sm: 3 }, maxWidth: 1200, mx: "auto" }}
+      >
+        <Typography variant="h5" fontWeight={700} gutterBottom>
+          Purchased templates
         </Typography>
 
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ mb: 2 }}>
-          <TextField
-            size="small"
-            label="Search"
-            placeholder={
-              admin
-                ? "Transaction, invoice, template, theme, page, user"
-                : "Transaction, invoice, template, theme, page"
-            }
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            sx={{ flex: 1 }}
-          />
-          <TextField
-            select
-            size="small"
-            label="Status"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            sx={{ minWidth: 160 }}
-          >
-            <MenuItem value="all">All</MenuItem>
-            {statuses.map((s) => (
-              <MenuItem key={s} value={s}>
-                {s}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Stack>
-
-        {totals.length > 0 && (
-          <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: "wrap", rowGap: 1 }}>
-            {totals.map(([currency, sum]) => (
-              <Chip
-                key={currency}
-                color="primary"
-                variant="outlined"
-                label={`Captured: ${formatMoney(sum, currency)}`}
-              />
-            ))}
-            <Chip
-              variant="outlined"
-              label={`${filtered.length} payment${filtered.length === 1 ? "" : "s"}`}
-            />
-          </Stack>
+        {loadError && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {loadError}
+          </Alert>
         )}
 
-        <Divider sx={{ mb: 2 }} />
-
-        {loading ? (
-          <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
-            <CircularProgress size={24} />
+        {loading && token ? (
+          <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+            <CircularProgress size={26} />
           </Box>
-        ) : error ? (
-          <Alert severity="error">{error}</Alert>
-        ) : filtered.length === 0 ? (
-          <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
-            {payments.length === 0
-              ? admin
-                ? "No payments yet."
-                : "You haven't bought a template yet."
-              : "No payments match your filters."}
+        ) : !loadError && payments.length === 0 ? (
+          <Typography color="text.secondary" sx={{ py: 2 }}>
+            No purchases yet.
           </Typography>
-        ) : (
+        ) : !loadError ? (
           <TableContainer>
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>Date</TableCell>
-                  {admin && <TableCell>User</TableCell>}
-                  <TableCell>Template</TableCell>
-                  <TableCell>Transaction</TableCell>
-                  <TableCell>Invoice</TableCell>
-                  <TableCell>Method</TableCell>
-                  <TableCell>Status</TableCell>
+                  {admin && <TableCell>Purchased user</TableCell>}
+                  <TableCell>Purchased templates with pages</TableCell>
                   <TableCell align="right">Amount</TableCell>
-                  <TableCell />
+                  <TableCell>Date of purchase</TableCell>
+                  <TableCell align="center">Invoice</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {filtered.map((p) => (
-                  <PaymentRow
-                    key={p.id}
-                    p={p}
-                    admin={admin}
-                    open={openId === p.id}
-                    onToggle={() => setOpenId(openId === p.id ? null : p.id)}
-                  />
-                ))}
+                {visiblePayments.map((payment) => {
+                  const pages = getPages(payment.pages);
+                  return (
+                    <TableRow hover key={payment.id}>
+                      {admin && (
+                        <TableCell>
+                          <Typography variant="body2" fontWeight={600}>
+                            {payment.userName || "—"}
+                          </Typography>
+                          {payment.email && (
+                            <Typography variant="caption" color="text.secondary">
+                              {payment.email}
+                            </Typography>
+                          )}
+                        </TableCell>
+                      )}
+                      <TableCell sx={{ minWidth: 200 }}>
+                        <Typography variant="body2" fontWeight={600}>
+                          {payment.templateName || `#${payment.templateId}`}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {pages.length
+                            ? pages.map((page) => page.title || `Page #${page.pagesId}`).join(", ")
+                            : "No pages recorded"}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                        {formatMoney(payment.amount, payment.currency)}
+                      </TableCell>
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>
+                        {formatDate(payment.paidAt || payment.createdAt)}
+                      </TableCell>
+                      <TableCell align="center">
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => setSelectedPayment(payment)}
+                        >
+                          View
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {emptyRows > 0 && (
+                  <TableRow sx={{ height: 53 * emptyRows }}>
+                    <TableCell colSpan={admin ? 5 : 4} />
+                  </TableRow>
+                )}
               </TableBody>
+              <TableFooter>
+                <TableRow>
+                  <TablePagination
+                    colSpan={admin ? 5 : 4}
+                    count={payments.length}
+                    page={page}
+                    rowsPerPage={rowsPerPage}
+                    rowsPerPageOptions={[
+                      5,
+                      10,
+                      25,
+                      { label: "All", value: -1 },
+                    ]}
+                    slotProps={{
+                      select: {
+                        inputProps: { "aria-label": "rows per page" },
+                        native: true,
+                      },
+                    }}
+                    onPageChange={(_, newPage) => setPage(newPage)}
+                    onRowsPerPageChange={(event) => {
+                      setRowsPerPage(Number.parseInt(event.target.value, 10));
+                      setPage(0);
+                    }}
+                    ActionsComponent={TablePaginationActions}
+                  />
+                </TableRow>
+              </TableFooter>
             </Table>
           </TableContainer>
-        )}
+        ) : null}
       </Paper>
+      <InvoiceDialog
+        payment={selectedPayment}
+        admin={admin}
+        onClose={() => setSelectedPayment(null)}
+      />
     </Box>
   );
 }
