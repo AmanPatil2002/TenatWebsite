@@ -317,7 +317,7 @@ export default function AddCategory() {
   return (
     <Box
       sx={{
-        p: { xs: 1.5, sm: 2, md: 3 },
+        p: { xs: 1.5, sm: 2, md: 1 },
         minHeight: "100vh",
         backgroundColor: "#f5f5f5",
       }}
@@ -328,7 +328,7 @@ export default function AddCategory() {
         sx={{ maxWidth: 1200, mx: "auto" }}
       >
         {/* -------- Form card -------- */}
-        <Grid size={{ xs: 12, md: 5 }}>
+        <Grid size={{ xs: 12, md: 4 }}>
           <Paper elevation={1} sx={{ p: { xs: 2, sm: 3 } }}>
             <Typography
               variant="h5"
@@ -368,7 +368,7 @@ export default function AddCategory() {
         </Grid>
 
         {/* -------- Table card -------- */}
-        <Grid size={{ xs: 12, md: 7 }}>
+        <Grid size={{ xs: 12, md: 8 }}>
           <Paper elevation={1} sx={{ p: { xs: 2, sm: 3 } }}>
             <Typography variant="h6" sx={{ fontWeight: "bold", mb: 1 }}>
               Existing categories
@@ -391,30 +391,30 @@ export default function AddCategory() {
                   overflowY: "auto",
                   WebkitOverflowScrolling: "touch",
                   borderRadius: 1,
-                  height: 500,
+                  height: 600,
                 }}
               >
                 <Table
-                  size="small"
+                 
                   sx={{
-                    minWidth: 600,
+                    minWidth: 800,
                     tableLayout: "auto",
                   }}
                 >
                   <TableHead>
                     <TableRow>
-                      <TableCell sx={{ minWidth: 200, fontWeight: "bold" }}>
+                      <TableCell sx={{ minWidth: 180, fontWeight: "bold" }}>
                         Name
                       </TableCell>
 
-                      <TableCell sx={{ minWidth: 280, fontWeight: "bold" }}>
+                      <TableCell sx={{ minWidth: 200, fontWeight: "bold" }}>
                         Tag
                       </TableCell>
 
                       <TableCell
                         align="right"
                         sx={{
-                          minWidth: 120,
+                          minWidth: 80,
                           whiteSpace: "nowrap",
                           fontWeight: "bold",
                         }}
@@ -433,7 +433,7 @@ export default function AddCategory() {
                       >
                         <TableCell
                           sx={{
-                            minWidth: 200,
+                            minWidth: 180,
                             overflowWrap: "anywhere",
                             verticalAlign: "middle",
                           }}
@@ -443,7 +443,7 @@ export default function AddCategory() {
 
                         <TableCell
                           sx={{
-                            minWidth: 280,
+                            minWidth: 200,
                             verticalAlign: "middle",
                           }}
                         >
@@ -470,7 +470,7 @@ export default function AddCategory() {
                         <TableCell
                           align="right"
                           sx={{
-                            minWidth: 120,
+                            minWidth: 80,
                             whiteSpace: "nowrap",
                             verticalAlign: "middle",
                           }}

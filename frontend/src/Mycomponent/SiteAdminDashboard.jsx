@@ -53,7 +53,11 @@ function StatCard({ title, value, caption, icon, color = "primary", onClick }) {
         },
       })}
     >
-      <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="flex-start"
+      >
         <Box>
           <Typography
             variant="overline"
@@ -62,7 +66,11 @@ function StatCard({ title, value, caption, icon, color = "primary", onClick }) {
           >
             {title}
           </Typography>
-          <Typography variant="h3" fontWeight={700} sx={{ lineHeight: 1.2, my: 0.5 }}>
+          <Typography
+            variant="h3"
+            fontWeight={700}
+            sx={{ lineHeight: 1.2, my: 0.5 }}
+          >
             {value}
           </Typography>
           <Typography variant="body2" color="text.secondary">
@@ -87,7 +95,10 @@ function StatCard({ title, value, caption, icon, color = "primary", onClick }) {
 
 function SectionCard({ title, subtitle, actionLabel, onAction, children }) {
   return (
-    <Paper variant="outlined" sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+    <Paper
+      variant="outlined"
+      sx={{ height: "100%", display: "flex", flexDirection: "column" }}
+    >
       <Stack
         direction="row"
         justifyContent="space-between"
@@ -117,7 +128,9 @@ function SectionCard({ title, subtitle, actionLabel, onAction, children }) {
         )}
       </Stack>
       <Divider />
-      <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>{children}</Box>
+      <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
+        {children}
+      </Box>
     </Paper>
   );
 }
@@ -180,13 +193,16 @@ export default function SiteAdminDashboard() {
     ])
       .then(([employeeResponse, entryResponse]) => {
         if (cancelled) return;
-        setEmployees(Array.isArray(employeeResponse.data) ? employeeResponse.data : []);
+        setEmployees(
+          Array.isArray(employeeResponse.data) ? employeeResponse.data : [],
+        );
         setEntries(Array.isArray(entryResponse.data) ? entryResponse.data : []);
       })
       .catch((requestError) => {
         if (!cancelled) {
           setError(
-            requestError.response?.data?.message || "Could not load dashboard data.",
+            requestError.response?.data?.message ||
+              "Could not load dashboard data.",
           );
         }
       })
@@ -216,13 +232,16 @@ export default function SiteAdminDashboard() {
         })}
       >
         <Stack
-          direction={{ xs: "column", md: "row" }}
+          direction={{ xs: "column", sm: "row" }}
           justifyContent="space-between"
-          alignItems={{ xs: "flex-start", md: "center" }}
+          alignItems={{ xs: "stretch", sm: "center" }}
           spacing={3}
         >
-          <Box sx={{ minWidth: 0 }}>
-            <Typography variant="overline" sx={{ opacity: 0.8, letterSpacing: 1 }}>
+          <Box sx={{ minWidth: 0, flexGrow: 1 }}>
+            <Typography
+              variant="overline"
+              sx={{ opacity: 0.8, letterSpacing: 1 }}
+            >
               Site dashboard
             </Typography>
             <Typography variant="h4" fontWeight={700} sx={{ mb: 1.5 }}>
@@ -233,45 +252,45 @@ export default function SiteAdminDashboard() {
                 <Chip
                   size="small"
                   label={site.categoryName}
-                  sx={{ bgcolor: "rgba(255,255,255,.18)", color: "common.white" }}
+                  sx={{
+                    bgcolor: "rgba(255,255,255,.18)",
+                    color: "common.white",
+                  }}
                 />
               )}
               {site?.themeName && (
                 <Chip
                   size="small"
-                  icon={<LockOutlinedIcon sx={{ color: "inherit !important" }} />}
+                  icon={
+                    <LockOutlinedIcon sx={{ color: "inherit !important" }} />
+                  }
                   label={`Theme: ${site.themeName}`}
-                  sx={{ bgcolor: "rgba(255,255,255,.18)", color: "common.white" }}
+                  sx={{
+                    bgcolor: "rgba(255,255,255,.18)",
+                    color: "common.white",
+                  }}
                 />
               )}
             </Stack>
           </Box>
-          <Stack direction="row" spacing={1.5} sx={{ flexShrink: 0 }}>
-            <Button
-              variant="outlined"
-              startIcon={<PreviewOutlinedIcon />}
-              onClick={go("preview")}
-              sx={{
-                color: "common.white",
-                borderColor: "rgba(255,255,255,.6)",
-                "&:hover": { borderColor: "common.white", bgcolor: "rgba(255,255,255,.1)" },
-              }}
-            >
-              Preview site
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<PagesOutlinedIcon />}
-              onClick={go("manage")}
-              sx={{
-                bgcolor: "common.white",
-                color: "primary.main",
-                "&:hover": { bgcolor: "grey.100" },
-              }}
-            >
-              Manage pages
-            </Button>
-          </Stack>
+
+          <Button
+            variant="outlined"
+            startIcon={<PreviewOutlinedIcon />}
+            onClick={go("preview")}
+            sx={{
+              flexShrink: 0,
+              alignSelf: { xs: "flex-end", sm: "center" },
+              color: "common.white",
+              borderColor: "rgba(255,255,255,.6)",
+              "&:hover": {
+                borderColor: "common.white",
+                bgcolor: "rgba(255,255,255,.1)",
+              },
+            }}
+          >
+            Preview site
+          </Button>
         </Stack>
       </Paper>
 
@@ -320,10 +339,10 @@ export default function SiteAdminDashboard() {
               />
             </Grid>
           </Grid>
-
+          <br/><br/>
           {/* Pages + Site details */}
           <Grid container spacing={3}>
-            <Grid size={{ xs: 12, md: 8 }}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <SectionCard
                 title="Your pages"
                 subtitle="In the order they appear on your site"
@@ -342,7 +361,10 @@ export default function SiteAdminDashboard() {
                                 width: 32,
                                 height: 32,
                                 fontSize: 14,
-                                bgcolor: alpha(theme.palette.primary.main, 0.12),
+                                bgcolor: alpha(
+                                  theme.palette.primary.main,
+                                  0.12,
+                                ),
                                 color: "primary.main",
                               })}
                             >
@@ -351,7 +373,10 @@ export default function SiteAdminDashboard() {
                           </ListItemAvatar>
                           <ListItemText
                             primary={page.title}
-                            primaryTypographyProps={{ fontWeight: 600, noWrap: true }}
+                            primaryTypographyProps={{
+                              fontWeight: 600,
+                              noWrap: true,
+                            }}
                           />
                         </ListItem>
                       </Box>
@@ -379,7 +404,7 @@ export default function SiteAdminDashboard() {
               </SectionCard>
             </Grid>
 
-            <Grid size={{ xs: 12, md: 4 }}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <SectionCard title="Site details">
                 <InfoRow label="Site name" value={site?.siteName} />
                 <Divider />
@@ -387,10 +412,12 @@ export default function SiteAdminDashboard() {
                 <Divider />
                 <InfoRow label="Theme" value={site?.themeName} />
                 <Divider />
-                <InfoRow label="Site ID" value={site?.siteId ? `#${site.siteId}` : ""} />
-                <Divider />
                 <Box sx={{ px: 2.5, py: 2, mt: "auto" }}>
-                  <Alert severity="info" icon={<LockOutlinedIcon fontSize="small" />} sx={{ py: 0 }}>
+                  <Alert
+                    severity="info"
+                    icon={<LockOutlinedIcon fontSize="small" />}
+                    sx={{ py: 0 }}
+                  >
                     The purchased theme is fixed and can’t be changed here.
                   </Alert>
                 </Box>
@@ -418,7 +445,11 @@ export default function SiteAdminDashboard() {
                             <Chip
                               size="small"
                               label={employee.status}
-                              color={employee.status === "active" ? "success" : "default"}
+                              color={
+                                employee.status === "active"
+                                  ? "success"
+                                  : "default"
+                              }
                               variant="outlined"
                             />
                           }
@@ -431,7 +462,10 @@ export default function SiteAdminDashboard() {
                           <ListItemText
                             primary={employee.name}
                             secondary={employee.jobTitle}
-                            primaryTypographyProps={{ fontWeight: 600, noWrap: true }}
+                            primaryTypographyProps={{
+                              fontWeight: 600,
+                              noWrap: true,
+                            }}
                             secondaryTypographyProps={{ noWrap: true }}
                             sx={{ pr: 8 }}
                           />
@@ -465,7 +499,9 @@ export default function SiteAdminDashboard() {
                           sx={{ px: 2.5, py: 1.25 }}
                           secondaryAction={
                             <Typography variant="body2" fontWeight={600}>
-                              {entry.price != null && entry.price !== "" ? entry.price : ""}
+                              {entry.price != null && entry.price !== ""
+                                ? entry.price
+                                : ""}
                             </Typography>
                           }
                         >
@@ -473,7 +509,10 @@ export default function SiteAdminDashboard() {
                             <Avatar
                               variant="rounded"
                               sx={(theme) => ({
-                                bgcolor: alpha(theme.palette.warning.main, 0.12),
+                                bgcolor: alpha(
+                                  theme.palette.warning.main,
+                                  0.12,
+                                ),
                                 color: "warning.main",
                               })}
                             >
@@ -483,7 +522,10 @@ export default function SiteAdminDashboard() {
                           <ListItemText
                             primary={entry.name}
                             secondary={entry.pageTitle}
-                            primaryTypographyProps={{ fontWeight: 600, noWrap: true }}
+                            primaryTypographyProps={{
+                              fontWeight: 600,
+                              noWrap: true,
+                            }}
                             secondaryTypographyProps={{ noWrap: true }}
                             sx={{ pr: 8 }}
                           />

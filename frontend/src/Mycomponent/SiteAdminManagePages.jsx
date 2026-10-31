@@ -222,6 +222,65 @@ export default function SiteAdminManagePages() {
         </Alert>
       )}
 
+      {site && (
+        <Paper
+          variant="outlined"
+          sx={{
+            mb: 2,
+            p: 2,
+            bgcolor: site.background || "#ffffff",
+            color: site.color || "#222222",
+            borderColor: site.color || "divider",
+          }}
+        >
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            justifyContent="space-between"
+            alignItems={{ xs: "flex-start", sm: "center" }}
+            spacing={1}
+          >
+            <Box>
+              <Typography fontWeight={700}>
+                {site.themeName || "Purchased theme"} applied
+              </Typography>
+              <Typography variant="body2">
+                This purchased theme is used by all pages on this site.
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Box
+                aria-label={`Theme background ${site.background || "#ffffff"}`}
+                sx={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 1,
+                  bgcolor: site.background || "#ffffff",
+                  border: "1px solid",
+                  borderColor: "divider",
+                }}
+              />
+              <Typography variant="caption">
+                Background {site.background || "#ffffff"}
+              </Typography>
+              <Box
+                aria-label={`Theme text color ${site.color || "#222222"}`}
+                sx={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 1,
+                  bgcolor: site.color || "#222222",
+                  border: "1px solid",
+                  borderColor: "divider",
+                }}
+              />
+              <Typography variant="caption">
+                Text {site.color || "#222222"}
+              </Typography>
+            </Stack>
+          </Stack>
+        </Paper>
+      )}
+
       {loading ? (
         <Box sx={{ display: "grid", placeItems: "center", minHeight: 300 }}>
           <CircularProgress />
@@ -388,6 +447,12 @@ export default function SiteAdminManagePages() {
                       { name: "insert", items: ["Image", "Table", "HorizontalRule", "SpecialChar"] },
                       { name: "links", items: ["Link", "Unlink"] },
                     ],
+                  }}
+                  onInstanceReady={(event) => {
+                    event.editor.document.getBody().setStyles({
+                      backgroundColor: site?.background || "#ffffff",
+                      color: site?.color || "#222222",
+                    });
                   }}
                   onChange={(event) => setContent(event.editor.getData())}
                 />

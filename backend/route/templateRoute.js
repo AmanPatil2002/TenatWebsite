@@ -8,6 +8,7 @@ const {
   getTemplateAdmin,
   addTemplate,
   updateTemplate,
+  reorderTemplatePages,
   deleteTemplate,
 } = require("../controller/templateController");
 
@@ -17,6 +18,12 @@ router.get("/admin/all", authenticateToken, requirePlatformAdmin, getAllTemplate
 router.get("/admin/:templateId", authenticateToken, requirePlatformAdmin, getTemplateAdmin);
 router.post("/", authenticateToken, requirePlatformAdmin, addTemplate);
 router.get("/", getTemplates);
+router.put(
+  "/:templateId/pages/order",
+  authenticateToken,
+  requirePlatformAdmin,
+  reorderTemplatePages,
+);
 router.get("/:templateId", getTemplate);
 router.put("/:templateId", authenticateToken, requirePlatformAdmin, updateTemplate);
 router.delete("/:templateId", authenticateToken, requirePlatformAdmin, deleteTemplate);

@@ -30,13 +30,14 @@ import ViewTemplate from "./Mycomponent/ViewTemplate";
 import MySiteView from "./Mycomponent/MySiteView";
 import AddTheme from "./Mycomponent/AddTheme";
 import AddPages from "./Mycomponent/AddPages";
-import SiteAdminAccess from "./Mycomponent/SiteAdminAccess"; // adjust path if different
+import SiteAdminAccess from "./Mycomponent/SiteAdminAccess";
 import SiteAdminLogin from "./Pages/Client/SiteAdminLogin";
 import SiteAdminLayout from "./Mycomponent/SiteAdminLayout";
 import SiteAdminDashboard from "./Mycomponent/SiteAdminDashboard";
 import SiteAdminManagePages from "./Mycomponent/SiteAdminManagePages";
 import SiteAdminEmployees from "./Mycomponent/SiteAdminEmployees";
-import SiteAdminPageData from "./Mycomponent/SiteAdminPageData";
+import ArrangeTemplatePages from "./Mycomponent/ArrangeTemplatePages";
+
 
 function App() {
   return (
@@ -53,7 +54,6 @@ function App() {
           <Route path="panel" element={<SiteAdminDashboard />} />
           <Route path="manage" element={<SiteAdminManagePages />} />
           <Route path="employees" element={<SiteAdminEmployees />} />
-          <Route path="page-data" element={<SiteAdminPageData />} />
         </Route>
 
         {/* Client */}
@@ -67,8 +67,8 @@ function App() {
             <Route path="/templates" element={<Template />} />
             <Route path="/payment" element={<Payment />} />
             <Route path="/mysite" element={<MySite />} />
-            <Route path="/mysite/:siteId" element={<MySiteView />} />
-            <Route path="/mysite/:siteId/preview" element={<MySiteView />} />
+            <Route path="/mysite/:siteSlug" element={<MySiteView />} />
+            <Route path="/mysite/:siteSlug/preview" element={<MySiteView />} />
           </Route>
         </Route>
 
@@ -84,6 +84,7 @@ function App() {
             />
             <Route path="category" element={<AddCategory />} />
             <Route path="viewtemplates" element={<ViewTemplate />} />
+            <Route path="template-pages" element={<ArrangeTemplatePages />} />
             <Route path="users" element={<ViewUser />} />
             <Route path="usereview" element={<ViewReview />} />
             <Route path="admindashboard" element={<AdminDashboard />} />

@@ -14,6 +14,7 @@ import {
 import LaptopIcon from "@mui/icons-material/Laptop";
 import TabletAndroidIcon from "@mui/icons-material/TabletAndroid";
 import PhoneAndroidIcon from "@mui/icons-material/PhoneAndroid";
+import { createSiteSlug } from "../utils/siteSlug";
 
 const API_URL = (
   import.meta.env.VITE_API_URL || "http://localhost:5000"
@@ -106,9 +107,10 @@ const buildSrcDoc = (html, background, color, entries, currency, pageTitle) => `
 </html>`;
 
 export default function MySiteView() {
-  const { siteId } = useParams();
+  const { siteId: adminSiteId, siteSlug } = useParams();
   const navigate = useNavigate();
   const siteAdminMode = window.location.pathname.startsWith("/site-admin/");
+  const routeSiteKey = siteAdminMode ? adminSiteId : siteSlug;
 
   const [site, setSite] = useState({ color: "#222222", background: "#ffffff" });
   const [pages, setPages] = useState([]);
@@ -132,28 +134,47 @@ export default function MySiteView() {
 
     let cancelled = false;
     const headers = { Authorization: `Bearer ${token}` };
-    const pagesUrl = siteAdminMode
-      ? `${API_URL}/sites/client-admin/${siteId}/pages`
-      : `${API_URL}/sites/${siteId}/pages`;
-
     const load = async () => {
       setLoading(true);
       setError("");
       try {
-        const [pagesRes, sitesRes] = await Promise.all([
-          axios.get(pagesUrl, { headers }),
-          siteAdminMode
-            ? Promise.resolve(null)
-            : axios.get(`${API_URL}/sites/my`, { headers }).catch(() => null),
-        ]);
+        let targetSiteId = routeSiteKey;
+        let meta = null;
+        if (!siteAdminMode) {
+          const sitesRes = await axios.get(`${API_URL}/sites/my`, { headers });
+          if (cancelled) return;
+          const sites = Array.isArray(sitesRes.data) ? sitesRes.data : [];
+          meta = sites.find((item) => createSiteSlug(item) === siteSlug);
+
+          if (!meta) {
+            const legacySite = sites.find(
+              (item) => String(item.id) === siteSlug,
+            );
+            if (legacySite) {
+              const previewPath = window.location.pathname.endsWith("/preview")
+                ? "/preview"
+                : "";
+              navigate(
+                `/mysite/${createSiteSlug(legacySite)}${previewPath}`,
+                { replace: true },
+              );
+              return;
+            }
+            setError("Site not found in your account.");
+            return;
+          }
+          targetSiteId = meta.id;
+        }
+
+        const pagesUrl = siteAdminMode
+          ? `${API_URL}/sites/client-admin/${targetSiteId}/pages`
+          : `${API_URL}/sites/${targetSiteId}/pages`;
+        const pagesRes = await axios.get(pagesUrl, { headers });
         if (cancelled) return;
 
         const list = Array.isArray(pagesRes.data?.pages)
           ? pagesRes.data.pages
           : [];
-        const meta = Array.isArray(sitesRes?.data)
-          ? sitesRes.data.find((s) => String(s.id) === String(siteId))
-          : null;
 
         setPages(list);
         setActiveId(
@@ -180,7 +201,7 @@ export default function MySiteView() {
     return () => {
       cancelled = true;
     };
-  }, [siteId, navigate, siteAdminMode]);
+  }, [routeSiteKey, siteSlug, navigate, siteAdminMode]);
 
   const activePage = useMemo(
     () =>
@@ -200,7 +221,7 @@ export default function MySiteView() {
     width: "100%",
   }}
 >
-  <Button onClick={() => navigate(siteAdminMode ? `/site-admin/${siteId}/panel` : "/mysite")}>
+  <Button onClick={() => navigate(siteAdminMode ? `/site-admin/${adminSiteId}/panel` : "/mysite")}>
     ← Back
   </Button>
 

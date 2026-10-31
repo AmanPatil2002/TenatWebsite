@@ -430,6 +430,63 @@ const updateTemplate = async (req, res) => {
   }
 };
 
+const reorderTemplatePages = async (req, res) => {
+  const { templateId } = req.params;
+  const { pageIds } = req.body ?? {};
+  if (!isId(templateId)) {
+    return res.status(400).json({ message: "Invalid templateId" });
+  }
+  if (
+    !Array.isArray(pageIds) ||
+    pageIds.length > 1000 ||
+    pageIds.some((id) => !isId(id)) ||
+    new Set(pageIds.map(String)).size !== pageIds.length
+  ) {
+    return res.status(400).json({ message: "Provide a valid ordered list of page ids" });
+  }
+
+  try {
+    await withTx(async (connection) => {
+      const [[template]] = await connection.query(
+        "SELECT templateId FROM template WHERE templateId = ? FOR UPDATE",
+        [templateId],
+      );
+      if (!template) {
+        const notFound = new Error("Template not found");
+        notFound.status = 404;
+        throw notFound;
+      }
+
+      const [templatePages] = await connection.query(
+        "SELECT pagesId FROM templatepages WHERE templateId = ? ORDER BY pagesId FOR UPDATE",
+        [templateId],
+      );
+      const existingIds = templatePages.map((page) => String(page.pagesId)).sort();
+      const requestedIds = pageIds.map(String).sort();
+      if (
+        existingIds.length !== requestedIds.length ||
+        existingIds.some((id, index) => id !== requestedIds[index])
+      ) {
+        const invalidOrder = new Error("The template page list changed. Reload before reordering.");
+        invalidOrder.status = 400;
+        throw invalidOrder;
+      }
+
+      for (let sortOrder = 0; sortOrder < pageIds.length; sortOrder += 1) {
+        await connection.query(
+          "UPDATE templatepages SET sortOrder = ? WHERE templateId = ? AND pagesId = ?",
+          [sortOrder, templateId, pageIds[sortOrder]],
+        );
+      }
+    });
+    return res.json({ message: "Template page order updated successfully" });
+  } catch (error) {
+    if (error.status) return res.status(error.status).json({ message: error.message });
+    console.error("Reorder template pages error:", error);
+    return res.status(500).json({ message: "Failed to reorder template pages" });
+  }
+};
+
 const deleteTemplate = async (req, res) => {
   if (!isId(req.params.templateId)) return res.status(400).json({ message: "Invalid templateId" });
   try {
@@ -452,5 +509,6 @@ module.exports = {
   getTemplateAdmin,
   addTemplate,
   updateTemplate,
+  reorderTemplatePages,
   deleteTemplate,
 };

@@ -35,6 +35,7 @@ import RateReviewIcon from "@mui/icons-material/RateReview";
 import LogoutIcon from "@mui/icons-material/Logout";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
+import ReorderIcon from "@mui/icons-material/Reorder";
 import AdminDashboard from "../../Mycomponent/AdminDashboard";
 
 const FULL_WIDTH = 250;
@@ -45,6 +46,7 @@ const menuItems = [
   { text: "Add Category", icon: <CategoryIcon />, path: "/admin/category" },
   { text: "Add Theme", icon: <ViewQuiltIcon />, path: "/admin/theme" },
   { text: "Add Pages", icon: <NoteAddIcon />, path: "/admin/page" },
+  { text: "Arrange Pages", icon: <ReorderIcon />, path: "/admin/template-pages" },
   { text: "Add Templates", icon: <DevicesOtherIcon />, path: "/admin/templates" },
   { text: "View Templates", icon: <FolderOpenIcon />, path: "/admin/viewtemplates" },
   { text: "FAQ", icon: <HelpOutlineIcon />, path: "/admin/faq" },

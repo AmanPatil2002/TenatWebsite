@@ -176,7 +176,11 @@ const createPayment = async (req, res) => {
           to: user.email,
           name: user.name,
           templateName: template.name,
-          pages: pages.map((p) => ({ title: p.title })),
+          invoiceNumber: provisioned.invoiceNumber,
+          baseAmount,
+          method,
+          paidAt: new Date().toISOString(),
+          pages: pages.map((p) => ({ title: p.title, price: fromMinor(p.minor) })),
         },
       };
     });

@@ -579,7 +579,16 @@ export default function Template() {
   };
 
   const selectedThemes = Array.isArray(selected?.themes) ? selected.themes : [];
-  const selectedPages = Array.isArray(selected?.pages) ? selected.pages : [];
+  const selectedPages = useMemo(
+    () =>
+      (Array.isArray(selected?.pages) ? selected.pages : [])
+        .slice()
+        .sort(
+          (first, second) =>
+            Number(first.sortOrder ?? 0) - Number(second.sortOrder ?? 0),
+        ),
+    [selected],
+  );
 
   // Slider photos: prefer `photos`, fall back to thumbnailUrl
   const sliderPhotos = useMemo(() => {

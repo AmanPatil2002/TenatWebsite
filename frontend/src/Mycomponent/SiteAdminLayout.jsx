@@ -22,7 +22,6 @@ import {
 } from "@mui/material";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
-import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 import LogoutIcon from "@mui/icons-material/Logout";
 import MenuIcon from "@mui/icons-material/Menu";
 import MenuOpenIcon from "@mui/icons-material/MenuOpen";
@@ -101,7 +100,6 @@ export default function SiteAdminLayout() {
     { text: "Dashboard", icon: <DashboardIcon />, path: `${siteBasePath}/panel` },
     { text: "Manage pages", icon: <PagesOutlinedIcon />, path: `${siteBasePath}/manage` },
     { text: "Employees", icon: <GroupsOutlinedIcon />, path: `${siteBasePath}/employees` },
-    { text: "Page data", icon: <Inventory2OutlinedIcon />, path: `${siteBasePath}/page-data` },
   ];
   const current = menuItems.find((item) => item.path === location.pathname);
 

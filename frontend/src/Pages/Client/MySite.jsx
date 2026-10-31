@@ -16,6 +16,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
+import { createSiteSlug } from "../../utils/siteSlug";
 
 const API_URL = (
   import.meta.env.VITE_API_URL || "http://localhost:5000"
@@ -151,7 +152,7 @@ export default function MySite() {
                             fullWidth
                             variant="contained"
                             disabled={!usable}
-                            onClick={() => navigate(`/mysite/${site.id}`)}
+                            onClick={() => navigate(`/mysite/${createSiteSlug(site)}`)}
                           >
                             Open site
                           </Button>
