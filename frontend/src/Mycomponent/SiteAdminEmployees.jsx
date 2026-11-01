@@ -24,6 +24,7 @@ import {
   TableRow,
   TextField,
   Typography,
+  Link, 
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -174,15 +175,33 @@ export default function SiteAdminEmployees() {
                     <TableCell>{employee.name}</TableCell>
                     <TableCell>{employee.jobTitle}</TableCell>
                     <TableCell>
-                      {employee.email || employee.phone || "—"}
-                      {employee.email && employee.phone && (
-                        <Typography
-                          variant="caption"
-                          display="block"
-                          color="text.secondary"
-                        >
-                          {employee.phone}
-                        </Typography>
+                      {employee.email || employee.phone ? (
+                        <>
+                          {employee.email && (
+                            <Typography variant="body2">
+                              <Link
+                                href={`mailto:${employee.email}`}
+                                underline="hover"
+                                color="inherit"
+                              >
+                                {employee.email}
+                              </Link>
+                            </Typography>
+                          )}
+                          {employee.phone && (
+                            <Typography variant="body2" color="text.secondary">
+                              <Link
+                                href={`tel:${employee.phone.replace(/[^\d+]/g, "")}`}
+                                underline="hover"
+                                color="inherit"
+                              >
+                                {employee.phone}
+                              </Link>
+                            </Typography>
+                          )}
+                        </>
+                      ) : (
+                        "—"
                       )}
                     </TableCell>
                     <TableCell>
