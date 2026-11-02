@@ -55,6 +55,7 @@ router.post(
   authenticateSiteAdmin,
   createSitePage,
 );
+
 router.put(
   "/client-admin/:siteId/pages/order",
   authenticateSiteAdmin,

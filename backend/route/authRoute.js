@@ -9,6 +9,8 @@ const {
   getUser,
   updateMe,
   changePassword,
+  forgotPassword,
+  resetPassword,
   updateUser,
   updateUserStatus,
 } = require("../controller/authControler");
@@ -17,6 +19,9 @@ const authenticateToken = require("../middleware/authenticate");
 router.get("/register", authenticateToken, getAuth);
 router.post("/register", postAuth);
 router.post("/login", checkLogin);
+
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password", resetPassword);
 
 router.get("/me", authenticateToken, getMe);
 router.put("/me", authenticateToken, updateMe);

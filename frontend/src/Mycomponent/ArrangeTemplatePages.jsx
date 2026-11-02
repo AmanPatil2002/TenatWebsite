@@ -229,14 +229,22 @@ export default function ArrangeTemplatePages() {
                     optional.
                   </Typography>
                 </Box>
-                <Button
-                  variant="contained"
-                  startIcon={<SaveOutlinedIcon />}
-                  onClick={saveOrder}
-                  disabled={!dirty || saving}
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    width: "100%",
+                  }}
                 >
-                  {saving ? "Saving..." : "Save order"}
-                </Button>
+                  <Button
+                    variant="contained"
+                    startIcon={<SaveOutlinedIcon />}
+                    onClick={saveOrder}
+                    disabled={!dirty || saving}
+                  >
+                    {saving ? "Saving..." : "Save order"}
+                  </Button>
+                </Box>
               </Stack>
 
               {pages.length ? (
@@ -248,30 +256,26 @@ export default function ArrangeTemplatePages() {
                       page.isDefault === 1 ||
                       page.isDefault === "1";
                     return (
-                      <Paper
-                        key={id}
-                        variant="outlined"
-                        sx={{ p: 1.5 }}
-                      >
-                        <Stack
-                          direction="row"
-                          alignItems="center"
-                          spacing={1}
-                        >
+                      <Paper key={id} variant="outlined" sx={{ p: 1 }}>
+                        <Stack direction="row" alignItems="center" spacing={1}>
                           <Typography
+                            variant="h4"
                             color="text.secondary"
                             sx={{ minWidth: 32, textAlign: "center" }}
                           >
-                            {index + 1}
+                            {index + 1}.
                           </Typography>
-                          <Typography sx={{ flexGrow: 1, minWidth: 0 }}>
+                          <Typography
+                            variant="h4"
+                            sx={{ flexGrow: 1, minWidth: 0 }}
+                          >
                             {page.title || "Untitled page"}
                           </Typography>
-                          <Chip
+                          {/* <Chip
                             size="small"
                             color={isDefault ? "primary" : "default"}
                             label={isDefault ? "Included" : "Optional"}
-                          />
+                          /> */}
                           <Stack>
                             <IconButton
                               size="small"

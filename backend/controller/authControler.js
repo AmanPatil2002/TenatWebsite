@@ -3,8 +3,13 @@ const db = require("../config/db");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
+const crypto = require("crypto");
+
+const { sendPasswordResetEmail } = require("../utils/mailer");
 
 const SECRET_KEY = process.env.SECRET_KEY;
+
+const EMAIL_RE = /^\S+@\S+\.\S+$/;
 
 const signToken = (u) =>
   jwt.sign(
@@ -42,8 +47,9 @@ const buildProfileUpdate = (body) => {
   }
 
   if (body.email !== undefined) {
-    const email = typeof body.email === "string" ? body.email.trim() : "";
-    if (email.length > 190 || !/^\S+@\S+\.\S+$/.test(email)) {
+    const email =
+      typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    if (email.length > 190 || !EMAIL_RE.test(email)) {
       return { error: "Enter a valid email" };
     }
     fields.push("email=?");
@@ -108,10 +114,7 @@ const postAuth = async (req, res) => {
         .status(400)
         .json({ message: "Name must be 120 characters or fewer" });
     }
-    if (
-      normalizedEmail.length > 190 ||
-      !/^\S+@\S+\.\S+$/.test(normalizedEmail)
-    ) {
+    if (normalizedEmail.length > 190 || !EMAIL_RE.test(normalizedEmail)) {
       return res.status(400).json({ message: "Enter a valid email" });
     }
     if (normalizedPhone && normalizedPhone.length > 20) {
@@ -315,6 +318,144 @@ const changePassword = (req, res) => {
   );
 };
 
+// Step 1 of forgot password: email a 6-digit code.
+// Same response whether or not the email exists.
+const forgotPassword = async (req, res) => {
+  const email =
+    typeof req.body.email === "string" ? req.body.email.trim().toLowerCase() : "";
+  if (!email || email.length > 190 || !EMAIL_RE.test(email)) {
+    return res.status(400).json({ message: "Enter a valid email" });
+  }
+
+  const generic = {
+    message: "If that email is registered, a verification code has been sent.",
+  };
+
+  try {
+    const [rows] = await db
+      .promise()
+      .execute("SELECT userId,name,status FROM users WHERE email=?", [email]);
+    if (rows.length === 0 || rows[0].status !== "active") {
+      return res.json(generic);
+    }
+    const user = rows[0];
+
+    // 60-second cooldown between codes
+    const [recent] = await db
+      .promise()
+      .execute(
+        "SELECT id FROM passwordResets WHERE userId=? AND createdAt > (NOW() - INTERVAL 60 SECOND)",
+        [user.userId],
+      );
+    if (recent.length > 0) return res.json(generic);
+
+    const code = String(crypto.randomInt(0, 1000000)).padStart(6, "0");
+    const codeHash = await bcrypt.hash(code, 10);
+
+    await db
+      .promise()
+      .execute("DELETE FROM passwordResets WHERE userId=?", [user.userId]);
+    await db
+      .promise()
+      .execute(
+        "INSERT INTO passwordResets(userId,codeHash,expiresAt) VALUES(?,?,DATE_ADD(NOW(), INTERVAL 10 MINUTE))",
+        [user.userId, codeHash],
+      );
+
+    try {
+      await sendPasswordResetEmail({
+        to: email,
+        name: user.name,
+        code,
+        expiresInMinutes: 10,
+      });
+    } catch (mailErr) {
+      // Logged only, so the response can't reveal whether the email exists
+      console.error("Reset email failed:", mailErr.message);
+    }
+
+    res.json(generic);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Step 2 of forgot password: verify the code and set the new password
+const resetPassword = async (req, res) => {
+  const email =
+    typeof req.body.email === "string" ? req.body.email.trim().toLowerCase() : "";
+  const code = String(req.body.code ?? "").trim();
+  const newPassword = req.body.newPassword;
+
+  if (!email || !EMAIL_RE.test(email) || !/^\d{6}$/.test(code)) {
+    return res.status(400).json({ message: "Invalid or expired code" });
+  }
+  if (typeof newPassword !== "string" || newPassword.length < 6) {
+    return res
+      .status(400)
+      .json({ message: "Password must be at least 6 characters" });
+  }
+
+  try {
+    const [rows] = await db.promise().execute(
+      `SELECT u.userId, u.status, r.id AS resetId, r.codeHash, r.attempts
+         FROM users u
+         JOIN passwordResets r ON r.userId = u.userId
+        WHERE u.email=? AND r.usedAt IS NULL AND r.expiresAt > NOW()
+        ORDER BY r.id DESC LIMIT 1`,
+      [email],
+    );
+    if (rows.length === 0 || rows[0].status !== "active") {
+      return res.status(400).json({ message: "Invalid or expired code" });
+    }
+    const r = rows[0];
+
+    if (r.attempts >= 5) {
+      return res
+        .status(400)
+        .json({ message: "Too many attempts. Please request a new code." });
+    }
+
+    const ok = await bcrypt.compare(code, r.codeHash);
+    if (!ok) {
+      await db
+        .promise()
+        .execute("UPDATE passwordResets SET attempts=attempts+1 WHERE id=?", [
+          r.resetId,
+        ]);
+      return res.status(400).json({ message: "Invalid or expired code" });
+    }
+
+    // Claim the code so it can only be used once
+    const [claim] = await db
+      .promise()
+      .execute(
+        "UPDATE passwordResets SET usedAt=NOW() WHERE id=? AND usedAt IS NULL",
+        [r.resetId],
+      );
+    if (claim.affectedRows === 0) {
+      return res.status(400).json({ message: "Invalid or expired code" });
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await db
+      .promise()
+      .execute("UPDATE users SET passwordHash=? WHERE userId=?", [
+        hashed,
+        r.userId,
+      ]);
+    await db
+      .promise()
+      .execute("DELETE FROM passwordResets WHERE userId=?", [r.userId]);
+
+    res.json({ message: "Password reset successful" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 // Admin edits any user: profile fields plus role (admin/client) and status
 const updateUser = (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ message: "Forbidden" });
@@ -375,7 +516,7 @@ const updateUserStatus = (req, res) => {
 
   const userId = req.params.userId;
   const { status } = req.body;
-  if (!/^[1-9]\d*$/.test(userId) || BigInt(userId) > 18446744073709551615n) {
+  if (!validId(userId)) {
     return res.status(400).json({ message: "Invalid user ID" });
   }
   if (!["active", "inactive"].includes(status)) {
@@ -405,6 +546,8 @@ module.exports = {
   getUser,
   updateMe,
   changePassword,
+  forgotPassword,
+  resetPassword,
   updateUser,
   updateUserStatus,
 };

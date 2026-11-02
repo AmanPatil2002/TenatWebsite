@@ -20,7 +20,7 @@ import Button from "@mui/material/Button";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-const COLUMNS = ["No.", "Reviewed By", "Rating", "Review", "Created At"];
+const COLUMNS = ["No.", "Reviewed By", "Review", "Created At"];
 
 const formatDate = (d) =>
   d
@@ -224,15 +224,9 @@ export default function ViewReview() {
                       readOnly
                       size="small"
                     />
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      maxWidth: 360,
-                      whiteSpace: "pre-wrap",
-                      overflowWrap: "anywhere",
-                    }}
-                  >
-                    {review.description}
+                    <Typography variant="body2" color="text.secondary">
+                      {review.description}
+                      </Typography>
                   </TableCell>
                   <TableCell>{formatDate(review.createdAt)}</TableCell>
                 </TableRow>

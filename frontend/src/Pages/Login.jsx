@@ -13,6 +13,10 @@ import {
   CardContent,
   Container,
   CssBaseline,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   IconButton,
   InputAdornment,
   Link,
@@ -43,6 +47,199 @@ const theme = createTheme({
   },
 });
 
+// Two-step dialog: 1) enter email -> code is emailed, 2) enter code + new password
+function ForgotPasswordDialog({ initialEmail, onClose, onDone }) {
+  const [step, setStep] = useState(1);
+  const [email, setEmail] = useState(initialEmail || "");
+  const [code, setCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
+
+  const requestCode = async (e) => {
+    e?.preventDefault();
+    if (loading) return;
+
+    const value = email.trim();
+    if (!value || value.length > EMAIL_MAX || !EMAIL_RE.test(value)) {
+      setError("Enter a valid email");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setInfo("");
+    try {
+      const { data } = await axios.post(`${API_URL}/auth/forgot-password`, {
+        email: value,
+      });
+      setStep(2);
+      setInfo(data.message);
+    } catch (err) {
+      setError(
+        err.response?.data?.message ||
+          "Could not send the code. Please try again.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitReset = async (e) => {
+    e.preventDefault();
+    if (loading) return;
+
+    if (!/^\d{6}$/.test(code)) {
+      setError("Enter the 6-digit code");
+      return;
+    }
+    if (newPassword.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
+    if (newPassword !== confirm) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setInfo("");
+    try {
+      await axios.post(`${API_URL}/auth/reset-password`, {
+        email: email.trim(),
+        code,
+        newPassword,
+      });
+      onDone("Password reset successfully. Please log in.");
+    } catch (err) {
+      setError(
+        err.response?.data?.message || "Could not reset password. Try again.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open onClose={loading ? undefined : onClose} fullWidth maxWidth="xs">
+      <form onSubmit={step === 1 ? requestCode : submitReset} noValidate>
+        <DialogTitle>
+          {step === 1 ? "Forgot password" : "Reset password"}
+        </DialogTitle>
+
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            {error && <Alert severity="error">{error}</Alert>}
+            {info && <Alert severity="info">{info}</Alert>}
+
+            {step === 1 ? (
+              <>
+                <Typography variant="body2" color="text.secondary">
+                  Enter your account email and we'll send you a 6-digit code.
+                </Typography>
+                <TextField
+                  label="Email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setError("");
+                  }}
+                  inputProps={{ maxLength: EMAIL_MAX }}
+                  autoComplete="email"
+                  autoFocus
+                  fullWidth
+                />
+              </>
+            ) : (
+              <>
+                <TextField
+                  label="6-digit code"
+                  value={code}
+                  onChange={(e) => {
+                    setCode(e.target.value.replace(/\D/g, "").slice(0, 6));
+                    setError("");
+                  }}
+                  inputProps={{ inputMode: "numeric", maxLength: 6 }}
+                  autoComplete="one-time-code"
+                  autoFocus
+                  fullWidth
+                />
+                <TextField
+                  label="New password"
+                  type={showPassword ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => {
+                    setNewPassword(e.target.value);
+                    setError("");
+                  }}
+                  autoComplete="new-password"
+                  fullWidth
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                          onClick={() => setShowPassword((s) => !s)}
+                          onMouseDown={(e) => e.preventDefault()}
+                          edge="end"
+                        >
+                          {showPassword ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+                <TextField
+                  label="Confirm new password"
+                  type={showPassword ? "text" : "password"}
+                  value={confirm}
+                  onChange={(e) => {
+                    setConfirm(e.target.value);
+                    setError("");
+                  }}
+                  autoComplete="new-password"
+                  fullWidth
+                />
+                <Link
+                  component="button"
+                  type="button"
+                  variant="body2"
+                  onClick={requestCode}
+                  disabled={loading}
+                  sx={{ alignSelf: "flex-start" }}
+                >
+                  Resend code
+                </Link>
+              </>
+            )}
+          </Stack>
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button type="button" onClick={onClose} disabled={loading}>
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            variant="contained"
+            disableElevation
+            disabled={loading}
+          >
+            {step === 1
+              ? loading ? "Sending..." : "Send code"
+              : loading ? "Resetting..." : "Reset password"}
+          </Button>
+        </DialogActions>
+      </form>
+    </Dialog>
+  );
+}
+
 function Login() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -54,6 +251,7 @@ function Login() {
   const [notice, setNotice] = useState(location.state?.message || "");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -61,6 +259,12 @@ function Login() {
     setErrors((prev) => ({ ...prev, [name]: "" }));
     setServerError("");
     setNotice("");
+  };
+
+  const handleForgotDone = (message) => {
+    setForgotOpen(false);
+    setServerError("");
+    setNotice(message);
   };
 
   const validate = () => {
@@ -183,6 +387,18 @@ function Login() {
                     }}
                   />
 
+                  <Box sx={{ textAlign: "right", mt: -1 }}>
+                    <Link
+                      component="button"
+                      type="button"
+                      variant="body2"
+                      fontWeight={600}
+                      onClick={() => setForgotOpen(true)}
+                    >
+                      Forgot password?
+                    </Link>
+                  </Box>
+
                   <Button
                     type="submit"
                     variant="contained"
@@ -208,6 +424,15 @@ function Login() {
             </CardContent>
           </Card>
         </Container>
+
+        {/* Rendered outside the login <form> so submits don't bubble into it */}
+        {forgotOpen && (
+          <ForgotPasswordDialog
+            initialEmail={form.email}
+            onClose={() => setForgotOpen(false)}
+            onDone={handleForgotDone}
+          />
+        )}
       </Box>
     </ThemeProvider>
   );

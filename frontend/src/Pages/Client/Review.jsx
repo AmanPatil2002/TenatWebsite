@@ -22,12 +22,6 @@ const formatDate = (value) =>
     year: "numeric",
   });
 
-const describeTarget = (review) =>
-  review.templateId
-    ? `Template #${review.templateId}`
-    : review.siteId
-      ? `Site #${review.siteId}`
-      : "General feedback";
 
 export default function Review() {
   const [reviews, setReviews] = useState([]);
@@ -218,20 +212,13 @@ export default function Review() {
                       alignItems="center"
                     >
                       <Rating value={review.rating} readOnly size="small" />
-                      <Typography variant="caption" color="text.secondary">
-                        {formatDate(review.createdAt)}
-                      </Typography>
                     </Stack>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mt: 0.5 }}
-                    >
-                      {describeTarget(review)}
-                    </Typography>
                     <Typography sx={{ mt: 1, whiteSpace: "pre-wrap" }}>
                       {review.description}
                     </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                        {formatDate(review.createdAt)}
+                      </Typography>
                   </Box>
                 ))}
               </Stack>

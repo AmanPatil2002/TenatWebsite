@@ -397,7 +397,7 @@ export default function AddCategory() {
                 <Table
                  
                   sx={{
-                    minWidth: 800,
+                    minWidth: 580,
                     tableLayout: "auto",
                   }}
                 >
@@ -405,10 +405,6 @@ export default function AddCategory() {
                     <TableRow>
                       <TableCell sx={{ minWidth: 180, fontWeight: "bold" }}>
                         Name
-                      </TableCell>
-
-                      <TableCell sx={{ minWidth: 200, fontWeight: "bold" }}>
-                        Tag
                       </TableCell>
 
                       <TableCell
@@ -439,14 +435,7 @@ export default function AddCategory() {
                           }}
                         >
                           {c.name}
-                        </TableCell>
-
-                        <TableCell
-                          sx={{
-                            minWidth: 200,
-                            verticalAlign: "middle",
-                          }}
-                        >
+                          <br/>
                           {c.tag ? (
                             <Chip
                               size="small"

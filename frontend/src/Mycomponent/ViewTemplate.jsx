@@ -45,6 +45,7 @@ const TEMPLATES_URL = `${API_URL}/templates`;
 const CATEGORIES_URL = `${API_URL}/categories`;
 const THEMES_URL = `${API_URL}/theme`;
 const PAGES_URL = `${API_URL}/pages`;
+const PAGES_PER_REQUEST = 100;
 
 const getHeaders = () => {
   const token =
@@ -73,13 +74,17 @@ const getCategoryId = (t) =>
   t?.categoryId ?? t?.category?.categoryId ?? t?.category?.id ?? "";
 const getId = (item) =>
   item?.id ?? item?.pagesId ?? item?.themeId ?? item?.categoryId;
+const getPageCategoryId = (page) =>
+  page?.categoryId ?? page?.category_id ?? page?.pageCategoryId ?? null;
 
 const parsePhotos = (photos) => {
-  if (Array.isArray(photos)) return photos.filter((p) => typeof p === "string" && p.trim());
+  if (Array.isArray(photos))
+    return photos.filter((p) => typeof p === "string" && p.trim());
   if (typeof photos !== "string" || !photos.trim()) return [];
   try {
     const parsed = JSON.parse(photos);
-    if (Array.isArray(parsed)) return parsed.filter((p) => typeof p === "string" && p.trim());
+    if (Array.isArray(parsed))
+      return parsed.filter((p) => typeof p === "string" && p.trim());
     if (typeof parsed === "string" && parsed.trim()) return [parsed.trim()];
     return [];
   } catch {
@@ -94,7 +99,10 @@ const pagesToMap = (templatePages) => {
     const id = String(p.pagesId ?? p.id ?? "");
     if (!id) continue;
     map[id] = {
-      isDefault: p.isDefault === true || p.isDefault === 1 || p.isDefault === "1" ? 1 : 0,
+      isDefault:
+        p.isDefault === true || p.isDefault === 1 || p.isDefault === "1"
+          ? 1
+          : 0,
       sortOrder: Number(p.sortOrder ?? 0),
     };
   }
@@ -108,7 +116,7 @@ const themeIdsFromTemplate = (templateThemes) =>
 
 const defaultThemeIdFromTemplate = (templateThemes) => {
   const def = (templateThemes || []).find(
-    (t) => t.isDefault === true || t.isDefault === 1 || t.isDefault === "1"
+    (t) => t.isDefault === true || t.isDefault === 1 || t.isDefault === "1",
   );
   return def ? String(def.themeId ?? def.id ?? "") : "";
 };
@@ -137,6 +145,7 @@ export default function ViewTemplate() {
   const [categories, setCategories] = useState([]);
   const [themes, setThemes] = useState([]);
   const [allPages, setAllPages] = useState([]);
+  const [loadedPagesCategoryId, setLoadedPagesCategoryId] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -155,44 +164,97 @@ export default function ViewTemplate() {
     setError("");
     try {
       const headers = getHeaders();
-      const [tplRes, catRes, themeRes, pageRes] = await Promise.all([
+      const [tplRes, catRes, themeRes] = await Promise.all([
         axios.get(`${TEMPLATES_URL}/admin/all`, { headers }),
         axios.get(CATEGORIES_URL, { headers }),
         axios.get(THEMES_URL, { headers }),
-        axios.get(PAGES_URL, { headers }),
       ]);
       setTemplates(getArray(tplRes, ["templates"]));
       setCategories(getArray(catRes, ["categories"]));
       setThemes(getArray(themeRes, ["themes"]));
-      setAllPages(getArray(pageRes, ["pages"]));
     } catch (err) {
       setError(
         err.response?.data?.message ||
           err.message ||
-          "Unable to load templates."
+          "Unable to load templates.",
       );
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    if (!editOpen || !form.categoryId) {
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    const loadCategoryPages = async () => {
+      try {
+        const pages = [];
+        let totalPages = 1;
+
+        for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
+          const response = await axios.get(PAGES_URL, {
+            headers: getHeaders(),
+            params: {
+              categoryId: form.categoryId,
+              page: pageNumber,
+              limit: PAGES_PER_REQUEST,
+            },
+            signal: controller.signal,
+          });
+          pages.push(...getArray(response, ["pages"]));
+          totalPages = Math.ceil(
+            Number(response.data?.total) / PAGES_PER_REQUEST,
+          );
+        }
+
+        if (!controller.signal.aborted) {
+          setAllPages(pages);
+          setLoadedPagesCategoryId(String(form.categoryId));
+        }
+      } catch (err) {
+        if (controller.signal.aborted) return;
+
+        setAllPages([]);
+        setLoadedPagesCategoryId(String(form.categoryId));
+        setError(
+          err.response?.data?.message ||
+            err.message ||
+            "Unable to load pages for the selected category.",
+        );
+      }
+    };
+
+    loadCategoryPages();
+    return () => controller.abort();
+  }, [editOpen, form.categoryId]);
 
   const updateField = (field, value) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
   const openView = (template) => {
-    setError(""); setNotice("");
+    setError("");
+    setNotice("");
     setSelectedTemplate(template);
     setViewOpen(true);
   };
 
   const openEdit = async (template) => {
-    setError(""); setNotice(""); setSaving(true);
+    setError("");
+    setNotice("");
+    setSaving(true);
     try {
       const id = getTemplateId(template);
       if (id == null) throw new Error("Template ID was not found.");
-      const response = await axios.get(`${TEMPLATES_URL}/admin/${id}`, { headers: getHeaders() });
+      const response = await axios.get(`${TEMPLATES_URL}/admin/${id}`, {
+        headers: getHeaders(),
+      });
       const full = getPayload(response);
 
       setSelectedTemplate(full);
@@ -235,7 +297,11 @@ export default function ViewTemplate() {
         setEditOpen(true);
         setError("Full template details couldn't load — using list data.");
       } else {
-        setError(err.response?.data?.message || err.message || "Unable to open template.");
+        setError(
+          err.response?.data?.message ||
+            err.message ||
+            "Unable to open template.",
+        );
       }
     } finally {
       setSaving(false);
@@ -257,8 +323,8 @@ export default function ViewTemplate() {
         themeIds.length === 0
           ? ""
           : themeIds.includes(String(prev.defaultThemeId))
-          ? prev.defaultThemeId
-          : String(themeIds[0]);
+            ? prev.defaultThemeId
+            : String(themeIds[0]);
       return { ...prev, themeIds, defaultThemeId: stillValid };
     });
   };
@@ -301,13 +367,21 @@ export default function ViewTemplate() {
     if (!form.categoryId) return setError("Category is required.");
     const price = Number(form.price);
     const validityDays = Number(form.validityDays);
-    if (!Number.isFinite(price) || price <= 0) return setError("Price must be greater than 0.");
-    if (!Number.isInteger(validityDays) || validityDays < 1) return setError("Validity must be a positive integer.");
-    if (form.themeIds.length === 0) return setError("Select at least one theme.");
-    if (!form.defaultThemeId || !form.themeIds.includes(String(form.defaultThemeId))) {
+    if (!Number.isFinite(price) || price <= 0)
+      return setError("Price must be greater than 0.");
+    if (!Number.isInteger(validityDays) || validityDays < 1)
+      return setError("Validity must be a positive integer.");
+    if (form.themeIds.length === 0)
+      return setError("Select at least one theme.");
+    if (
+      !form.defaultThemeId ||
+      !form.themeIds.includes(String(form.defaultThemeId))
+    ) {
       return setError("Choose exactly one default theme.");
     }
-    const defaultPageCount = Object.values(form.pages).filter((p) => p.isDefault === 1).length;
+    const defaultPageCount = Object.values(form.pages).filter(
+      (p) => p.isDefault === 1,
+    ).length;
     if (form.status === "published" && defaultPageCount === 0) {
       return setError("Published templates need a default page.");
     }
@@ -333,7 +407,9 @@ export default function ViewTemplate() {
       })),
     };
 
-    setSaving(true); setError(""); setNotice("");
+    setSaving(true);
+    setError("");
+    setNotice("");
     try {
       await axios.put(`${TEMPLATES_URL}/${id}`, payload, {
         headers: { ...getHeaders(), "Content-Type": "application/json" },
@@ -352,12 +428,21 @@ export default function ViewTemplate() {
 
   const deleteTemplate = async () => {
     const id = getTemplateId(selectedTemplate);
-    if (id == null) { setError("Cannot delete: missing ID."); setDeleteOpen(false); return; }
-    setSaving(true); setError(""); setNotice("");
+    if (id == null) {
+      setError("Cannot delete: missing ID.");
+      setDeleteOpen(false);
+      return;
+    }
+    setSaving(true);
+    setError("");
+    setNotice("");
     try {
       await axios.delete(`${TEMPLATES_URL}/${id}`, { headers: getHeaders() });
-      setDeleteOpen(false); setViewOpen(false); setEditOpen(false);
-      setSelectedTemplate(null); setNotice("Template deleted successfully.");
+      setDeleteOpen(false);
+      setViewOpen(false);
+      setEditOpen(false);
+      setSelectedTemplate(null);
+      setNotice("Template deleted successfully.");
       await loadData();
     } catch (err) {
       setError(err.response?.data?.message || "Failed to delete the template.");
@@ -367,41 +452,118 @@ export default function ViewTemplate() {
   };
 
   const openDelete = (template) => {
-    setSelectedTemplate(template); setDeleteOpen(true); setError(""); setNotice("");
+    setSelectedTemplate(template);
+    setDeleteOpen(true);
+    setError("");
+    setNotice("");
   };
-  const closeDelete = () => { if (!saving) setDeleteOpen(false); };
+  const closeDelete = () => {
+    if (!saving) setDeleteOpen(false);
+  };
 
   const renderStatus = (status) => {
-    const color = status === "published" ? "success" : status === "archived" ? "default" : "warning";
-    return <Chip label={status || "draft"} color={color} size="small" variant="outlined" />;
+    const color =
+      status === "published"
+        ? "success"
+        : status === "archived"
+          ? "default"
+          : "warning";
+    return (
+      <Chip
+        label={status || "draft"}
+        color={color}
+        size="small"
+        variant="outlined"
+      />
+    );
   };
+
+  const selectedPageIds = new Set(Object.keys(form.pages));
+  const pagesById = new Map(
+    (selectedTemplate?.pages || []).map((page) => [
+      String(getId(page)),
+      page,
+    ]),
+  );
+  allPages.forEach((page) => pagesById.set(String(getId(page)), page));
+  const editPages = Array.from(pagesById.values()).filter(
+    (page) =>
+      selectedPageIds.has(String(getId(page))) ||
+      String(getPageCategoryId(page)) === String(form.categoryId),
+  );
+  const pagesLoading =
+    editOpen &&
+    form.categoryId &&
+    String(loadedPagesCategoryId) !== String(form.categoryId);
 
   return (
     <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1500, mx: "auto" }}>
-      <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }} spacing={2} sx={{ mb: 3 }}>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        justifyContent="space-between"
+        alignItems={{ xs: "stretch", sm: "center" }}
+        spacing={2}
+        sx={{ mb: 3 }}
+      >
         <Box>
-          <Typography variant="h4" fontWeight={700}>Template Management</Typography>
-          <Typography color="text.secondary" sx={{ mt: 0.5 }}>View, edit, and delete your website templates.</Typography>
+          <Typography variant="h4" fontWeight={700}>
+            Template Management
+          </Typography>
+          <Typography color="text.secondary" sx={{ mt: 0.5 }}>
+            View, edit, and delete your website templates.
+          </Typography>
         </Box>
-        <Stack direction="row" spacing={1} flexWrap="wrap">
-          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={loadData} disabled={loading}>Refresh</Button>
-          <Button variant="contained" onClick={() => navigate("/admin/templates")}>Add Template</Button>
+        
+        <Stack
+          direction="row"
+          spacing={1}
+          flexWrap="wrap"
+          justifyContent="flex-start"
+          alignItems="right"
+        >
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={loadData}
+            disabled={loading}
+          >
+            Refresh
+          </Button>
+
+          <Button
+            variant="contained"
+            onClick={() => navigate("/admin/templates")}
+          >
+            Add Template
+          </Button>
         </Stack>
       </Stack>
 
-      {error && <Alert severity="error" onClose={() => setError("")} sx={{ mb: 2 }}>{error}</Alert>}
-      {notice && <Alert severity="success" onClose={() => setNotice("")} sx={{ mb: 2 }}>{notice}</Alert>}
+      {error && (
+        <Alert severity="error" onClose={() => setError("")} sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+      {notice && (
+        <Alert severity="success" onClose={() => setNotice("")} sx={{ mb: 2 }}>
+          {notice}
+        </Alert>
+      )}
 
       <Paper variant="outlined" sx={{ overflow: "hidden" }}>
         {loading ? (
           <Box sx={{ py: 8, textAlign: "center" }}>
             <CircularProgress />
-            <Typography color="text.secondary" sx={{ mt: 2 }}>Loading templates...</Typography>
+            <Typography color="text.secondary" sx={{ mt: 2 }}>
+              Loading templates...
+            </Typography>
           </Box>
         ) : templates.length === 0 ? (
           <Box sx={{ p: 5, textAlign: "center" }}>
             <Typography variant="h6">No templates found</Typography>
-            <Typography color="text.secondary" sx={{ mt: 1 }}>Create a template using the Add Template page.</Typography>
+            <Typography color="text.secondary" sx={{ mt: 1 }}>
+              Create a template using the Add Template page.
+            </Typography>
           </Box>
         ) : (
           <TableContainer>
@@ -411,7 +573,7 @@ export default function ViewTemplate() {
                   <TableCell>Template</TableCell>
                   <TableCell>Price</TableCell>
                   <TableCell>Status</TableCell>
-                  <TableCell align="right">Actions</TableCell>
+                  <TableCell align="center">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -419,35 +581,93 @@ export default function ViewTemplate() {
                   const id = getTemplateId(template);
                   const categoryId = getCategoryId(template);
                   const category = categories.find(
-                    (item) => String(item.categoryId ?? item.id) === String(categoryId)
+                    (item) =>
+                      String(item.categoryId ?? item.id) === String(categoryId),
                   );
                   return (
                     <TableRow key={id ?? template.name} hover>
                       <TableCell>
-                        <Stack direction="row" spacing={1.5} alignItems="center">
+                        <Stack
+                          direction="row"
+                          spacing={1.5}
+                          alignItems="center"
+                        >
                           {template.thumbnailUrl ? (
-                            <Box component="img" src={template.thumbnailUrl} alt={template.name || "Template"}
-                              sx={{ width: 64, height: 48, objectFit: "cover", borderRadius: 1, bgcolor: "action.hover" }} />
+                            <Box
+                              component="img"
+                              src={template.thumbnailUrl}
+                              alt={template.name || "Template"}
+                              sx={{
+                                width: 64,
+                                height: 48,
+                                objectFit: "cover",
+                                borderRadius: 1,
+                                bgcolor: "action.hover",
+                              }}
+                            />
                           ) : (
-                            <Box sx={{ width: 64, height: 48, borderRadius: 1, bgcolor: "action.hover", display: "grid", placeItems: "center" }}>
+                            <Box
+                              sx={{
+                                width: 64,
+                                height: 48,
+                                borderRadius: 1,
+                                bgcolor: "action.hover",
+                                display: "grid",
+                                placeItems: "center",
+                              }}
+                            >
                               <VisibilityIcon color="disabled" />
                             </Box>
                           )}
                           <Box>
-                            <Typography fontWeight={600}>{template.name || "Untitled template"}</Typography>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography fontWeight={600}>
+                              {template.name || "Untitled template"}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
                               {category?.name || template.categoryName || "—"}
                             </Typography>
                           </Box>
                         </Stack>
                       </TableCell>
-                      <TableCell>{template.currency || "INR"} {Number(template.price || 0).toLocaleString("en-IN")}</TableCell>
+                      <TableCell>
+                        {template.currency || "INR"}{" "}
+                        {Number(template.price || 0).toLocaleString("en-IN")}
+                      </TableCell>
                       <TableCell>{renderStatus(template.status)}</TableCell>
-                      <TableCell align="right">
-                        <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                          <Button size="small" startIcon={<VisibilityIcon />} onClick={() => openView(template)}>View</Button>
-                          <Button size="small" color="primary" startIcon={<EditIcon />} onClick={() => openEdit(template)} disabled={saving}>Edit</Button>
-                          <Button size="small" color="error" startIcon={<DeleteIcon />} onClick={() => openDelete(template)} disabled={saving}>Delete</Button>
+                      <TableCell align="center">
+                        <Stack
+                          direction="row"
+                          spacing={0.5}
+                          justifyContent="flex-start"
+                        >
+                          <Button
+                            size="small"
+                            startIcon={<VisibilityIcon />}
+                            onClick={() => openView(template)}
+                          >
+                            View
+                          </Button>
+                          <Button
+                            size="small"
+                            color="primary"
+                            startIcon={<EditIcon />}
+                            onClick={() => openEdit(template)}
+                            disabled={saving}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            size="small"
+                            color="error"
+                            startIcon={<DeleteIcon />}
+                            onClick={() => openDelete(template)}
+                            disabled={saving}
+                          >
+                            Delete
+                          </Button>
                         </Stack>
                       </TableCell>
                     </TableRow>
@@ -460,40 +680,93 @@ export default function ViewTemplate() {
       </Paper>
 
       {/* View dialog */}
-      <Dialog open={viewOpen} onClose={() => setViewOpen(false)} fullWidth maxWidth="md">
+      <Dialog
+        open={viewOpen}
+        onClose={() => setViewOpen(false)}
+        fullWidth
+        maxWidth="md"
+      >
         <DialogTitle>Template Details</DialogTitle>
         <DialogContent dividers>
           {selectedTemplate && (
             <Stack spacing={2}>
               {selectedTemplate.thumbnailUrl && (
-                <Box component="img" src={selectedTemplate.thumbnailUrl} alt={selectedTemplate.name}
-                  sx={{ width: "100%", maxHeight: 280, objectFit: "contain", borderRadius: 2, bgcolor: "action.hover" }} />
+                <Box
+                  component="img"
+                  src={selectedTemplate.thumbnailUrl}
+                  alt={selectedTemplate.name}
+                  sx={{
+                    width: "100%",
+                    maxHeight: 280,
+                    objectFit: "contain",
+                    borderRadius: 2,
+                    bgcolor: "action.hover",
+                  }}
+                />
               )}
-              <Typography variant="h5" fontWeight={700}>{selectedTemplate.name}</Typography>
-              <Divider />
-              <Typography><strong>Category:</strong>{" "}
-                {categories.find((item) => String(item.categoryId ?? item.id) === String(getCategoryId(selectedTemplate)))?.name || selectedTemplate.categoryName || "—"}
+              <Typography variant="h5" fontWeight={700}>
+                {selectedTemplate.name}
               </Typography>
-              <Typography><strong>Price:</strong> {selectedTemplate.currency || "INR"} {Number(selectedTemplate.price || 0).toLocaleString("en-IN")}</Typography>
-              <Typography><strong>Validity:</strong> {selectedTemplate.validityDays ?? 365} days</Typography>
-              <Typography><strong>Status:</strong> {selectedTemplate.status || "draft"}</Typography>
+              <Divider />
+              <Typography>
+                <strong>Category:</strong>{" "}
+                {categories.find(
+                  (item) =>
+                    String(item.categoryId ?? item.id) ===
+                    String(getCategoryId(selectedTemplate)),
+                )?.name ||
+                  selectedTemplate.categoryName ||
+                  "—"}
+              </Typography>
+              <Typography>
+                <strong>Price:</strong> {selectedTemplate.currency || "INR"}{" "}
+                {Number(selectedTemplate.price || 0).toLocaleString("en-IN")}
+              </Typography>
+              <Typography>
+                <strong>Validity:</strong>{" "}
+                {selectedTemplate.validityDays ?? 365} days
+              </Typography>
+              <Typography>
+                <strong>Status:</strong> {selectedTemplate.status || "draft"}
+              </Typography>
               <Typography fontWeight={600}>Themes</Typography>
-              {Array.isArray(selectedTemplate.themes) && selectedTemplate.themes.length > 0 ? (
+              {Array.isArray(selectedTemplate.themes) &&
+              selectedTemplate.themes.length > 0 ? (
                 <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                   {selectedTemplate.themes.map((t) => (
-                    <Chip key={t.themeId} label={`${t.name}${t.isDefault ? " (default)" : ""}`} variant={t.isDefault ? "filled" : "outlined"} color={t.isDefault ? "primary" : "default"} />
+                    <Chip
+                      key={t.themeId}
+                      label={`${t.name}${t.isDefault ? " (default)" : ""}`}
+                      variant={t.isDefault ? "filled" : "outlined"}
+                      color={t.isDefault ? "primary" : "default"}
+                    />
                   ))}
                 </Stack>
               ) : (
-                <Typography color="text.secondary">No themes linked.</Typography>
+                <Typography color="text.secondary">
+                  No themes linked.
+                </Typography>
               )}
               <Typography fontWeight={600}>Pages</Typography>
-              {Array.isArray(selectedTemplate.pages) && selectedTemplate.pages.length > 0 ? (
+              {Array.isArray(selectedTemplate.pages) &&
+              selectedTemplate.pages.length > 0 ? (
                 <Stack spacing={0.5}>
                   {selectedTemplate.pages.map((p) => (
-                    <Box key={p.pagesId} sx={{ display: "flex", justifyContent: "space-between" }}>
+                    <Box
+                      key={p.pagesId}
+                      sx={{ display: "flex", justifyContent: "space-between" }}
+                    >
                       <Typography>{p.title}</Typography>
-                      <Chip size="small" label={p.isDefault ? "Included" : `+${selectedTemplate.currency || "INR"} ${Number(p.pagePrice || 0).toFixed(2)}`} color={p.isDefault ? "success" : "warning"} variant="outlined" />
+                      <Chip
+                        size="small"
+                        label={
+                          p.isDefault
+                            ? "Included"
+                            : `+${selectedTemplate.currency || "INR"} ${Number(p.pagePrice || 0).toFixed(2)}`
+                        }
+                        color={p.isDefault ? "success" : "warning"}
+                        variant="outlined"
+                      />
                     </Box>
                   ))}
                 </Stack>
@@ -505,7 +778,17 @@ export default function ViewTemplate() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setViewOpen(false)}>Close</Button>
-          <Button variant="contained" startIcon={<EditIcon />} onClick={() => { const t = selectedTemplate; setViewOpen(false); if (t) openEdit(t); }}>Edit Template</Button>
+          <Button
+            variant="contained"
+            startIcon={<EditIcon />}
+            onClick={() => {
+              const t = selectedTemplate;
+              setViewOpen(false);
+              if (t) openEdit(t);
+            }}
+          >
+            Edit Template
+          </Button>
         </DialogActions>
       </Dialog>
 
@@ -515,29 +798,89 @@ export default function ViewTemplate() {
           <DialogTitle>Edit Template</DialogTitle>
           <DialogContent dividers>
             <Stack spacing={2.5} sx={{ pt: 1 }}>
-              <TextField label="Template Name" value={form.name} onChange={(e) => updateField("name", e.target.value)} required fullWidth />
+              <TextField
+                label="Template Name"
+                value={form.name}
+                onChange={(e) => updateField("name", e.target.value)}
+                required
+                fullWidth
+              />
               <FormControl fullWidth required>
                 <InputLabel id="edit-category-label">Category</InputLabel>
-                <Select labelId="edit-category-label" label="Category" value={form.categoryId ?? ""} onChange={(e) => updateField("categoryId", e.target.value)}>
+                <Select
+                  labelId="edit-category-label"
+                  label="Category"
+                  value={form.categoryId ?? ""}
+                  onChange={(e) => updateField("categoryId", e.target.value)}
+                >
                   {categories.map((c) => {
                     const id = c.categoryId ?? c.id;
-                    return <MenuItem key={id} value={String(id)}>{c.name || c.title || `Category ${id}`}</MenuItem>;
+                    return (
+                      <MenuItem key={id} value={String(id)}>
+                        {c.name || c.title || `Category ${id}`}
+                      </MenuItem>
+                    );
                   })}
                 </Select>
               </FormControl>
 
-              <TextField label="Short Description" value={form.shortDescription} onChange={(e) => updateField("shortDescription", e.target.value)} multiline minRows={2} fullWidth />
-              <TextField label="Description" value={form.description} onChange={(e) => updateField("description", e.target.value)} multiline minRows={4} fullWidth />
-              <TextField label="Thumbnail Image URL" value={form.thumbnailUrl} onChange={(e) => updateField("thumbnailUrl", e.target.value)} fullWidth />
+              <TextField
+                label="Short Description"
+                value={form.shortDescription}
+                onChange={(e) =>
+                  updateField("shortDescription", e.target.value)
+                }
+                multiline
+                minRows={2}
+                fullWidth
+              />
+              <TextField
+                label="Description"
+                value={form.description}
+                onChange={(e) => updateField("description", e.target.value)}
+                multiline
+                minRows={4}
+                fullWidth
+              />
+              <TextField
+                label="Thumbnail Image URL"
+                value={form.thumbnailUrl}
+                onChange={(e) => updateField("thumbnailUrl", e.target.value)}
+                fullWidth
+              />
 
               <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                <TextField label="Price" type="number" value={form.price} onChange={(e) => updateField("price", e.target.value)} inputProps={{ min: 0, step: "0.01" }} required fullWidth />
-                <TextField label="Currency" value={form.currency} onChange={(e) => updateField("currency", e.target.value)} required fullWidth />
-                <TextField label="Validity (days)" type="number" value={form.validityDays} onChange={(e) => updateField("validityDays", e.target.value)} inputProps={{ min: 1, step: 1 }} required fullWidth />
+                <TextField
+                  label="Price"
+                  type="number"
+                  value={form.price}
+                  onChange={(e) => updateField("price", e.target.value)}
+                  inputProps={{ min: 0, step: "0.01" }}
+                  required
+                  fullWidth
+                />
+                <TextField
+                  label="Currency"
+                  value={form.currency}
+                  onChange={(e) => updateField("currency", e.target.value)}
+                  required
+                  fullWidth
+                />
+                <TextField
+                  label="Validity (days)"
+                  type="number"
+                  value={form.validityDays}
+                  onChange={(e) => updateField("validityDays", e.target.value)}
+                  inputProps={{ min: 1, step: 1 }}
+                  required
+                  fullWidth
+                />
               </Stack>
 
               <Divider />
-              <Typography variant="subtitle1" fontWeight={700}>Themes</Typography>
+              <Typography variant="subtitle1" fontWeight={700}>
+                Themes
+              </Typography>
 
               <FormControl fullWidth>
                 <InputLabel id="edit-themes-label">Themes</InputLabel>
@@ -548,30 +891,51 @@ export default function ViewTemplate() {
                   label="Themes"
                   onChange={handleThemeChange}
                   renderValue={(selected) =>
-                    themes.filter((t) => selected.map(String).includes(String(getId(t)))).map((t) => t.name).join(", ")
+                    themes
+                      .filter((t) =>
+                        selected.map(String).includes(String(getId(t))),
+                      )
+                      .map((t) => t.name)
+                      .join(", ")
                   }
                 >
                   {themes.map((theme) => (
-                    <MenuItem key={getId(theme)} value={String(getId(theme))}>{theme.name}</MenuItem>
+                    <MenuItem key={getId(theme)} value={String(getId(theme))}>
+                      {theme.name}
+                    </MenuItem>
                   ))}
                 </Select>
               </FormControl>
 
               {form.themeIds.length > 0 && (
                 <FormControl>
-                  <Typography variant="subtitle2" sx={{ mb: 1 }}>Default theme</Typography>
-                  <RadioGroup value={String(form.defaultThemeId)} onChange={(e) => updateField("defaultThemeId", e.target.value)}>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                    Default theme
+                  </Typography>
+                  <RadioGroup
+                    value={String(form.defaultThemeId)}
+                    onChange={(e) =>
+                      updateField("defaultThemeId", e.target.value)
+                    }
+                  >
                     {themes
                       .filter((t) => form.themeIds.includes(String(getId(t))))
                       .map((t) => (
-                        <FormControlLabel key={getId(t)} value={String(getId(t))} control={<Radio size="small" />} label={t.name} />
+                        <FormControlLabel
+                          key={getId(t)}
+                          value={String(getId(t))}
+                          control={<Radio size="small" />}
+                          label={t.name}
+                        />
                       ))}
                   </RadioGroup>
                 </FormControl>
               )}
 
               <Divider />
-              <Typography variant="subtitle1" fontWeight={700}>Pages</Typography>
+              <Typography variant="subtitle1" fontWeight={700}>
+                Pages
+              </Typography>
 
               <Paper variant="outlined">
                 <Table size="small">
@@ -584,29 +948,59 @@ export default function ViewTemplate() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {allPages.map((page) => {
+                    {editPages.map((page) => {
                       const id = String(getId(page));
                       const selected = Boolean(form.pages[id]);
                       const isDefault = form.pages[id]?.isDefault === 1;
                       const price = Number(page.pagePrice ?? page.price ?? 0);
                       return (
                         <TableRow key={id} hover>
-                          <TableCell padding="checkbox"><Checkbox checked={selected} onChange={() => togglePage(id)} /></TableCell>
+                          <TableCell padding="checkbox">
+                            <Checkbox
+                              checked={selected}
+                              onChange={() => togglePage(id)}
+                            />
+                          </TableCell>
                           <TableCell>{page.title || page.name}</TableCell>
-                          <TableCell align="right">{price > 0 ? `${form.currency} ${price.toFixed(2)}` : "Free"}</TableCell>
+                          <TableCell align="right">
+                            {price > 0
+                              ? `${form.currency} ${price.toFixed(2)}`
+                              : "Free"}
+                          </TableCell>
                           <TableCell align="center">
-                            <Switch size="small" checked={isDefault} disabled={!selected} onChange={(e) => setPageDefault(id, e.target.checked)} />
+                            <Switch
+                              size="small"
+                              checked={isDefault}
+                              disabled={!selected}
+                              onChange={(e) =>
+                                setPageDefault(id, e.target.checked)
+                              }
+                            />
                           </TableCell>
                         </TableRow>
                       );
                     })}
+                    {editPages.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={4} align="center">
+                          {pagesLoading
+                            ? "Loading pages..."
+                            : "No pages available for this category."}
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </Paper>
 
               <FormControl fullWidth>
                 <InputLabel id="edit-status-label">Status</InputLabel>
-                <Select labelId="edit-status-label" label="Status" value={form.status} onChange={(e) => updateField("status", e.target.value)}>
+                <Select
+                  labelId="edit-status-label"
+                  label="Status"
+                  value={form.status}
+                  onChange={(e) => updateField("status", e.target.value)}
+                >
                   <MenuItem value="draft">Draft</MenuItem>
                   <MenuItem value="published">Published</MenuItem>
                   <MenuItem value="archived">Archived</MenuItem>
@@ -615,9 +1009,21 @@ export default function ViewTemplate() {
             </Stack>
           </DialogContent>
           <DialogActions sx={{ p: 2 }}>
-            <Button onClick={closeEdit} disabled={saving}>Cancel</Button>
-            <Button type="submit" variant="contained" disabled={saving}
-              startIcon={saving ? <CircularProgress size={18} color="inherit" /> : <EditIcon />}>
+            <Button onClick={closeEdit} disabled={saving}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={saving}
+              startIcon={
+                saving ? (
+                  <CircularProgress size={18} color="inherit" />
+                ) : (
+                  <EditIcon />
+                )
+              }
+            >
               {saving ? "Saving..." : "Save Changes"}
             </Button>
           </DialogActions>
@@ -628,12 +1034,29 @@ export default function ViewTemplate() {
       <Dialog open={deleteOpen} onClose={closeDelete} maxWidth="xs" fullWidth>
         <DialogTitle>Delete Template?</DialogTitle>
         <DialogContent>
-          <Typography>Are you sure you want to delete <strong>{selectedTemplate?.name || "this template"}</strong>? This cannot be undone.</Typography>
+          <Typography>
+            Are you sure you want to delete{" "}
+            <strong>{selectedTemplate?.name || "this template"}</strong>? This
+            cannot be undone.
+          </Typography>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={closeDelete} disabled={saving}>Cancel</Button>
-          <Button color="error" variant="contained" onClick={deleteTemplate} disabled={saving}
-            startIcon={saving ? <CircularProgress size={18} color="inherit" /> : <DeleteIcon />}>
+          <Button onClick={closeDelete} disabled={saving}>
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={deleteTemplate}
+            disabled={saving}
+            startIcon={
+              saving ? (
+                <CircularProgress size={18} color="inherit" />
+              ) : (
+                <DeleteIcon />
+              )
+            }
+          >
             {saving ? "Deleting..." : "Delete Template"}
           </Button>
         </DialogActions>

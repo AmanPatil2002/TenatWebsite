@@ -11,7 +11,6 @@ import {
   CardContent,
   CircularProgress,
   Container,
-  Divider,
   Typography,
 } from "@mui/material";
 
@@ -244,27 +243,6 @@ export default function Myaccount() {
 
           {/* Details */}
           <CardContent sx={{ p: { xs: 3, md: 5 } }}>
-            <Typography
-              component="h2"
-              variant="h6"
-              fontWeight={600}
-              textAlign="center"
-              sx={{ mb: 0.5 }}
-            >
-              My Profile
-            </Typography>
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              textAlign="center"
-              sx={{ mb: 3, fontSize: { xs: "0.875rem", md: "1rem" } }}
-            >
-              Your current account details
-            </Typography>
-
-            <Divider sx={{ mb: 4 }} />
-
-            {/* CSS grid works the same on every MUI version */}
             <Box
               sx={{
                 display: "grid",

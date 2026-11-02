@@ -11,7 +11,15 @@ const getStats = async (req, res) => {
         (SELECT COUNT(*) FROM pages)    AS pages,
         (SELECT COUNT(*) FROM sites)    AS sites,
         (SELECT COUNT(*) FROM payments WHERE status = 'captured') AS purchases,
-        (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'captured') AS revenue
+        (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'captured') AS revenue,
+        (SELECT COUNT(*) FROM payments
+          WHERE status = 'captured'
+            AND paidAt >= CURDATE()
+            AND paidAt < DATE_ADD(CURDATE(), INTERVAL 1 DAY)) AS todayPurchases,
+        (SELECT COALESCE(SUM(amount), 0) FROM payments
+          WHERE status = 'captured'
+            AND paidAt >= CURDATE()
+            AND paidAt < DATE_ADD(CURDATE(), INTERVAL 1 DAY)) AS todayRevenue
     `);
 
     const [monthlyRows] = await pool.query(`
@@ -75,6 +83,8 @@ const getStats = async (req, res) => {
     return res.status(200).json({
       ...counts,
       revenue: Number(counts.revenue),
+      todayPurchases: Number(counts.todayPurchases),
+      todayRevenue: Number(counts.todayRevenue),
       monthly,
       purchasesByTemplate,
       revenueByTemplate,

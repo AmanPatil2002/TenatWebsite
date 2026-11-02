@@ -41,7 +41,7 @@ const API_URL = (
   import.meta.env.VITE_API_URL || "http://localhost:5000"
 ).replace(/\/$/, "");
 
-const PAGE_LIMIT = 5;
+const PAGE_LIMIT = 10;
 
 const EMPTY_FORM = {
   title: "",
@@ -735,14 +735,22 @@ export default function AddPages() {
               Existing pages
             </Typography>
 
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<RefreshIcon />}
-              onClick={() => setRefreshKey((previous) => previous + 1)}
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "flex-end",
+                width: "100%",
+              }}
             >
-              Refresh
-            </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<RefreshIcon />}
+                onClick={() => setRefreshKey((previous) => previous + 1)}
+              >
+                Refresh
+              </Button>
+            </Box>
           </Stack>
 
           <Divider sx={{ mb: 2.5 }} />

@@ -42,6 +42,7 @@ const CATEGORIES_URL = `${API_URL}/categories`;
 const THEMES_URL = `${API_URL}/theme`;
 const PAGES_URL = `${API_URL}/pages`;
 const IMAGE_UPLOAD_URL = `${API_URL}/uploads/ckeditor`;
+const PAGES_PER_REQUEST = 100;
 
 const EMPTY_FORM = {
   categoryId: "",
@@ -126,6 +127,9 @@ const parsePhotos = (photos) => {
 
 const getPagePrice = (page) =>
   Number(page?.price ?? page?.pagePrice ?? page?.amount ?? 0) || 0;
+
+const getPageCategoryId = (page) =>
+  page?.categoryId ?? page?.category_id ?? page?.pageCategoryId ?? null;
 
 function MultiplePhotoUpload({ value = [], onChange, disabled = false }) {
   const inputRef = useRef(null);
@@ -313,6 +317,7 @@ export default function AddTemplate() {
   const [categories, setCategories] = useState([]);
   const [themes, setThemes] = useState([]);
   const [pages, setPages] = useState([]);
+  const [pagesLoading, setPagesLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -323,23 +328,19 @@ export default function AddTemplate() {
     setError("");
 
     try {
-      const [categoryResponse, themeResponse, pageResponse] = await Promise.all(
-        [
-          axios.get(CATEGORIES_URL, authConfig()),
-          axios.get(THEMES_URL, authConfig()),
-          axios.get(PAGES_URL, authConfig()),
-        ],
-      );
+      const [categoryResponse, themeResponse] = await Promise.all([
+        axios.get(CATEGORIES_URL, authConfig()),
+        axios.get(THEMES_URL, authConfig()),
+      ]);
 
       setCategories(getArray(categoryResponse));
       setThemes(getArray(themeResponse));
-      setPages(getArray(pageResponse));
     } catch (err) {
       console.error("Failed to load template form data:", err);
 
       setError(
         err.response?.data?.message ||
-          "Unable to load categories, themes, or pages. Check your API routes.",
+          "Unable to load categories or themes. Check your API routes.",
       );
     } finally {
       setLoading(false);
@@ -350,6 +351,58 @@ export default function AddTemplate() {
     loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    if (!form.categoryId) return undefined;
+
+    const controller = new AbortController();
+    const loadCategoryPages = async () => {
+      try {
+        const firstResponse = await axios.get(PAGES_URL, {
+          ...authConfig(),
+          params: {
+            categoryId: form.categoryId,
+            page: 1,
+            limit: PAGES_PER_REQUEST,
+          },
+          signal: controller.signal,
+        });
+        const allPages = getArray(firstResponse);
+        const totalPages = Math.ceil(
+          Number(firstResponse.data?.total) / PAGES_PER_REQUEST,
+        );
+
+        for (let pageNumber = 2; pageNumber <= totalPages; pageNumber += 1) {
+          const response = await axios.get(PAGES_URL, {
+            ...authConfig(),
+            params: {
+              categoryId: form.categoryId,
+              page: pageNumber,
+              limit: PAGES_PER_REQUEST,
+            },
+            signal: controller.signal,
+          });
+          allPages.push(...getArray(response));
+        }
+
+        if (!controller.signal.aborted) setPages(allPages);
+      } catch (err) {
+        if (controller.signal.aborted) return;
+
+        console.error("Failed to load pages for the selected category:", err);
+        setPages([]);
+        setError(
+          err.response?.data?.message ||
+            "Unable to load pages for the selected category.",
+        );
+      } finally {
+        if (!controller.signal.aborted) setPagesLoading(false);
+      }
+    };
+
+    loadCategoryPages();
+    return () => controller.abort();
+  }, [form.categoryId]);
+
   const handleChange = (event) => {
     const { name, value } = event.target;
 
@@ -357,6 +410,19 @@ export default function AddTemplate() {
       ...previous,
       [name]: value,
     }));
+  };
+
+  const handleCategoryChange = (event) => {
+    const { value } = event.target;
+
+    setForm((previous) => ({
+      ...previous,
+      categoryId: value,
+      pageIds: [], // pages belong to a category, so reset them
+    }));
+    setPages([]);
+    setPagesLoading(Boolean(value));
+    setError("");
   };
 
   const handlePhotoChange = (photos) => {
@@ -384,12 +450,19 @@ export default function AddTemplate() {
     }));
   };
 
+  const filteredPages = useMemo(() => {
+    if (!form.categoryId) return [];
+    return pages.filter(
+      (page) => String(getPageCategoryId(page)) === String(form.categoryId),
+    );
+  }, [pages, form.categoryId]);
+
   const selectedPages = useMemo(
     () =>
-      pages.filter((page) =>
+      filteredPages.filter((page) =>
         form.pageIds.map(String).includes(String(getId(page))),
       ),
-    [pages, form.pageIds],
+    [filteredPages, form.pageIds],
   );
 
   const calculatedPagePrice = useMemo(
@@ -544,7 +617,7 @@ export default function AddTemplate() {
                   name="categoryId"
                   value={form.categoryId}
                   label="Category"
-                  onChange={handleChange}
+                  onChange={handleCategoryChange}
                 >
                   {categories.map((category) => (
                     <MenuItem key={getId(category)} value={getId(category)}>
@@ -702,8 +775,8 @@ export default function AddTemplate() {
                             <Box
                               aria-hidden
                               sx={{
-                                width: 18,
-                                height: 18,
+                                width: 40,
+                                height: 20,
                                 minWidth: 18,
                                 borderRadius: 0.5,
                                 backgroundColor: theme.background || "#fff",
@@ -718,11 +791,8 @@ export default function AddTemplate() {
                                 lineHeight: 1,
                               }}
                             >
-                              Aa
+                              Theme
                             </Box>
-                            <Typography variant="body2" component="span">
-                              {getName(theme)}
-                            </Typography>
                           </Stack>
                         ))}
                       </Stack>
@@ -762,7 +832,10 @@ export default function AddTemplate() {
               </FormControl>
             </Grid>
             <Grid size={{ xs: 2, sm: 4, md: 6 }}>
-              <FormControl fullWidth>
+              <FormControl
+                fullWidth
+                disabled={!form.categoryId || pagesLoading}
+              >
                 <InputLabel id="pages-label">Pages</InputLabel>
                 <Select
                   labelId="pages-label"
@@ -772,7 +845,7 @@ export default function AddTemplate() {
                   label="Pages"
                   onChange={handlePageChange}
                   renderValue={(selected) =>
-                    pages
+                    filteredPages
                       .filter((page) =>
                         selected.map(String).includes(String(getId(page))),
                       )
@@ -780,7 +853,14 @@ export default function AddTemplate() {
                       .join(", ")
                   }
                 >
-                  {pages.map((page) => (
+                  {filteredPages.length === 0 && (
+                    <MenuItem disabled value="">
+                      {pagesLoading
+                        ? "Loading pages..."
+                        : "No pages found for this category"}
+                    </MenuItem>
+                  )}
+                  {filteredPages.map((page) => (
                     <MenuItem key={getId(page)} value={String(getId(page))}>
                       {getName(page)}
                       {getPagePrice(page) > 0
@@ -790,7 +870,11 @@ export default function AddTemplate() {
                   ))}
                 </Select>
                 <FormHelperText>
-                  Select the pages included in this template.
+                  {form.categoryId
+                    ? pagesLoading
+                      ? "Loading all pages for this category..."
+                      : "Only pages added to this category are shown."
+                    : "Select a category first to see its pages."}
                 </FormHelperText>
               </FormControl>
 
@@ -869,6 +953,8 @@ export default function AddTemplate() {
               variant="outlined"
               onClick={() => {
                 setForm({ ...EMPTY_FORM });
+                setPages([]);
+                setPagesLoading(false);
                 setError("");
                 setSuccess("");
               }}
@@ -887,7 +973,7 @@ export default function AddTemplate() {
                   <SaveOutlined />
                 )
               }
-              disabled={saving || loading}
+              disabled={saving || loading || pagesLoading}
             >
               {saving ? "Saving..." : "Save Template"}
             </Button>

@@ -228,7 +228,6 @@ export default function SiteAdminAccess() {
                 <TableRow>
                   <TableCell sx={headCellSx}>Site</TableCell>
                   <TableCell sx={headCellSx}>Purchased by</TableCell>
-                  <TableCell sx={headCellSx}>Template</TableCell>
                   <TableCell sx={headCellSx}>Expires</TableCell>
                   <TableCell sx={headCellSx}>Status</TableCell>
                   <TableCell sx={headCellSx}>Site-admin email</TableCell>
@@ -278,8 +277,6 @@ export default function SiteAdminAccess() {
                           </Box>
                         </Stack>
                       </TableCell>
-
-                      <TableCell>{site.templateName || "—"}</TableCell>
 
                       <TableCell sx={{ whiteSpace: "nowrap" }}>
                         {formatDate(site.expiresAt)}

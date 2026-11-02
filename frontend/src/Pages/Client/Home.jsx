@@ -82,7 +82,7 @@ function Hero() {
               <Button
                 variant="contained"
                 size="large"
-                onClick={() => navigate('/viewtemp')}
+                onClick={() => navigate('/templates')}
                 sx={{
                   background: `linear-gradient(135deg, ${c.indigo}, ${c.violet})`,
                   boxShadow: '0 10px 24px rgba(67,97,238,0.35)',

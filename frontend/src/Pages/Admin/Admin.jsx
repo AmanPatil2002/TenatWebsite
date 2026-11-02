@@ -17,7 +17,8 @@ import {
   useTheme,
   Stack,
 } from "@mui/material";
-
+import AdminProfileDialog from "./AdminProfileDialog"; // adjust path
+import EditIcon from "@mui/icons-material/Edit";
 import { useLocation, useNavigate, useOutlet } from "react-router-dom";
 
 import MenuIcon from "@mui/icons-material/Menu";
@@ -26,9 +27,9 @@ import DashboardIcon from "@mui/icons-material/Dashboard";
 import CategoryIcon from "@mui/icons-material/Category";
 import ViewQuiltIcon from "@mui/icons-material/ViewQuilt";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
-import NoteAddIcon from '@mui/icons-material/NoteAdd';
+import NoteAddIcon from "@mui/icons-material/NoteAdd";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutlined";
-import DevicesOtherIcon from '@mui/icons-material/DevicesOther';
+import DevicesOtherIcon from "@mui/icons-material/DevicesOther";
 import ContactMailIcon from "@mui/icons-material/ContactMail";
 import PeopleIcon from "@mui/icons-material/People";
 import RateReviewIcon from "@mui/icons-material/RateReview";
@@ -46,15 +47,31 @@ const menuItems = [
   { text: "Add Category", icon: <CategoryIcon />, path: "/admin/category" },
   { text: "Add Theme", icon: <ViewQuiltIcon />, path: "/admin/theme" },
   { text: "Add Pages", icon: <NoteAddIcon />, path: "/admin/page" },
-  { text: "Arrange Pages", icon: <ReorderIcon />, path: "/admin/template-pages" },
-  { text: "Add Templates", icon: <DevicesOtherIcon />, path: "/admin/templates" },
-  { text: "View Templates", icon: <FolderOpenIcon />, path: "/admin/viewtemplates" },
+  {
+    text: "Arrange Pages",
+    icon: <ReorderIcon />,
+    path: "/admin/template-pages",
+  },
+  {
+    text: "Add Templates",
+    icon: <DevicesOtherIcon />,
+    path: "/admin/templates",
+  },
+  {
+    text: "View Templates",
+    icon: <FolderOpenIcon />,
+    path: "/admin/viewtemplates",
+  },
   { text: "FAQ", icon: <HelpOutlineIcon />, path: "/admin/faq" },
   { text: "Contact", icon: <ContactMailIcon />, path: "/admin/contact" },
   { text: "View Users", icon: <PeopleIcon />, path: "/admin/users" },
   { text: "View Review", icon: <RateReviewIcon />, path: "/admin/usereview" },
   { text: "View Payment", icon: <RateReviewIcon />, path: "/admin/invoice" },
-  { text: "Site Admin Access", icon: <ManageAccountsIcon />, path: "/admin/site-admins" },
+  {
+    text: "Site Admin Access",
+    icon: <ManageAccountsIcon />,
+    path: "/admin/site-admins",
+  },
 ];
 
 export default function Admin() {
@@ -74,7 +91,14 @@ export default function Admin() {
   }, [isSmallScreen]);
 
   const drawerWidth = collapsed ? MINI_WIDTH : FULL_WIDTH;
-  const email = localStorage.getItem("email");
+  const [email, setEmail] = useState(localStorage.getItem("email"));
+  const [profileOpen, setProfileOpen] = useState(false);
+
+  const handleProfileSaved = (profile) => {
+    localStorage.setItem("email", profile.email.trim());
+    localStorage.setItem("username", profile.name.trim());
+    setEmail(profile.email.trim());
+  };
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -82,7 +106,7 @@ export default function Admin() {
     localStorage.removeItem("role");
     localStorage.removeItem("email");
     localStorage.removeItem("Id");
-    navigate("/login");
+    navigate("/");
   };
 
   return (
@@ -109,24 +133,52 @@ export default function Admin() {
             {collapsed ? <MenuIcon /> : <MenuOpenIcon />}
           </IconButton>
 
-          <Typography variant="h6" fontWeight="bold" noWrap sx={{ flexGrow: 1 }}>
+          <Typography
+            variant="h6"
+            fontWeight="bold"
+            noWrap
+            sx={{ flexGrow: 1 }}
+          >
             Admin Dashboard
           </Typography>
 
           <Stack direction="row" spacing={1} alignItems="center">
-            <Typography
-              variant="h6"
-              fontWeight="bold"
-              noWrap
-              sx={{
-                border: "1px solid white",
-                padding: "4px 8px",
-                borderRadius: "4px",
-                display: { xs: "none", sm: "block" },
-              }}
+            <Tooltip title="Edit my profile">
+              <Box
+                onClick={() => setProfileOpen(true)}
+                sx={{
+                  display: { xs: "none", sm: "flex" },
+                  alignItems: "center",
+                  gap: 1,
+                  border: "1px solid white",
+                  px: 1,
+                  py: 0.5,
+                  borderRadius: 1,
+                  cursor: "pointer",
+                  "&:hover": { bgcolor: "rgba(255,255,255,0.15)" },
+                }}
+              >
+                <Typography variant="h6" fontWeight="bold" noWrap>
+                  {email}
+                </Typography>
+                <EditIcon fontSize="small" />
+              </Box>
+            </Tooltip>
+
+            {/* Small screens: the email box is hidden, so show an icon button */}
+            <IconButton
+              color="inherit"
+              onClick={() => setProfileOpen(true)}
+              aria-label="Edit my profile"
+              sx={{ display: { xs: "inline-flex", sm: "none" } }}
             >
-              {email}
-            </Typography>
+              <ManageAccountsIcon />
+            </IconButton>
+            <AdminProfileDialog
+              open={profileOpen}
+              onClose={() => setProfileOpen(false)}
+              onSaved={handleProfileSaved}
+            />
           </Stack>
         </Toolbar>
       </AppBar>

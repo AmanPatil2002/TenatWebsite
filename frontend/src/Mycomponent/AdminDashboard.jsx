@@ -805,7 +805,7 @@ export default function AdminDashboard() {
             position: "relative",
             overflow: "hidden",
             background:
-              "linear-gradient(135deg, #0f172a 0%, #0c4a6e 55%, #0f766e 100%)",
+              "linear-gradient(135deg, #1f5ef0 0%, #1e86c3 55%, #2f7fe0 100%)",
             boxShadow: "0 20px 40px -20px rgba(15,23,42,0.6)",
             "&::after": {
               content: '""',
@@ -862,12 +862,12 @@ export default function AdminDashboard() {
             >
               {[
                 {
-                  label: `${current?.label || "This month"} revenue`,
-                  value: money(current?.revenue),
+                  label: "Today's revenue",
+                  value: money(stats?.todayRevenue),
                 },
                 {
-                  label: `${current?.label || "This month"} purchases`,
-                  value: current?.purchases ?? 0,
+                  label: "Today's purchases",
+                  value: stats?.todayPurchases ?? 0,
                 },
               ].map((item) => (
                 <Box

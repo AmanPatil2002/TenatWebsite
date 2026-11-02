@@ -283,6 +283,9 @@ function Register() {
                   Log in
                 </Link>
               </Typography>
+              <Link component={RouterLink} to="/" fontWeight={600} sx={{ mt: 1, display: "block", textAlign: "center" }}>
+                  Back
+                </Link>
             </CardContent>
           </Card>
         </Container>

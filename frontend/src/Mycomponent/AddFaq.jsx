@@ -327,7 +327,7 @@ export default function AddFaq() {
                 <Table
                   size="small"
                   sx={{
-                    minWidth: 650,
+                    minWidth: 630,
                     tableLayout: "auto",
                   }}
                 >

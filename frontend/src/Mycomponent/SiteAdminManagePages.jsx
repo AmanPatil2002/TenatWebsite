@@ -11,7 +11,6 @@ import {
   CircularProgress,
   Divider,
   IconButton,
-  MenuItem,
   Paper,
   Stack,
   TextField,
@@ -28,9 +27,6 @@ export default function SiteAdminManagePages() {
 
   const [site, setSite] = useState(null);
   const [pages, setPages] = useState([]);
-  const [pageOptions, setPageOptions] = useState([]);
-  const [selectedStarter, setSelectedStarter] = useState("");
-  const [addingStarter, setAddingStarter] = useState(false);
   const [selectedId, setSelectedId] = useState("");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -53,7 +49,8 @@ export default function SiteAdminManagePages() {
     setSelectedId(selected ? String(selected.sitePageId) : "");
     setTitle(selected?.title || "");
     setContent(selected?.page || "");
-    setCreating(false);
+    // If there are no pages left, go straight to the "create" form
+    setCreating(!selected);
   };
 
   useEffect(() => {
@@ -62,22 +59,15 @@ export default function SiteAdminManagePages() {
       setLoading(true);
       setError("");
       try {
-        const [pagesResponse, optionsResponse] = await Promise.all([
-          axios.get(pagesUrl, authConfig),
-          axios.get(`${baseUrl}/page-options`, authConfig),
-        ]);
+        const { data } = await axios.get(pagesUrl, authConfig);
         if (cancelled) return;
-        const list = Array.isArray(pagesResponse.data.pages)
-          ? pagesResponse.data.pages
-          : [];
-        setSite(pagesResponse.data);
+        const list = Array.isArray(data.pages) ? data.pages : [];
+        setSite(data);
         setPages(list);
-        setPageOptions(
-          Array.isArray(optionsResponse.data) ? optionsResponse.data : [],
-        );
         setSelectedId(list[0] ? String(list[0].sitePageId) : "");
         setTitle(list[0]?.title || "");
         setContent(list[0]?.page || "");
+        setCreating(list.length === 0);
       } catch (requestError) {
         if (!cancelled) {
           setError(
@@ -94,7 +84,7 @@ export default function SiteAdminManagePages() {
     return () => {
       cancelled = true;
     };
-  }, [baseUrl, pagesUrl, authConfig]);
+  }, [pagesUrl, authConfig]);
 
   const selectPage = (page) => {
     setSelectedId(String(page.sitePageId));
@@ -144,35 +134,6 @@ export default function SiteAdminManagePages() {
     setSuccess("");
   };
 
-  const addCategoryPage = async () => {
-    if (!selectedStarter || addingStarter) return;
-    setAddingStarter(true);
-    setError("");
-    setSuccess("");
-    try {
-      const { data } = await axios.post(
-        pagesUrl,
-        { sourcePagesId: selectedStarter },
-        authConfig,
-      );
-      await loadPages(data.sitePageId);
-      setPageOptions((current) =>
-        current.filter((page) => String(page.pagesId) !== String(selectedStarter)),
-      );
-      setSelectedStarter("");
-      setSuccess(
-        `Added a ${site?.categoryName || "category"} page. You can edit it now.`,
-      );
-    } catch (requestError) {
-      setError(
-        requestError.response?.data?.message ||
-          "Could not add this category page.",
-      );
-    } finally {
-      setAddingStarter(false);
-    }
-  };
-
   const savePage = async () => {
     if (!title.trim() || !content.trim()) {
       setError("Enter a page title and content before saving.");
@@ -209,6 +170,7 @@ export default function SiteAdminManagePages() {
     }
   };
 
+
   return (
     <Box sx={{ maxWidth: 1400, mx: "auto" }}>
       {error && (
@@ -222,7 +184,22 @@ export default function SiteAdminManagePages() {
         </Alert>
       )}
 
-      {site && (
+      {loading ? (
+        <Box sx={{ display: "grid", placeItems: "center", minHeight: 300 }}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", md: "280px minmax(0, 1fr)" },
+            gap: 2,
+            alignItems: "start",
+          }}
+        >
+          {/* Pages list */}
+          <Paper variant="outlined" sx={{ p: 2 }}>
+            {site && (
         <Paper
           variant="outlined"
           sx={{
@@ -233,20 +210,16 @@ export default function SiteAdminManagePages() {
             borderColor: site.color || "divider",
           }}
         >
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            justifyContent="space-between"
-            alignItems={{ xs: "flex-start", sm: "center" }}
-            spacing={1}
-          >
+          
             <Box>
               <Typography fontWeight={700}>
-                {site.themeName || "Purchased theme"} applied
+                {site.themeName || "Purchased theme"}
               </Typography>
               <Typography variant="body2">
-                This purchased theme is used by all pages on this site.
+                This purchased theme is applied to all pages on this site.
               </Typography>
             </Box>
+            <br/>
             <Stack direction="row" spacing={1} alignItems="center">
               <Box
                 aria-label={`Theme background ${site.background || "#ffffff"}`}
@@ -277,25 +250,9 @@ export default function SiteAdminManagePages() {
                 Text {site.color || "#222222"}
               </Typography>
             </Stack>
-          </Stack>
+          
         </Paper>
       )}
-
-      {loading ? (
-        <Box sx={{ display: "grid", placeItems: "center", minHeight: 300 }}>
-          <CircularProgress />
-        </Box>
-      ) : (
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", md: "280px minmax(0, 1fr)" },
-            gap: 2,
-            alignItems: "start",
-          }}
-        >
-          {/* Pages list */}
-          <Paper variant="outlined" sx={{ p: 2 }}>
             <Stack
               direction="row"
               justifyContent="space-between"
@@ -317,32 +274,6 @@ export default function SiteAdminManagePages() {
             >
               Use the arrows to change the order pages appear on your site.
             </Typography>
-
-            {pageOptions.length > 0 && (
-              <Stack spacing={1} sx={{ mb: 2 }}>
-                <TextField
-                  select
-                  size="small"
-                  label={`Add a ${site?.categoryName || "category"} page`}
-                  value={selectedStarter}
-                  onChange={(event) => setSelectedStarter(event.target.value)}
-                >
-                  {pageOptions.map((option) => (
-                    <MenuItem key={option.pagesId} value={String(option.pagesId)}>
-                      {option.title}
-                    </MenuItem>
-                  ))}
-                </TextField>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={addCategoryPage}
-                  disabled={!selectedStarter || addingStarter}
-                >
-                  {addingStarter ? "Adding..." : "Add category page"}
-                </Button>
-              </Stack>
-            )}
 
             <Divider sx={{ mb: 1 }} />
             {pages.map((page, index) => (
@@ -457,7 +388,11 @@ export default function SiteAdminManagePages() {
                   onChange={(event) => setContent(event.editor.getData())}
                 />
               </Box>
-              <Stack direction="row" justifyContent="flex-end">
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center"
+              >
                 <Button
                   variant="contained"
                   onClick={savePage}

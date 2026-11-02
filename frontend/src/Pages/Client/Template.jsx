@@ -660,7 +660,7 @@ export default function Template() {
       </Box>
 
       {/* Categories + grid */}
-      <Container maxWidth="lg" sx={{ mt: 4 }}>
+      <Container sx={{ mt: 4 ,width: "100%", maxWidth: 1200, px: { xs: 2, md: 3 } }}>
         {categoryWarning && (
           <Alert
             severity="warning"
@@ -723,72 +723,92 @@ export default function Template() {
                   }`}
             </Typography>
 
-            <Grid container spacing={3}>
-              {loading
-                ? Array.from({ length: 6 }).map((_, i) => (
-                    <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={i}>
-                      <Skeleton variant="rounded" height={300} />
-                    </Grid>
-                  ))
-                : visible.map((template) => (
-                    <Grid
-                      size={{ xs: 12, sm: 6, lg: 4 }}
-                      key={template.templateId}
-                    >
-                      <Card
-                        variant="outlined"
-                        sx={{
-                          height: "100%",
-                          borderRadius: 3,
-                          overflow: "hidden",
-                          transition: "all .2s",
-                          "&:hover": {
-                            boxShadow: 5,
-                            transform: "translateY(-2px)",
-                          },
-                        }}
+            <Box
+              sx={{
+                maxHeight: 720, // adjust to taste
+                overflowY: "auto",
+                pr: 1, // room so the scrollbar doesn't overlap cards
+                // nice-looking thin scrollbar
+                scrollbarWidth: "thin",
+                scrollbarColor: "#c4c4c4 transparent",
+                "&::-webkit-scrollbar": { width: 8 },
+                "&::-webkit-scrollbar-track": { background: "transparent" },
+                "&::-webkit-scrollbar-thumb": {
+                  backgroundColor: "#c4c4c4",
+                  borderRadius: 8,
+                },
+                "&::-webkit-scrollbar-thumb:hover": {
+                  backgroundColor: "#a8a8a8",
+                },
+              }}
+            >
+              <Grid container spacing={3}>
+                {loading
+                  ? Array.from({ length: 6 }).map((_, i) => (
+                      <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={i}>
+                        <Skeleton variant="rounded" height={300} />
+                      </Grid>
+                    ))
+                  : visible.map((template) => (
+                      <Grid
+                        size={{ xs: 12, sm: 6, lg: 4 }}
+                        key={template.templateId}
                       >
-                        <CardActionArea
-                          onClick={() => openTemplate(template)}
-                          sx={{ height: "100%" }}
+                        <Card
+                          variant="outlined"
+                          sx={{
+                            height: "100%",
+                            borderRadius: 3,
+                            overflow: "hidden",
+                            transition: "all .2s",
+                            "&:hover": {
+                              boxShadow: 5,
+                              transform: "translateY(-2px)",
+                            },
+                          }}
                         >
-                          <CardMedia
-                            component="img"
-                            height="280"
-                            image={cardImage(template)}
-                            alt={template.name || "Template"}
-                            onError={(e) => {
-                              e.currentTarget.onerror = null;
-                              e.currentTarget.src = PLACEHOLDER_IMAGE;
-                            }}
-                            sx={{
-                              objectFit: "cover",
-                              bgcolor: "#eef2f7",
-                            }}
-                          />
-                          <CardContent>
-                            <Typography
-                              variant="h6"
-                              fontWeight={700}
-                              sx={{
-                                overflowWrap: "anywhere",
-                                mb: 1,
+                          <CardActionArea
+                            onClick={() => openTemplate(template)}
+                            sx={{ height: "100%" }}
+                          >
+                            <CardMedia
+                              component="img"
+                              height="280"
+                              image={cardImage(template)}
+                              alt={template.name || "Template"}
+                              onError={(e) => {
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.src = PLACEHOLDER_IMAGE;
                               }}
-                            >
-                              {template.name}
-                            </Typography>
-                            <Typography
-                              fontWeight={700}
-                              sx={{ whiteSpace: "nowrap" }}
-                            >
-                              {formatPrice(template.price, template.currency)}
-                            </Typography>
-                          </CardContent>
-                        </CardActionArea>
-                      </Card>
-                    </Grid>
-                  ))}
-            </Grid>
+                              sx={{
+                                objectFit: "cover",
+                                bgcolor: "#eef2f7",
+                              }}
+                            />
+                            <CardContent>
+                              <Typography
+                                variant="h6"
+                                fontWeight={700}
+                                sx={{
+                                  overflowWrap: "anywhere",
+                                  mb: 1,
+                                }}
+                              >
+                                {template.name}
+                              </Typography>
+                              <Typography
+                                fontWeight={700}
+                                sx={{ whiteSpace: "nowrap" }}
+                              >
+                                {formatPrice(template.price, template.currency)}
+                              </Typography>
+                            </CardContent>
+                          </CardActionArea>
+                        </Card>
+                      </Grid>
+                    ))}
+              </Grid>
+            </Box>
 
             {!loading && !visible.length && !error && (
               <Paper
@@ -992,7 +1012,7 @@ export default function Template() {
                                 sx={{
                                   maxHeight: 400, // adjust to taste
                                   overflowY: "auto",
-                                  
+
                                   scrollbarWidth: "none", // Firefox
                                   msOverflowStyle: "none", // old Edge / IE
                                   "&::-webkit-scrollbar": {
@@ -1000,28 +1020,28 @@ export default function Template() {
                                   },
                                 }}
                               >
-                              {selectedPages.map((p, i) => (
-                                <Box
-                                  key={p.pagesId ?? i}
-                                  sx={{
-                                    py: 1,
-                                    borderBottom:
-                                      i < selectedPages.length - 1
-                                        ? "1px dashed #e5e7eb"
-                                        : "none",
-                                  }}
-                                >
-                                  <Stack
-                                    direction="row"
-                                    justifyContent="space-between"
-                                    alignItems="center"
+                                {selectedPages.map((p, i) => (
+                                  <Box
+                                    key={p.pagesId ?? i}
+                                    sx={{
+                                      py: 1,
+                                      borderBottom:
+                                        i < selectedPages.length - 1
+                                          ? "1px dashed #e5e7eb"
+                                          : "none",
+                                    }}
                                   >
-                                    <Typography fontWeight={600}>
-                                      {p.title || "Untitled page"}
-                                    </Typography>
-                                  </Stack>
-                                </Box>
-                              ))}
+                                    <Stack
+                                      direction="row"
+                                      justifyContent="space-between"
+                                      alignItems="center"
+                                    >
+                                      <Typography fontWeight={600}>
+                                        {p.title || "Untitled page"}
+                                      </Typography>
+                                    </Stack>
+                                  </Box>
+                                ))}
                               </Box>
                             ) : (
                               <Typography color="text.secondary">

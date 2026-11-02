@@ -513,7 +513,6 @@ export default function ViewPayment({ admin = true }) {
               <Table stickyHeader size="medium" sx={{ minWidth: 900 }}>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={headCellSx}>Invoice</TableCell>
                     {admin && <TableCell sx={headCellSx}>Purchased by</TableCell>}
                     <TableCell sx={headCellSx}>Template &amp; pages</TableCell>
                     <TableCell sx={headCellSx} align="right">
@@ -532,12 +531,7 @@ export default function ViewPayment({ admin = true }) {
                     const status = statusMeta(payment.status);
                     return (
                       <TableRow hover key={payment.id}>
-                        <TableCell sx={{ whiteSpace: "nowrap" }}>
-                          <Typography variant="body2" fontWeight={600}>
-                            {payment.invoiceNumber || "—"}
-                          </Typography>
-                        </TableCell>
-
+                        
                         {admin && (
                           <TableCell sx={{ minWidth: 220 }}>
                             <Stack direction="row" spacing={1.5} alignItems="center">
