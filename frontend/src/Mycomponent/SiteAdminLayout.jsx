@@ -28,6 +28,9 @@ import MenuIcon from "@mui/icons-material/Menu";
 import MenuOpenIcon from "@mui/icons-material/MenuOpen";
 import PagesOutlinedIcon from "@mui/icons-material/PagesOutlined";
 import PreviewOutlinedIcon from "@mui/icons-material/PreviewOutlined";
+import NewspaperOutlinedIcon from "@mui/icons-material/NewspaperOutlined";
+import PhotoLibraryOutlinedIcon from "@mui/icons-material/PhotoLibraryOutlined";
+import ViewCarouselOutlinedIcon from "@mui/icons-material/ViewCarouselOutlined";
 
 const FULL_WIDTH = 250;
 const MINI_WIDTH = 72;
@@ -101,6 +104,9 @@ export default function SiteAdminLayout() {
     { text: "Dashboard", icon: <DashboardIcon />, path: `${siteBasePath}/panel` },
     { text: "Manage pages", icon: <PagesOutlinedIcon />, path: `${siteBasePath}/manage` },
     { text: "Employees", icon: <GroupsOutlinedIcon />, path: `${siteBasePath}/employees` },
+    { text: "News", icon: <NewspaperOutlinedIcon />, path: `${siteBasePath}/news` },
+    { text: "Gallery", icon: <PhotoLibraryOutlinedIcon />, path: `${siteBasePath}/gallery` },
+    { text: "Slider", icon: <ViewCarouselOutlinedIcon />, path: `${siteBasePath}/slider` },
   ];
   const current = menuItems.find((item) => item.path === location.pathname);
 
@@ -129,9 +135,9 @@ export default function SiteAdminLayout() {
           >
             {collapsed ? <MenuIcon /> : <MenuOpenIcon />}
           </IconButton>
-          <Typography variant="h6" fontWeight="bold" noWrap sx={{ flexGrow: 1 }}>
+          {/* <Typography variant="h6" fontWeight="bold" noWrap sx={{ flexGrow: 1 }}>
             {current?.text || "Site Admin Panel"}
-          </Typography>
+          </Typography> */}
           <Button
             color="inherit"
             startIcon={<PreviewOutlinedIcon />}

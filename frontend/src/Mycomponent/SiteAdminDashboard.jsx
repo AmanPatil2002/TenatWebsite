@@ -175,14 +175,6 @@ export default function SiteAdminDashboard() {
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
           <SummaryCard
-            title="Entries"
-            value={entries.length}
-            caption="Active entries across your pages"
-            icon={<ViewListOutlinedIcon color="primary" />}
-          />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-          <SummaryCard
             title="Employees"
             value={employeesLoading ? "…" : employees.length}
             caption={

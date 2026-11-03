@@ -1,10 +1,4 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import {
   Alert,
@@ -600,16 +594,12 @@ export default function AddTemplate() {
         }}
       >
         <Stack spacing={3}>
-          <Typography variant="h6" fontWeight={700}>
-            Basic Information
-          </Typography>
-
           <Grid
             container
             spacing={{ xs: 2, md: 3 }}
             columns={{ xs: 4, sm: 8, md: 12 }}
           >
-            <Grid size={{ xs: 2, sm: 4, md: 6 }}>
+            <Grid size={{ xs: 2, sm: 4, md: 5 }}>
               <FormControl fullWidth required>
                 <InputLabel id="category-label">Category</InputLabel>
                 <Select
@@ -627,7 +617,7 @@ export default function AddTemplate() {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid size={{ xs: 2, sm: 4, md: 6 }}>
+            <Grid size={{ xs: 2, sm: 4, md: 5 }}>
               <TextField
                 label="Template Name"
                 name="name"
@@ -638,6 +628,25 @@ export default function AddTemplate() {
                 inputProps={{ maxLength: 150 }}
               />
             </Grid>
+            <Grid size={{ xs: 2, sm: 4, md: 2 }}>
+              {/* <TextField
+                label="Currency"
+                name="currency"
+                value={form.currency}
+                onChange={handleChange}
+                required
+                fullWidth
+                inputProps={{ maxLength: 3 }}
+              /> */}
+              
+  <TextField
+    label="Currency"
+    name="currency"
+    value="INR"
+    disabled
+    fullWidth
+  />
+            </Grid>
           </Grid>
 
           <Grid
@@ -645,7 +654,7 @@ export default function AddTemplate() {
             spacing={{ xs: 2, md: 3 }}
             columns={{ xs: 4, sm: 8, md: 12 }}
           >
-            <Grid size={{ xs: 2, sm: 4, md: 6 }}>
+            <Grid size={{ xs: 2, sm: 4, md: 5 }}>
               <TextField
                 label="Language"
                 name="language"
@@ -655,30 +664,17 @@ export default function AddTemplate() {
               />
             </Grid>
 
-            <Grid size={{ xs: 2, sm: 4, md: 6 }}>
+            <Grid size={{ xs: 2, sm: 4, md: 7 }}>
               <TextField
-                label="Currency"
-                name="currency"
-                value={form.currency}
+                label="Short Description"
+                name="shortDescription"
+                value={form.shortDescription}
                 onChange={handleChange}
-                required
                 fullWidth
-                inputProps={{ maxLength: 3 }}
-                helperText="Use a three-letter code, e.g. INR"
+                inputProps={{ maxLength: 300 }}
               />
             </Grid>
           </Grid>
-
-          <TextField
-            label="Short Description"
-            name="shortDescription"
-            value={form.shortDescription}
-            onChange={handleChange}
-            fullWidth
-            multiline
-            minRows={2}
-            inputProps={{ maxLength: 300 }}
-          />
 
           <TextField
             label="Description"
@@ -689,12 +685,6 @@ export default function AddTemplate() {
             multiline
             minRows={4}
           />
-
-          <Divider />
-
-          <Typography variant="h6" fontWeight={700}>
-            Template Images
-          </Typography>
 
           <TextField
             label="Thumbnail URL"
@@ -731,10 +721,6 @@ export default function AddTemplate() {
           />
 
           <Divider />
-
-          <Typography variant="h6" fontWeight={700}>
-            Themes and Pages
-          </Typography>
           <Grid
             container
             spacing={{ xs: 2, md: 3 }}

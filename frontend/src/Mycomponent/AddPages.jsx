@@ -330,26 +330,80 @@ function PageForm({
               key={editorKey}
               editorUrl="https://cdn.ckeditor.com/4.22.1/standard-all/ckeditor.js"
               initData={formData.page}
+              onBeforeLoad={(CKEDITOR) => {
+                if (CKEDITOR.plugins.get("localvideo")) return;
+
+                CKEDITOR.plugins.add("localvideo", {
+                  init(editor) {
+                    editor.addCommand("localvideoCmd", {
+                      exec() {
+                        const input = document.createElement("input");
+                        input.type = "file";
+                        input.accept = "video/mp4,video/webm,video/ogg";
+
+                        input.onchange = async () => {
+                          const file = input.files?.[0];
+                          if (!file) return;
+
+                          const body = new FormData();
+                          body.append("upload", file);
+
+                          try {
+                            const res = await fetch(
+                              `${API_URL}/uploads/ckeditor-video`,
+                              {
+                                method: "POST",
+                                // credentials: "include",                          // if you use cookies
+                                // headers: { Authorization: `Bearer ${token}` },   // if you use a token
+                                body,
+                              },
+                            );
+                            const data = await res.json();
+                            if (!data.uploaded) {
+                              throw new Error(
+                                data.error?.message || "Upload failed",
+                              );
+                            }
+                            editor.insertHtml(
+                              `<video controls style="max-width:100%" src="${data.url}"></video><p></p>`,
+                            );
+                          } catch (err) {
+                            alert(err.message);
+                          }
+                        };
+
+                        input.click();
+                      },
+                    });
+
+                    editor.ui.addButton("LocalVideo", {
+                      label: "Insert video",
+                      command: "localvideoCmd",
+                      toolbar: "insert",
+                      icon:
+                        "data:image/svg+xml;utf8," +
+                        encodeURIComponent(
+                          '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="#444" d="M4 5h11a2 2 0 0 1 2 2v3l5-3v10l-5-3v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/></svg>',
+                        ),
+                    });
+                  },
+                });
+              }}
               config={{
                 height: 350,
                 language: "en",
                 allowedContent: true,
-                extraPlugins: "uploadimage",
+                extraPlugins: "uploadimage,localvideo",
                 uploadUrl: `${API_URL}/uploads/ckeditor`,
                 imageUploadUrl: `${API_URL}/uploads/ckeditor`,
+                filebrowserImageUploadUrl: `${API_URL}/uploads/ckeditor`,
                 toolbar: [
                   {
                     name: "document",
                     items: ["Source", "Preview", "Maximize"],
                   },
-                  {
-                    name: "clipboard",
-                    items: ["Undo", "Redo"],
-                  },
-                  {
-                    name: "styles",
-                    items: ["Format", "FontSize"],
-                  },
+                  { name: "clipboard", items: ["Undo", "Redo"] },
+                  { name: "styles", items: ["Format", "FontSize"] },
                   {
                     name: "basicstyles",
                     items: ["Bold", "Italic", "Underline", "Strike"],
@@ -364,13 +418,10 @@ function PageForm({
                       "JustifyRight",
                     ],
                   },
-                  {
-                    name: "links",
-                    items: ["Link", "Unlink"],
-                  },
+                  { name: "links", items: ["Link", "Unlink"] },
                   {
                     name: "insert",
-                    items: ["Image", "Table", "HorizontalRule"],
+                    items: ["Image", "LocalVideo", "Table", "HorizontalRule"],
                   },
                 ],
               }}

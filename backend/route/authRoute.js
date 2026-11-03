@@ -10,6 +10,7 @@ const {
   updateMe,
   changePassword,
   forgotPassword,
+  resetPasswordStatus,
   resetPassword,
   updateUser,
   updateUserStatus,
@@ -21,6 +22,7 @@ router.post("/register", postAuth);
 router.post("/login", checkLogin);
 
 router.post("/forgot-password", forgotPassword);
+router.get("/reset-password/status", resetPasswordStatus);
 router.post("/reset-password", resetPassword);
 
 router.get("/me", authenticateToken, getMe);

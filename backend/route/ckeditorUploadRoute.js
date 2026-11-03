@@ -1,4 +1,3 @@
-
 const express = require("express");
 const multer = require("multer");
 const path = require("path");
@@ -13,75 +12,81 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-const allowedTypes = {
+const imageTypes = {
   "image/jpeg": ".jpg",
   "image/png": ".png",
   "image/webp": ".webp",
   "image/gif": ".gif",
+};
+
+const fileTypes = {
+  ...imageTypes,
   "application/pdf": ".pdf",
 };
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, callback) => {
-    callback(null, uploadDir);
-  },
+const videoTypes = {
+  "video/mp4": ".mp4",
+  "video/webm": ".webm",
+  "video/ogg": ".ogv",
+};
 
-  filename: (_req, file, callback) => {
-    const extension = allowedTypes[file.mimetype];
-
-    callback(
-      null,
-      `${crypto.randomUUID()}${extension}`
-    );
-  },
-});
-
-const upload = multer({
-  storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024,
-    files: 1,
-  },
-  fileFilter: (_req, file, callback) => {
-    if (!allowedTypes[file.mimetype]) {
-      return callback(
-        new Error("Only JPG, PNG, WEBP, GIF and PDF files are allowed.")
-      );
-    }
-
-    callback(null, true);
-  },
-});
-
-router.post("/ckeditor", (req, res) => {
-  upload.single("upload")(req, res, (error) => {
-    if (error) {
-      return res.status(400).json({
-        uploaded: 0,
-        error: {
-          message: error.message || "Upload failed.",
-        },
-      });
-    }
-
-    if (!req.file) {
-      return res.status(400).json({
-        uploaded: 0,
-        error: {
-          message: "No file was uploaded.",
-        },
-      });
-    }
-
-    const fileUrl =
-      `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
-
-    return res.json({
-      uploaded: 1,
-      fileName: req.file.originalname,
-      url: fileUrl,
-    });
+function createUploader({ types, maxSize, message }) {
+  const storage = multer.diskStorage({
+    destination: (_req, _file, callback) => callback(null, uploadDir),
+    filename: (_req, file, callback) =>
+      callback(null, `${crypto.randomUUID()}${types[file.mimetype]}`),
   });
+
+  return multer({
+    storage,
+    limits: { fileSize: maxSize, files: 1 },
+    fileFilter: (_req, file, callback) => {
+      if (!types[file.mimetype]) return callback(new Error(message));
+      callback(null, true);
+    },
+  });
+}
+
+const imageUpload = createUploader({
+  types: fileTypes, // keeps your PDF support
+  maxSize: 5 * 1024 * 1024,
+  message: "Only JPG, PNG, WEBP, GIF and PDF files are allowed.",
 });
+
+const videoUpload = createUploader({
+  types: videoTypes,
+  maxSize: 100 * 1024 * 1024,
+  message: "Only MP4, WEBM and OGG videos are allowed.",
+});
+
+function handleUpload(uploader) {
+  return (req, res) => {
+    uploader.single("upload")(req, res, (error) => {
+      if (error) {
+        const message =
+          error.code === "LIMIT_FILE_SIZE"
+            ? "File is too large."
+            : error.message || "Upload failed.";
+        return res.status(400).json({ uploaded: 0, error: { message } });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({
+          uploaded: 0,
+          error: { message: "No file was uploaded." },
+        });
+      }
+
+      return res.json({
+        uploaded: 1,
+        fileName: req.file.originalname,
+        url: `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`,
+      });
+    });
+  };
+}
+
+router.post("/ckeditor", handleUpload(imageUpload));
+router.post("/ckeditor-video", handleUpload(videoUpload));
 
 module.exports = router;

@@ -23,6 +23,11 @@ const esc = (v) =>
   String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 const getFrom = () => process.env.MAIL_FROM || process.env.SMTP_FROM || process.env.SMTP_USER;
+const getClientUrl = () =>
+  (process.env.CLIENT_URL || process.env.FRONTEND_URL || "http://localhost:5173")
+    .split(",")[0]
+    .trim()
+    .replace(/\/+$/, "");
 
 // Logs the real error, then rethrows so the route can respond
 const send = async (label, options) => {
@@ -104,23 +109,28 @@ const sendSiteAdminCredentials = async ({
   });
 };
 
-const sendPasswordResetEmail = async ({ to, name, code, expiresInMinutes = 10 }) =>
-  send("sendPasswordResetEmail", {
+const sendPasswordResetEmail = async ({ to, name, code, expiresInMinutes = 10 }) => {
+  const resetUrl = `${getClientUrl()}/reset-password?email=${encodeURIComponent(to)}`;
+
+  return send("sendPasswordResetEmail", {
     to,
-    subject: "Your password reset code",
+    subject: "Reset your password",
     text:
       `Hi ${name},\n\n` +
       `Your password reset code is ${code}.\n` +
-      `It expires in ${expiresInMinutes} minutes.\n\n` +
+      `It expires in ${expiresInMinutes} minutes. Open this page to reset your password:\n` +
+      `${resetUrl}\n\n` +
       "If you did not request this, you can ignore this email.",
     html: `
       <h2>Password reset</h2>
       <p>Hi ${esc(name)},</p>
-      <p>Your password reset code is:</p>
+      <p>Open the link below and enter this 6-digit password reset code:</p>
       <p style="font-size:28px;letter-spacing:6px;"><b>${esc(code)}</b></p>
       <p>It expires in ${esc(expiresInMinutes)} minutes.</p>
+      <p><a href="${esc(resetUrl)}">Change your password</a></p>
       <p>If you did not request this, you can ignore this email.</p>`,
   });
+};
 
 module.exports = {
   sendPaymentEmail,

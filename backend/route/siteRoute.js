@@ -25,6 +25,7 @@ const {
   updateSitePage,
   reorderSitePages,
 } = require("../controller/siteController");
+const siteMedia = require("../controller/siteMediaController");
 
 const router = express.Router();
 
@@ -95,5 +96,25 @@ router.delete(
   authenticateSiteAdmin,
   deleteEntry,
 );
+router.post(
+  "/client-admin/:siteId/media/upload",
+  authenticateSiteAdmin,
+  ...siteMedia.uploadImage,
+);
+for (const contentType of ["news", "galleries", "slider"]) {
+  const handlers = siteMedia[contentType];
+  router.get(`/client-admin/:siteId/${contentType}`, authenticateSiteAdmin, handlers.list);
+  router.post(`/client-admin/:siteId/${contentType}`, authenticateSiteAdmin, handlers.create);
+  router.put(
+    `/client-admin/:siteId/${contentType}/:itemId`,
+    authenticateSiteAdmin,
+    handlers.update,
+  );
+  router.delete(
+    `/client-admin/:siteId/${contentType}/:itemId`,
+    authenticateSiteAdmin,
+    handlers.remove,
+  );
+}
 
 module.exports = router;

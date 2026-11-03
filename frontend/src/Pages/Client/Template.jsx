@@ -660,7 +660,9 @@ export default function Template() {
       </Box>
 
       {/* Categories + grid */}
-      <Container sx={{ mt: 4 ,width: "100%", maxWidth: 1200, px: { xs: 2, md: 3 } }}>
+      <Container
+        sx={{ mt: 4, width: "100%", maxWidth: 1200, px: { xs: 2, md: 3 } }}
+      >
         {categoryWarning && (
           <Alert
             severity="warning"
@@ -676,7 +678,20 @@ export default function Template() {
               <Typography variant="overline" color="text.secondary">
                 Categories
               </Typography>
-              <Stack spacing={0.5} sx={{ mt: 1 }}>
+              <Stack
+                spacing={0.5}
+                sx={{
+                  mt: 1,
+                  maxHeight: 400, // adjust, or use "calc(100vh - 200px)"
+                  overflowY: "auto",
+                  // Firefox
+                  scrollbarWidth: "none",
+                  // IE / old Edge
+                  msOverflowStyle: "none",
+                  // Chrome, Safari, new Edge
+                  "&::-webkit-scrollbar": { display: "none" },
+                }}
+              >
                 <Button
                   variant={categoryId === "" ? "contained" : "text"}
                   onClick={() => setCategoryId("")}
@@ -693,10 +708,7 @@ export default function Template() {
                         : "text"
                     }
                     onClick={() => setCategoryId(String(c.categoryId))}
-                    sx={{
-                      justifyContent: "flex-start",
-                      textAlign: "left",
-                    }}
+                    sx={{ justifyContent: "flex-start", textAlign: "left" }}
                   >
                     {c.name}
                   </Button>

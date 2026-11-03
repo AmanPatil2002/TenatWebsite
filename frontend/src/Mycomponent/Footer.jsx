@@ -22,7 +22,7 @@ export default function Footer() {
       sx={{
         backgroundColor: "#172033",
         color: "white",
-        mt: 8,
+        mt: "auto",
       }}
     >
       <Container maxWidth="lg">
@@ -174,20 +174,8 @@ export default function Footer() {
                   "&:hover": { color: "#ffffff" },
                 }}
               >
-                Contact
+                My Account
               </Link>
-              {role === "admin" || role === "superadmin" &&
-              <Link
-                href="/admin"
-                underline="none"
-                sx={{
-                  color: "#b8c0cc",
-                  "&:hover": { color: "#ffffff" },
-                }}
-              >
-                Admin
-              </Link>
-}
             </Stack>
           </Grid>
         </Grid>

@@ -170,7 +170,6 @@ export default function SiteAdminManagePages() {
     }
   };
 
-
   return (
     <Box sx={{ maxWidth: 1400, mx: "auto" }}>
       {error && (
@@ -200,59 +199,57 @@ export default function SiteAdminManagePages() {
           {/* Pages list */}
           <Paper variant="outlined" sx={{ p: 2 }}>
             {site && (
-        <Paper
-          variant="outlined"
-          sx={{
-            mb: 2,
-            p: 2,
-            bgcolor: site.background || "#ffffff",
-            color: site.color || "#222222",
-            borderColor: site.color || "divider",
-          }}
-        >
-          
-            <Box>
-              <Typography fontWeight={700}>
-                {site.themeName || "Purchased theme"}
-              </Typography>
-              <Typography variant="body2">
-                This purchased theme is applied to all pages on this site.
-              </Typography>
-            </Box>
-            <br/>
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Box
-                aria-label={`Theme background ${site.background || "#ffffff"}`}
+              <Paper
+                variant="outlined"
                 sx={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 1,
+                  mb: 2,
+                  p: 2,
                   bgcolor: site.background || "#ffffff",
-                  border: "1px solid",
-                  borderColor: "divider",
+                  color: site.color || "#222222",
+                  borderColor: site.color || "divider",
                 }}
-              />
-              <Typography variant="caption">
-                Background {site.background || "#ffffff"}
-              </Typography>
-              <Box
-                aria-label={`Theme text color ${site.color || "#222222"}`}
-                sx={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 1,
-                  bgcolor: site.color || "#222222",
-                  border: "1px solid",
-                  borderColor: "divider",
-                }}
-              />
-              <Typography variant="caption">
-                Text {site.color || "#222222"}
-              </Typography>
-            </Stack>
-          
-        </Paper>
-      )}
+              >
+                <Box>
+                  <Typography fontWeight={700}>
+                    {site.themeName || "Purchased theme"}
+                  </Typography>
+                  <Typography variant="body2">
+                    This purchased theme is applied to all pages on this site.
+                  </Typography>
+                </Box>
+                <br />
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Box
+                    aria-label={`Theme background ${site.background || "#ffffff"}`}
+                    sx={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: 1,
+                      bgcolor: site.background || "#ffffff",
+                      border: "1px solid",
+                      borderColor: "divider",
+                    }}
+                  />
+                  <Typography variant="caption">
+                    Background {site.background || "#ffffff"}
+                  </Typography>
+                  <Box
+                    aria-label={`Theme text color ${site.color || "#222222"}`}
+                    sx={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: 1,
+                      bgcolor: site.color || "#222222",
+                      border: "1px solid",
+                      borderColor: "divider",
+                    }}
+                  />
+                  <Typography variant="caption">
+                    Text {site.color || "#222222"}
+                  </Typography>
+                </Stack>
+              </Paper>
+            )}
             <Stack
               direction="row"
               justifyContent="space-between"
@@ -353,18 +350,84 @@ export default function SiteAdminManagePages() {
                   key={creating ? "new" : selectedId}
                   editorUrl="https://cdn.ckeditor.com/4.22.1/standard-all/ckeditor.js"
                   initData={content}
+                  onBeforeLoad={(CKEDITOR) => {
+                    if (CKEDITOR.plugins.get("localvideo")) return;
+
+                    CKEDITOR.plugins.add("localvideo", {
+                      init(editor) {
+                        editor.addCommand("localvideoCmd", {
+                          exec() {
+                            const input = document.createElement("input");
+                            input.type = "file";
+                            input.accept = "video/mp4,video/webm,video/ogg";
+
+                            input.onchange = async () => {
+                              const file = input.files?.[0];
+                              if (!file) return;
+
+                              const body = new FormData();
+                              body.append("upload", file);
+
+                              try {
+                                const res = await fetch(
+                                  `${API_URL}/uploads/ckeditor-video`,
+                                  {
+                                    method: "POST",
+                                    // credentials: "include",                          // if you use cookies
+                                    // headers: { Authorization: `Bearer ${token}` },   // if you use a token
+                                    body,
+                                  },
+                                );
+                                const data = await res.json();
+                                if (!data.uploaded) {
+                                  throw new Error(
+                                    data.error?.message || "Upload failed",
+                                  );
+                                }
+                                editor.insertHtml(
+                                  `<video controls style="max-width:100%" src="${data.url}"></video><p></p>`,
+                                );
+                              } catch (err) {
+                                alert(err.message);
+                              }
+                            };
+
+                            input.click();
+                          },
+                        });
+
+                        editor.ui.addButton("LocalVideo", {
+                          label: "Insert video",
+                          command: "localvideoCmd",
+                          toolbar: "insert",
+                          icon:
+                            "data:image/svg+xml;utf8," +
+                            encodeURIComponent(
+                              '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="#444" d="M4 5h11a2 2 0 0 1 2 2v3l5-3v10l-5-3v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/></svg>',
+                            ),
+                        });
+                      },
+                    });
+                  }}
                   config={{
                     height: 350,
                     language: "en",
                     allowedContent: true,
-                    extraPlugins: "uploadimage",
+                    extraPlugins: "uploadimage,localvideo",
                     uploadUrl: `${API_URL}/uploads/ckeditor`,
                     imageUploadUrl: `${API_URL}/uploads/ckeditor`,
+                    filebrowserImageUploadUrl: `${API_URL}/uploads/ckeditor`,
                     toolbar: [
-                      { name: "document", items: ["Source", "Preview", "Maximize"] },
+                      {
+                        name: "document",
+                        items: ["Source", "Preview", "Maximize"],
+                      },
                       { name: "clipboard", items: ["Undo", "Redo"] },
                       { name: "styles", items: ["Format", "FontSize"] },
-                      { name: "basicstyles", items: ["Bold", "Italic", "Underline", "Strike"] },
+                      {
+                        name: "basicstyles",
+                        items: ["Bold", "Italic", "Underline", "Strike"],
+                      },
                       {
                         name: "paragraph",
                         items: [
@@ -375,7 +438,16 @@ export default function SiteAdminManagePages() {
                           "JustifyRight",
                         ],
                       },
-                      { name: "insert", items: ["Image", "Table", "HorizontalRule", "SpecialChar"] },
+                      {
+                        name: "insert",
+                        items: [
+                          "Image",
+                          "LocalVideo",
+                          "Table",
+                          "HorizontalRule",
+                          "SpecialChar",
+                        ],
+                      },
                       { name: "links", items: ["Link", "Unlink"] },
                     ],
                   }}
@@ -398,7 +470,11 @@ export default function SiteAdminManagePages() {
                   onClick={savePage}
                   disabled={saving || !title.trim() || !content.trim()}
                 >
-                  {saving ? "Saving..." : creating ? "Create page" : "Save changes"}
+                  {saving
+                    ? "Saving..."
+                    : creating
+                      ? "Create page"
+                      : "Save changes"}
                 </Button>
               </Stack>
             </Stack>

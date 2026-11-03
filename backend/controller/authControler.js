@@ -381,6 +381,41 @@ const forgotPassword = async (req, res) => {
   }
 };
 
+const resetPasswordStatus = async (req, res) => {
+  const email =
+    typeof req.query.email === "string"
+      ? req.query.email.trim().toLowerCase()
+      : "";
+  if (!email || email.length > 190 || !EMAIL_RE.test(email)) {
+    return res.status(400).json({ message: "Invalid or expired reset link" });
+  }
+
+  try {
+    const [rows] = await db.promise().execute(
+      `SELECT u.userId
+         FROM users u
+        WHERE u.email=? AND u.status='active'
+          AND EXISTS (
+            SELECT 1
+              FROM passwordResets r
+             WHERE r.userId=u.userId AND r.usedAt IS NULL AND r.expiresAt > NOW()
+          )
+        LIMIT 1`,
+      [email],
+    );
+    if (rows.length === 0) {
+      return res
+        .status(410)
+        .json({ message: "This reset link has expired. Request a new one from the login page." });
+    }
+
+    res.json({ valid: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Could not verify the reset link" });
+  }
+};
+
 // Step 2 of forgot password: verify the code and set the new password
 const resetPassword = async (req, res) => {
   const email =
@@ -547,6 +582,7 @@ module.exports = {
   updateMe,
   changePassword,
   forgotPassword,
+  resetPasswordStatus,
   resetPassword,
   updateUser,
   updateUserStatus,

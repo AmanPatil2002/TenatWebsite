@@ -19,6 +19,19 @@ CREATE TABLE users (
   INDEX idxUsersRoleStatus (role, status)
 ) ENGINE=InnoDB;
 
+CREATE TABLE passwordResets (
+  id        BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  userId    BIGINT UNSIGNED NOT NULL,
+  codeHash  VARCHAR(255) NOT NULL,
+  expiresAt DATETIME NOT NULL,
+  attempts  TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  usedAt    DATETIME NULL,
+  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idxPasswordResetsUserCreated (userId, createdAt),
+  CONSTRAINT fkPasswordResetsUser FOREIGN KEY (userId)
+    REFERENCES users(userId) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 -- ---------------------------------------------------------------------
 -- 2. review
 -- ---------------------------------------------------------------------
@@ -259,6 +272,23 @@ CREATE TABLE IF NOT EXISTS sitepages (
   CONSTRAINT fkSitePagesSource FOREIGN KEY (sourcePagesId) REFERENCES pages(pagesId) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS siteentries (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  siteId        BIGINT UNSIGNED NOT NULL,
+  sitePageId    BIGINT UNSIGNED NOT NULL,
+  name          VARCHAR(190) NOT NULL,
+  description   TEXT NULL,
+  price         DECIMAL(10,2) NULL,
+  imageUrl      VARCHAR(1000) NULL,
+  status        ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  customFields  JSON NULL,
+  createdAt     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idxSiteEntriesSitePage (siteId, sitePageId, status),
+  CONSTRAINT fkSiteEntryPage FOREIGN KEY (sitePageId, siteId)
+    REFERENCES sitepages(id, siteId) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 CREATE TABLE siteemployees (
   id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   siteId        BIGINT UNSIGNED NOT NULL,
@@ -273,22 +303,6 @@ CREATE TABLE siteemployees (
   CONSTRAINT fkSiteEmployeeSite FOREIGN KEY (siteId) REFERENCES sites(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
-CREATE TABLE siteentries (
-  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  siteId        BIGINT UNSIGNED NOT NULL,
-  sitePageId    BIGINT UNSIGNED NOT NULL,
-  name          VARCHAR(190) NOT NULL,
-  description   TEXT NULL,
-  price         DECIMAL(10,2) NULL,
-  imageUrl      VARCHAR(1000) NULL,
-  status        ENUM('active','inactive') NOT NULL DEFAULT 'active',
-  customFields  JSON NULL,
-  createdAt     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updatedAt     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idxSiteEntriesPage (siteId, sitePageId, status),
-  CONSTRAINT fkSiteEntryPage FOREIGN KEY (sitePageId, siteId)
-    REFERENCES sitepages(id, siteId) ON DELETE CASCADE
-) ENGINE=InnoDB;
 
 INSERT IGNORE INTO sitepages (siteId, sourcePagesId, title, page, sortOrder)
 SELECT s.id, p.pagesId, p.title, p.page, tp.sortOrder
@@ -387,3 +401,62 @@ JOIN pages         p   ON p.pagesId = pp.pagesId
 JOIN templatepages tp  ON tp.templateId = pp.templateId AND tp.pagesId = pp.pagesId
 JOIN theme         th  ON th.themeId = s.themeId
 WHERE s.status = 'active' AND s.expiresAt > NOW();
+
+
+
+CREATE TABLE sitenews (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    siteId BIGINT UNSIGNED NOT NULL,
+    title VARCHAR(150) NOT NULL,
+    imageUrl VARCHAR(500) NULL,
+    content TEXT NOT NULL,
+    status ENUM('active', 'inactive')
+        NOT NULL DEFAULT 'active',
+    publishedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idxSiteNews (siteId, status, createdAt),
+    CONSTRAINT fkSiteNewsSite
+        FOREIGN KEY (siteId)
+        REFERENCES sites(id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE sitegalleries (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    siteId BIGINT UNSIGNED NOT NULL,
+    title VARCHAR(150) NULL,
+    imageUrl VARCHAR(500) NOT NULL,
+    caption VARCHAR(500) NULL,
+    altText VARCHAR(255) NULL,
+    sortOrder INT UNSIGNED NOT NULL DEFAULT 0,
+    status ENUM('active', 'inactive')
+        NOT NULL DEFAULT 'active',
+    createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idxSiteGalleries (siteId, status, sortOrder),
+    CONSTRAINT fkSiteGalleriesSite
+        FOREIGN KEY (siteId)
+        REFERENCES sites(id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE siteslider (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    siteId BIGINT UNSIGNED NOT NULL,
+    title VARCHAR(150) NULL,
+    imageUrl VARCHAR(500) NOT NULL,
+    sortOrder INT UNSIGNED NOT NULL DEFAULT 0,
+    status ENUM('active', 'inactive')
+        NOT NULL DEFAULT 'active',
+    createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idxSiteSlider (siteId, status, sortOrder),
+    CONSTRAINT fkSiteSliderSite
+        FOREIGN KEY (siteId)
+        REFERENCES sites(id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB;

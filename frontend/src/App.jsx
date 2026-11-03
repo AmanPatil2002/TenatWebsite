@@ -7,6 +7,7 @@ import {
 } from "react-router-dom";
 import Register from "./Pages/Register";
 import Login from "./Pages/Login";
+import ResetPassword from "./Pages/ResetPassword";
 import ProtectedRoutes from "./utils/ProtectedRoutes";
 import Admin from "./Pages/Admin/Admin";
 import Home from "./Pages/Client/Home";
@@ -37,6 +38,9 @@ import SiteAdminDashboard from "./Mycomponent/SiteAdminDashboard";
 import SiteAdminManagePages from "./Mycomponent/SiteAdminManagePages";
 import SiteAdminEmployees from "./Mycomponent/SiteAdminEmployees";
 import ArrangeTemplatePages from "./Mycomponent/ArrangeTemplatePages";
+import SiteAdminNews from "./Mycomponent/SiteAdminNews";
+import SiteAdminGalary from "./Mycomponent/SiteAdminGalary";
+import SiteAdminMediaManager from "./Mycomponent/SiteAdminMediaManager";
 
 
 function App() {
@@ -45,6 +49,7 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Site admin (client's own admin area) */}
         <Route path="/site-admin/:siteId/login" element={<SiteAdminLogin />} />
@@ -54,6 +59,9 @@ function App() {
           <Route path="panel" element={<SiteAdminDashboard />} />
           <Route path="manage" element={<SiteAdminManagePages />} />
           <Route path="employees" element={<SiteAdminEmployees />} />
+          <Route path="news" element={<SiteAdminNews />} />
+          <Route path="slider" element={<SiteAdminMediaManager />} />
+          <Route path="gallery" element={<SiteAdminGalary />} />
         </Route>
 
         {/* Client */}

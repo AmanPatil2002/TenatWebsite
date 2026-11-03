@@ -71,7 +71,7 @@ function Hero() {
       <Container maxWidth="lg" sx={{ position: 'relative' }}>
         <Grid container spacing={6} sx={{ alignItems: 'center' }}>
           <Grid size={{ xs: 12, md: 7 }}>
-            <Typography variant="h2" gutterBottom sx={{ color: c.ink }}>
+            <Typography variant="h3" gutterBottom sx={{ color: c.ink }}>
               Launch a high-performing site without starting from scratch
             </Typography>
             <Typography variant="h6" color="text.secondary" fontWeight={400} sx={{ mb: 5, maxWidth: 560 }}>
@@ -181,7 +181,7 @@ function CTASection() {
           <Box sx={{ position: 'absolute', top: 30, right: '12%', width: 40, height: 40, borderRadius: 2, bgcolor: '#fff', opacity: 0.2, transform: 'rotate(20deg)' }} />
 
           <Box sx={{ position: 'relative' }}>
-            <Typography variant="h2" gutterBottom>
+            <Typography variant="h4" gutterBottom sx={{ color: '#fff', fontWeight: 700 }}>
               Create and sell custom website templates with Webflow
             </Typography>
             <Typography sx={{ mb: 4, opacity: 0.92, maxWidth: 640, mx: 'auto' }}>

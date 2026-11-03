@@ -1,10 +1,6 @@
 import { useState } from "react";
 import axios from "axios";
-import {
-  useNavigate,
-  useLocation,
-  Link as RouterLink,
-} from "react-router-dom";
+import { useNavigate, useLocation, Link as RouterLink } from "react-router-dom";
 import {
   Alert,
   Box,
@@ -30,8 +26,8 @@ import VisibilityOff from "@mui/icons-material/VisibilityOff";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-const EMAIL_MAX = 190; // matches users.email
-const EMAIL_RE = /^\S+@\S+\.\S+$/; // same pattern as the backend
+const EMAIL_MAX = 190; 
+const EMAIL_RE = /^\S+@\S+\.\S+$/; 
 
 const theme = createTheme({
   palette: {
@@ -125,7 +121,12 @@ function ForgotPasswordDialog({ initialEmail, onClose, onDone }) {
   };
 
   return (
-    <Dialog open onClose={loading ? undefined : onClose} fullWidth maxWidth="xs">
+    <Dialog
+      open
+      onClose={loading ? undefined : onClose}
+      fullWidth
+      maxWidth="xs"
+    >
       <form onSubmit={step === 1 ? requestCode : submitReset} noValidate>
         <DialogTitle>
           {step === 1 ? "Forgot password" : "Reset password"}
@@ -183,7 +184,9 @@ function ForgotPasswordDialog({ initialEmail, onClose, onDone }) {
                     endAdornment: (
                       <InputAdornment position="end">
                         <IconButton
-                          aria-label={showPassword ? "Hide password" : "Show password"}
+                          aria-label={
+                            showPassword ? "Hide password" : "Show password"
+                          }
                           onClick={() => setShowPassword((s) => !s)}
                           onMouseDown={(e) => e.preventDefault()}
                           edge="end"
@@ -231,8 +234,12 @@ function ForgotPasswordDialog({ initialEmail, onClose, onDone }) {
             disabled={loading}
           >
             {step === 1
-              ? loading ? "Sending..." : "Send code"
-              : loading ? "Resetting..." : "Reset password"}
+              ? loading
+                ? "Sending..."
+                : "Send code"
+              : loading
+                ? "Resetting..."
+                : "Reset password"}
           </Button>
         </DialogActions>
       </form>
@@ -375,7 +382,9 @@ function Login() {
                       endAdornment: (
                         <InputAdornment position="end">
                           <IconButton
-                            aria-label={showPassword ? "Hide password" : "Show password"}
+                            aria-label={
+                              showPassword ? "Hide password" : "Show password"
+                            }
                             onClick={() => setShowPassword((s) => !s)}
                             onMouseDown={(e) => e.preventDefault()}
                             edge="end"
@@ -421,6 +430,14 @@ function Login() {
                   Register
                 </Link>
               </Typography>
+              <Link
+                component={RouterLink}
+                to="/"
+                fontWeight={600}
+                sx={{ mt: 1, display: "block", textAlign: "center" }}
+              >
+                Back
+              </Link>
             </CardContent>
           </Card>
         </Container>

@@ -201,7 +201,7 @@ export default function Myaccount() {
 
   /* ----- UI ----- */
   return (
-    <Box sx={{ py: { xs: 3, md: 6 } }}>
+    <Box sx={{ py: { xs: 3, md: 6 },minHeight: "80vh" }}>
       <Container maxWidth="md">
         <Card elevation={4} sx={{ borderRadius: 4, overflow: "hidden" }}>
           {/* Header */}
