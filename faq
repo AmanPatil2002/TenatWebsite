@@ -1,0 +1,16 @@
+INSERT INTO tenant.faq (id, question, answer, created_at, updated_at) VALUES
+(1, 'Can I customize the website after purchasing a template?',
+    'Yes. You can edit pages, navigation menus, and supported themes from your site dashboard.',
+    '2026-10-25 21:58:25', '2026-10-25 21:58:25'),
+
+(2, 'Do I need coding skills to make changes to my site?',
+    'No coding is required. All edits—pages, menus, and themes—are made through your site dashboard with a visual, point-and-click editor.',
+    '2026-10-27 11:59:05', '2026-10-27 11:59:05'),
+
+(3, 'Can I change the colors, fonts, and layout of the template?',
+    'Yes, within the supported themes. You can adjust colors, fonts, and layout options from your dashboard, though the exact customization options depend on the theme you choose.',
+    '2026-10-27 11:59:23', '2026-10-27 11:59:23'),
+
+(4, 'Will my edits be saved automatically?',
+    'Yes. Changes made in the dashboard are saved as you go, and you can preview them before publishing to your live site.',
+    '2026-10-27 11:59:55', '2026-10-27 11:59:55');
