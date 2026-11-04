@@ -66,12 +66,11 @@ export default function SiteAdminLogin() {
           <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
             <Stack spacing={2.5} component="form" onSubmit={handleSubmit}>
               <Box>
-                <Typography variant="h5" fontWeight={700}>
-                  Site admin sign in
+                <Typography variant="h5" fontWeight={700} sx={{textAlign: "center", mb: 1}}>
+                  Site admin 
                 </Typography>
-                <Typography color="text.secondary" variant="body2">
-                  Sign in to manage pages for site {siteId}. Theme settings are
-                  not available to site admins.
+                <Typography color="text.secondary" variant="body2" sx={{textAlign: "center"}}>
+                  Sign in to manage pages for site 
                 </Typography>
               </Box>
               {error && <Alert severity="error">{error}</Alert>}
@@ -102,8 +101,7 @@ export default function SiteAdminLogin() {
                 {loading ? "Signing in..." : "Sign in"}
               </Button>
             </Stack>
-          </CardContent>
-          <Typography
+            <Typography
             color="text.secondary"
             sx={{ mt: 3, mb: 2, textAlign: "center" }}
           >
@@ -112,6 +110,8 @@ export default function SiteAdminLogin() {
               My Site
             </Link>
           </Typography>
+          </CardContent>
+          
         </Card>
       </Container>
     </Box>

@@ -566,7 +566,7 @@ export default function ViewTemplate() {
             </Typography>
           </Box>
         ) : (
-          <TableContainer>
+          <TableContainer sx={{ maxHeight: 560 }}>
             <Table>
               <TableHead>
                 <TableRow sx={{ bgcolor: "action.hover" }}>

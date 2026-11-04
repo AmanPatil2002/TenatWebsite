@@ -23,9 +23,10 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 
-const API = (
-  import.meta.env.VITE_API_URL || "http://localhost:5000"
-).replace(/\/+$/, "");
+const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(
+  /\/+$/,
+  "",
+);
 
 /* ------------------------------ helpers ------------------------------ */
 
@@ -67,11 +68,12 @@ const getId = (value) => {
 // ({ type: "Buffer", data: [1] }).
 const toFlag = (v) => {
   if (v === true || v === 1 || v === "1" || v === "true") return true;
-  if (v && typeof v === "object" && Array.isArray(v.data)) return v.data[0] === 1;
+  if (v && typeof v === "object" && Array.isArray(v.data))
+    return v.data[0] === 1;
   return false;
 };
 
-const isDefaultPage = (page) => toFlag(page?.isDefault ?? page?.is_default);
+//const isDefaultPage = (page) => toFlag(page?.isDefault ?? page?.is_default);
 const isDefaultTheme = (theme) => toFlag(theme?.isDefault ?? theme?.is_default);
 
 const getToken = () =>
@@ -91,13 +93,41 @@ const pageTitle = (page) => page.title || page.name || `Page ${page.pageKey}`;
 
 const numeric = { fontVariantNumeric: "tabular-nums" };
 
+const DEFAULT_PAGE_KEYS = new Set([
+  "home",
+  "index",
+  "contact",
+  "contact-us",
+  "contactus",
+  "about",
+  "about-us",
+  "aboutus",
+  "story",
+  "our-story",
+]);
+
+const normalizeKey = (value = "") =>
+  String(value)
+    .toLowerCase()
+    .trim()
+    .replace(/[\s_]+/g, "-");
+
+const isDefaultPage = (page) =>
+  DEFAULT_PAGE_KEYS.has(normalizeKey(page.pageKey)) ||
+  DEFAULT_PAGE_KEYS.has(normalizeKey(pageTitle(page)));
+
 /* --------------------------- small components --------------------------- */
 
 // A numbered step: checkout really is a sequence (theme -> pages -> pay).
 function Step({ number, title, hint, children }) {
   return (
     <Box sx={{ p: { xs: 2.5, md: 3.5 } }}>
-      <Stack direction="row" spacing={2} alignItems="flex-start" sx={{ mb: 2.5 }}>
+      <Stack
+        direction="row"
+        spacing={2}
+        alignItems="flex-start"
+        sx={{ mb: 2.5 }}
+      >
         <Box
           sx={{
             width: 28,
@@ -192,19 +222,19 @@ export default function Payment() {
         }))
         .filter((page) => page.pageKey !== null)
         .sort((a, b) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0)),
-    [pages]
+    [pages],
   );
 
   // Pages marked "Default" in Edit Template: already included in the price.
   const defaultPages = useMemo(
     () => normalizedPages.filter((p) => p.isDefault),
-    [normalizedPages]
+    [normalizedPages],
   );
 
   // Everything else: optional, priced, selectable.
   const additionalPages = useMemo(
     () => normalizedPages.filter((p) => !p.isDefault),
-    [normalizedPages]
+    [normalizedPages],
   );
 
   // ---- state ----
@@ -216,7 +246,7 @@ export default function Payment() {
             asArray(passedTemplate?.themes).find(isDefaultTheme) ||
             asArray(passedTemplate?.themes)[0];
           return def ? String(def.themeId ?? def.id) : "";
-        })()
+        })(),
   );
 
   const [selectedExtraIds, setSelectedExtraIds] = useState([]);
@@ -273,7 +303,7 @@ export default function Payment() {
   useEffect(() => {
     if (themes.length === 0) return;
     const exists = themes.some(
-      (t) => String(t.themeId ?? t.id) === String(themeId)
+      (t) => String(t.themeId ?? t.id) === String(themeId),
     );
     if (!exists) {
       const def = themes.find(isDefaultTheme) || themes[0];
@@ -288,13 +318,18 @@ export default function Payment() {
   const additionalPageIds = useMemo(() => {
     const valid = new Set(additionalPages.map((p) => p.pageKey));
     return [...new Set(selectedExtraIds.map(getId).filter(Boolean))].filter(
-      (id) => valid.has(id)
+      (id) => valid.has(id),
     );
   }, [selectedExtraIds, additionalPages]);
 
   const selectedExtras = useMemo(
     () => additionalPages.filter((p) => additionalPageIds.includes(p.pageKey)),
-    [additionalPages, additionalPageIds]
+    [additionalPages, additionalPageIds],
+  );
+
+  const selectableExtraPages = useMemo(
+    () => additionalPages.filter((page) => !isDefaultPage(page)),
+    [additionalPages],
   );
 
   // ---- server quote ----
@@ -316,7 +351,7 @@ export default function Payment() {
         const { data } = await axios.post(
           `${API}/payments/quote`,
           { templateId, themeId: selectedThemeId, additionalPageIds },
-          { headers: authHeaders({ "Content-Type": "application/json" }) }
+          { headers: authHeaders({ "Content-Type": "application/json" }) },
         );
         if (!cancelled) setQuote(data);
       } catch (err) {
@@ -351,7 +386,7 @@ export default function Payment() {
     if (!id) return;
     setError("");
     setSelectedExtraIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   };
 
@@ -377,7 +412,7 @@ export default function Payment() {
           additionalPageIds,
           method: "manual",
         },
-        { headers: authHeaders({ "Content-Type": "application/json" }) }
+        { headers: authHeaders({ "Content-Type": "application/json" }) },
       );
 
       setSuccess({
@@ -419,7 +454,11 @@ export default function Payment() {
     return (
       <Container maxWidth="sm" sx={{ py: { xs: 4, md: 8 } }}>
         <Paper variant="outlined" sx={{ p: { xs: 3, md: 5 }, borderRadius: 2 }}>
-          <Stack alignItems="center" spacing={1} sx={{ textAlign: "center", mb: 3 }}>
+          <Stack
+            alignItems="center"
+            spacing={1}
+            sx={{ textAlign: "center", mb: 3 }}
+          >
             <CheckCircleIcon color="success" sx={{ fontSize: 56 }} />
             <Typography variant="h5" fontWeight={700}>
               Purchase successful
@@ -430,7 +469,13 @@ export default function Payment() {
             </Typography>
           </Stack>
 
-          <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1.5 }}>
+          <Box
+            sx={{
+              border: "1px solid",
+              borderColor: "divider",
+              borderRadius: 1.5,
+            }}
+          >
             {rows.map(([label, value], i) => (
               <Stack
                 key={label}
@@ -450,7 +495,11 @@ export default function Payment() {
                 <Typography
                   variant="body2"
                   fontWeight={600}
-                  sx={{ overflowWrap: "anywhere", textAlign: "right", ...numeric }}
+                  sx={{
+                    overflowWrap: "anywhere",
+                    textAlign: "right",
+                    ...numeric,
+                  }}
                 >
                   {value}
                 </Typography>
@@ -458,7 +507,11 @@ export default function Payment() {
             ))}
           </Box>
 
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ mt: 3 }}>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1.5}
+            sx={{ mt: 3 }}
+          >
             <Button
               fullWidth
               variant="contained"
@@ -512,7 +565,10 @@ export default function Payment() {
       )}
 
       {!template ? (
-        <Paper variant="outlined" sx={{ p: 4, textAlign: "center", borderRadius: 2 }}>
+        <Paper
+          variant="outlined"
+          sx={{ p: 4, textAlign: "center", borderRadius: 2 }}
+        >
           <Typography variant="h6" fontWeight={700} gutterBottom>
             No template selected
           </Typography>
@@ -526,8 +582,11 @@ export default function Payment() {
       ) : (
         <Grid container spacing={3} alignItems="flex-start">
           {/* ------------------------- LEFT: steps ------------------------- */}
-          <Grid size={{ xs: 12, md: 8 }}>
-            <Paper variant="outlined" sx={{ borderRadius: 2, overflow: "hidden" }}>
+          <Grid size={{ xs: 12, md: 7 }}>
+            <Paper
+              variant="outlined"
+              sx={{ borderRadius: 2, overflow: "hidden" }}
+            >
               {/* 1. Theme */}
               <Step
                 number={1}
@@ -546,59 +605,83 @@ export default function Payment() {
                       setThemeId(e.target.value);
                     }}
                   >
-                    <Grid container spacing={1.5}>
+                    <Grid container spacing={2}>
                       {themes.map((theme) => {
                         const value = String(theme.themeId ?? theme.id);
                         const selected = value === String(themeId);
+                        const name = theme.name || `Theme ${value}`;
+
                         return (
-                          <Grid key={value} size={{ xs: 12, sm: 6 }}>
+                          <Grid
+                            key={value}
+                            size={{ xs: 12, sm: 6, md: 4 }}
+                            sx={{ display: "flex" }}
+                          >
                             <FormControlLabel
                               value={value}
-                              control={<Radio size="small" />}
+                              control={<Radio size="small" sx={{ p: 0.5 }} />}
                               sx={{
                                 m: 0,
-                                width: "100%",
+                                flex: 1,
+                                minWidth: 0,
+                                boxSizing: "border-box",
+                                alignItems: "center",
+                                gap: 1,
                                 px: 1.5,
                                 py: 1,
                                 border: "1px solid",
-                                borderColor: selected ? "primary.main" : "divider",
+                                borderColor: selected
+                                  ? "primary.main"
+                                  : "divider",
                                 borderRadius: 1.5,
                                 bgcolor: selected
                                   ? (t) => alpha(t.palette.primary.main, 0.06)
                                   : "transparent",
-                                "& .MuiFormControlLabel-label": { flex: 1, minWidth: 0 },
+                                "& .MuiFormControlLabel-label": {
+                                  flex: 1,
+                                  minWidth: 0,
+                                },
                               }}
                               label={
-                                <Stack direction="row" spacing={1.5} alignItems="center">
+                                <Stack
+                                  direction="row"
+                                  spacing={1}
+                                  alignItems="center"
+                                  sx={{ width: "100%" }}
+                                >
                                   <Box
                                     aria-hidden
                                     sx={{
-                                      width: 40,
-                                      height: 28,
-                                      flexShrink: 0,
+                                      flex: 1,
+                                      minWidth: 0,
+                                      height: 38,
+                                      px: 1,
                                       borderRadius: 1,
                                       border: "1px solid",
                                       borderColor: "divider",
-                                      backgroundColor: theme.background || "#fff",
+                                      backgroundColor:
+                                        theme.background || "#fff",
                                       color: theme.color || "#111",
-                                      display: "grid",
-                                      placeItems: "center",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
                                       fontSize: 12,
                                       fontWeight: 700,
+                                      overflow: "hidden",
+                                      whiteSpace: "nowrap",
+                                      textOverflow: "ellipsis",
                                     }}
                                   >
-                                    Aa
+                                    {name}
                                   </Box>
-                                  <Typography
-                                    variant="body2"
-                                    fontWeight={600}
-                                    noWrap
-                                    sx={{ flex: 1 }}
-                                  >
-                                    {theme.name || `Theme ${value}`}
-                                  </Typography>
+
                                   {isDefaultTheme(theme) && (
-                                    <Chip size="small" label="Default" variant="outlined" />
+                                    <Chip
+                                      size="small"
+                                      label="Default"
+                                      variant="outlined"
+                                      sx={{ flexShrink: 0 }}
+                                    />
                                   )}
                                 </Stack>
                               }
@@ -613,22 +696,21 @@ export default function Payment() {
 
               <Divider />
 
-              
               {/* @. Additional pages: the only selectable ones */}
               <Step
                 number={2}
                 title="Add more pages"
                 hint="Optional. Each extra page is added to the price."
               >
-                {templateLoading && additionalPages.length === 0 ? (
+                {templateLoading && selectableExtraPages.length === 0 ? (
                   <CircularProgress size={20} />
-                ) : additionalPages.length === 0 ? (
+                ) : selectableExtraPages.length === 0 ? (
                   <Typography variant="body2" color="text.secondary">
                     No additional pages are available for this template.
                   </Typography>
                 ) : (
                   <Stack spacing={1}>
-                    {additionalPages.map((page) => {
+                    {selectableExtraPages.map((page) => {
                       const checked = additionalPageIds.includes(page.pageKey);
                       return (
                         <FormControlLabel
@@ -641,7 +723,7 @@ export default function Payment() {
                           }
                           sx={{
                             m: 0,
-                            width: "100%",
+                            width: "60%",
                             pr: 2,
                             py: 0.25,
                             border: "1px solid",
@@ -650,7 +732,10 @@ export default function Payment() {
                             bgcolor: checked
                               ? (t) => alpha(t.palette.primary.main, 0.06)
                               : "transparent",
-                            "& .MuiFormControlLabel-label": { flex: 1, minWidth: 0 },
+                            "& .MuiFormControlLabel-label": {
+                              flex: 1,
+                              minWidth: 0,
+                            },
                           }}
                           label={
                             <Stack
@@ -681,7 +766,7 @@ export default function Payment() {
           </Grid>
 
           {/* ---------------------- RIGHT: order summary ---------------------- */}
-          <Grid size={{ xs: 12, md: 4 }}>
+          <Grid size={{ xs: 12, md: 5 }}>
             <Paper
               variant="outlined"
               sx={{
@@ -716,15 +801,30 @@ export default function Payment() {
                 {template.name || "Website template"}
               </Typography>
 
-              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
-                {template.language && <Chip size="small" label={template.language} />}
+              <Stack
+                direction="row"
+                spacing={1}
+                flexWrap="wrap"
+                useFlexGap
+                sx={{ mt: 1 }}
+              >
+                {template.language && (
+                  <Chip size="small" label={template.language} />
+                )}
                 {template.validityDays && (
-                  <Chip size="small" label={`Valid for ${template.validityDays} days`} />
+                  <Chip
+                    size="small"
+                    label={`Valid for ${template.validityDays} days`}
+                  />
                 )}
               </Stack>
 
               {template.shortDescription && (
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mt: 1.5 }}
+                >
                   {template.shortDescription}
                 </Typography>
               )}
@@ -732,13 +832,9 @@ export default function Payment() {
               <Divider sx={{ my: 2 }} />
 
               <Stack spacing={1.25}>
-                <SummaryRow
-                  label="Template"
-                  caption={`Includes ${defaultPages.length} page${
-                    defaultPages.length === 1 ? "" : "s"
-                  }`}
-                  value={formatPrice(templatePrice, currency)}
-                />
+                <Typography variant="subtitle2" fontWeight={700}>
+                  Pages
+                </Typography>
 
                 {selectedExtras.map((page) => (
                   <SummaryRow
@@ -755,11 +851,15 @@ export default function Payment() {
 
               <Divider sx={{ my: 2 }} />
 
-              <Stack direction="row" justifyContent="space-between" alignItems="baseline">
-                <Typography fontWeight={700}>Total</Typography>
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="baseline"
+              >
+                <Typography fontWeight={700}>Total : </Typography>
                 <Stack direction="row" spacing={1} alignItems="center">
                   {quoteLoading && <CircularProgress size={14} />}
-                  <Typography variant="h5" fontWeight={700} sx={numeric}>
+                  <Typography variant="body1" fontWeight={500} sx={numeric}>
                     {formatPrice(total, currency)}
                   </Typography>
                 </Stack>
@@ -779,10 +879,10 @@ export default function Payment() {
                 {paying
                   ? "Processing…"
                   : quoteLoading || templateLoading
-                  ? "Calculating price…"
-                  : canPay
-                  ? `Pay ${formatPrice(total, currency)}`
-                  : "Select a theme to continue"}
+                    ? "Calculating price…"
+                    : canPay
+                      ? `Pay ${formatPrice(total, currency)}`
+                      : "Select a theme to continue"}
               </Button>
 
               <Stack

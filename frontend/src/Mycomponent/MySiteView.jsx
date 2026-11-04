@@ -6,14 +6,20 @@ import {
   Box,
   Button,
   CircularProgress,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  IconButton,
   Tab,
   Tabs,
   ToggleButton,
   ToggleButtonGroup,
+  Typography,
 } from "@mui/material";
 import LaptopIcon from "@mui/icons-material/Laptop";
 import TabletAndroidIcon from "@mui/icons-material/TabletAndroid";
 import PhoneAndroidIcon from "@mui/icons-material/PhoneAndroid";
+import CloseIcon from "@mui/icons-material/Close";
 import { createSiteSlug } from "../utils/siteSlug";
 
 const API_URL = (
@@ -55,6 +61,63 @@ const readCustomFields = (value) => {
   return {};
 };
 
+const resolveMediaImage = (url) => {
+  if (typeof url !== "string") return "";
+  if (url.startsWith("/uploads/")) return `${API_URL}${url}`;
+  return /^https?:\/\/\S+$/i.test(url) ? url : "";
+};
+
+// Gallery grid: built ONLY from gallery images.
+// The "Gallery" heading comes from the CKEditor gallery page, so it is not added here.
+const renderGallery = (items) => {
+  if (!Array.isArray(items)) return "";
+  const cards = items
+    .map((item) => {
+      const imageUrl = resolveMediaImage(item.imageUrl);
+      if (!imageUrl) return "";
+      const title = item.title || item.caption || item.altText || "Gallery image";
+      const description = item.caption || item.title;
+      const caption = description
+        ? `<figcaption>${escapeHtml(description)}</figcaption>`
+        : "";
+      return `<figure><img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.altText || title)}" loading="lazy" />${caption}</figure>`;
+    })
+    .filter(Boolean)
+    .join("");
+
+  if (!cards) return "";
+  return `<section class="site-gallery"><div class="site-gallery-grid">${cards}</div></section>`;
+};
+
+// Home slider: built ONLY from slider images. Renders nothing when there are none.
+const renderSlider = (items) => {
+  if (!Array.isArray(items)) return "";
+  const slides = items
+    .filter((item) => resolveMediaImage(item.imageUrl))
+    .map((item) => {
+      const title = item.title || "Site slide";
+      return `<div class="site-slide"><img src="${escapeHtml(resolveMediaImage(item.imageUrl))}" alt="${escapeHtml(title)}" /><span>${escapeHtml(title)}</span></div>`;
+    });
+
+  if (!slides.length) return "";
+  const animation = slides.length > 1
+    ? `animation: siteSlider ${slides.length * 5}s linear infinite;`
+    : "";
+  const keyframes = slides.length > 1
+    ? `@keyframes siteSlider { ${slides
+        .map((_, index) => {
+          const start = (index / slides.length) * 100;
+          const holdEnd = index === slides.length - 1
+            ? 100
+            : ((index + 1) / slides.length) * 100 - 1;
+          return `${start}% , ${holdEnd}% { transform: translateX(-${index * 100}%); }`;
+        })
+        .join(" ")} }`
+    : "";
+
+  return `<section class="site-home-slider" aria-label="Image slider"><div class="site-slider-track" style="${animation}">${slides.join("")}</div></section><style>${keyframes}</style>`;
+};
+
 const renderSiteEntries = (entries, currency, pageTitle) => {
   if (!Array.isArray(entries) || !entries.length) return "";
   const cards = entries
@@ -84,7 +147,32 @@ const renderSiteEntries = (entries, currency, pageTitle) => {
   return `<section style="margin-top:32px"><h2>${escapeHtml(pageTitle)} items</h2><div style="display:flex;flex-wrap:wrap;gap:16px">${cards}</div></section>`;
 };
 
-const buildSrcDoc = (html, background, color, entries, currency, pageTitle) => `<!DOCTYPE html>
+const SLIDER_MARKER = /<!--\s*SITE_SLIDER\s*-->/i;
+ 
+const buildSrcDoc = (
+  html,
+  background,
+  color,
+  entries,
+  currency,
+  pageTitle,
+  galleries,
+  slides,
+) => {
+  const isHome = /home/i.test(pageTitle);
+  const isGallery = /gall[ae]ry/i.test(pageTitle);
+ 
+  const sliderHtml = isHome ? renderSlider(slides) : "";
+  const pageHtml = html || "<p>This page has no content yet.</p>";
+ 
+  // Marker found  -> slider replaces the marker (e.g. right below the title).
+  // No marker     -> slider goes at the top of the page, as before.
+  // No slider imgs-> sliderHtml is "", so the marker simply disappears.
+  const bodyHtml = SLIDER_MARKER.test(pageHtml)
+    ? pageHtml.replace(SLIDER_MARKER, () => sliderHtml)
+    : `${sliderHtml}${pageHtml}`;
+ 
+  return `<!DOCTYPE html>
 <html>
   <head>
     <meta charset="UTF-8" />
@@ -101,10 +189,22 @@ const buildSrcDoc = (html, background, color, entries, currency, pageTitle) => `
       }
       img { max-width: 100%; height: auto; }
       table { max-width: 100%; }
+      .site-home-slider { width: 100%; margin: 22px auto 28px; overflow: hidden; border-radius: 12px; background: #f0f0f0; }
+      .site-slider-track { display: flex; width: 100%; }
+      .site-slide { position: relative; flex: 0 0 100%; height: clamp(220px, 42vw, 520px); }
+      .site-slide img { width: 100%; height: 100%; object-fit: cover; }
+      .site-slide span { position: absolute; inset: auto 0 0; padding: 18px 22px; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,.7)); font-size: 1.15rem; text-align: left; }
+      .site-gallery { margin-top: 32px; }
+      .site-gallery-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 16px; }
+      .site-gallery figure { margin: 0; overflow: hidden; border-radius: 10px; background: #f3f4f6; }
+      .site-gallery img { display: block; width: 100%; height: 240px; object-fit: cover; transition: transform 0.4s ease; }
+      .site-gallery figure:hover img { transform: scale(1.06); }
+      .site-gallery figcaption { padding: 10px 12px; }
     </style>
   </head>
-  <body>${html || "<p>This page has no content yet.</p>"}${renderSiteEntries(entries, currency, pageTitle)}</body>
+  <body>${bodyHtml}${isGallery ? renderGallery(galleries) : ""}</body>
 </html>`;
+};
 
 export default function MySiteView() {
   const { siteId: adminSiteId, siteSlug } = useParams();
@@ -114,8 +214,11 @@ export default function MySiteView() {
 
   const [site, setSite] = useState({ color: "#222222", background: "#ffffff" });
   const [pages, setPages] = useState([]);
+  const [media, setMedia] = useState({ news: [], galleries: [], slider: [] });
   const [activeId, setActiveId] = useState("");
   const [devices, setDevices] = useState("laptop");
+  const [newsIndex, setNewsIndex] = useState(0);
+  const [newsOpen, setNewsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -169,7 +272,13 @@ export default function MySiteView() {
         const pagesUrl = siteAdminMode
           ? `${API_URL}/sites/client-admin/${targetSiteId}/pages`
           : `${API_URL}/sites/${targetSiteId}/pages`;
-        const pagesRes = await axios.get(pagesUrl, { headers });
+        const mediaUrl = siteAdminMode
+          ? `${API_URL}/sites/client-admin/${targetSiteId}/media`
+          : `${API_URL}/sites/${targetSiteId}/media`;
+        const [pagesRes, mediaRes] = await Promise.all([
+          axios.get(pagesUrl, { headers }),
+          axios.get(mediaUrl, { headers }),
+        ]);
         if (cancelled) return;
 
         const list = Array.isArray(pagesRes.data?.pages)
@@ -177,6 +286,20 @@ export default function MySiteView() {
           : [];
 
         setPages(list);
+
+        const news = Array.isArray(mediaRes.data?.news) ? mediaRes.data.news : [];
+        setNewsIndex(0);
+        setNewsOpen(news.length > 0);
+        setMedia({
+          news,
+          galleries: Array.isArray(mediaRes.data?.galleries)
+            ? mediaRes.data.galleries
+            : [],
+          slider: Array.isArray(mediaRes.data?.slider)
+            ? mediaRes.data.slider
+            : [],
+        });
+
         setActiveId(
           list[0] ? String(list[0].sitePageId ?? list[0].pagesId) : "",
         );
@@ -203,6 +326,20 @@ export default function MySiteView() {
     };
   }, [routeSiteKey, siteSlug, navigate, siteAdminMode]);
 
+  // News pop-up: re-open every 5 minutes, rotating through the news items.
+  useEffect(() => {
+    if (!media.news.length) return undefined;
+
+    let nextIndex = 0;
+    const timer = window.setInterval(() => {
+      nextIndex = (nextIndex + 1) % media.news.length;
+      setNewsIndex(nextIndex);
+      setNewsOpen(true);
+    }, 5 * 60 * 1000);
+
+    return () => window.clearInterval(timer);
+  }, [media.news]);
+
   const activePage = useMemo(
     () =>
       pages.find(
@@ -214,35 +351,41 @@ export default function MySiteView() {
   return (
     <Box sx={{ bgcolor: "#f7f7f8", minHeight: "100vh", width: "100%" }}>
       <Box
-  sx={{
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    width: "100%",
-  }}
->
-  <Button onClick={() => navigate(siteAdminMode ? `/site-admin/${adminSiteId}/panel` : "/mysite")}>
-    ← Back
-  </Button>
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          width: "100%",
+        }}
+      >
+        <Button
+          onClick={() =>
+            navigate(
+              siteAdminMode ? `/site-admin/${adminSiteId}/panel` : "/mysite",
+            )
+          }
+        >
+          ← Back
+        </Button>
 
-  <ToggleButtonGroup
-    size="small"
-    exclusive
-    value={devices}
-    onChange={handleDevices}
-    aria-label="device"
-  >
-    <ToggleButton value="laptop" aria-label="laptop">
-      <LaptopIcon />
-    </ToggleButton>
-    <ToggleButton value="tablet" aria-label="tablet">
-      <TabletAndroidIcon />
-    </ToggleButton>
-    <ToggleButton value="phone" aria-label="phone">
-      <PhoneAndroidIcon />
-    </ToggleButton>
-  </ToggleButtonGroup>
-</Box>
+        <ToggleButtonGroup
+          size="small"
+          exclusive
+          value={devices}
+          onChange={handleDevices}
+          aria-label="device"
+        >
+          <ToggleButton value="laptop" aria-label="laptop">
+            <LaptopIcon />
+          </ToggleButton>
+          <ToggleButton value="tablet" aria-label="tablet">
+            <TabletAndroidIcon />
+          </ToggleButton>
+          <ToggleButton value="phone" aria-label="phone">
+            <PhoneAndroidIcon />
+          </ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
 
       {loading ? (
         <Box sx={{ display: "grid", placeItems: "center", minHeight: 300 }}>
@@ -296,6 +439,8 @@ export default function MySiteView() {
                 activePage?.entries,
                 site.currency,
                 activePage?.title || "Site",
+                media.galleries, // gallery page -> gallery images only
+                media.slider, //    home page    -> slider images only
               )}
               sx={{
                 width: DEVICE_WIDTHS[devices],
@@ -309,6 +454,47 @@ export default function MySiteView() {
             />
           </Box>
         </>
+      )}
+
+      {media.news[newsIndex] && (
+        <Dialog
+          open={newsOpen}
+          onClose={() => setNewsOpen(false)}
+          fullWidth
+          maxWidth="sm"
+          aria-labelledby="site-news-title"
+        >
+          <DialogTitle id="site-news-title" sx={{ pr: 7 }}>
+            {media.news[newsIndex].title}
+            <IconButton
+              aria-label="Close news"
+              onClick={() => setNewsOpen(false)}
+              sx={{ position: "absolute", right: 8, top: 8 }}
+            >
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent dividers>
+            {resolveMediaImage(media.news[newsIndex].imageUrl) && (
+              <Box
+                component="img"
+                src={resolveMediaImage(media.news[newsIndex].imageUrl)}
+                alt={media.news[newsIndex].title || "News"}
+                sx={{
+                  display: "block",
+                  width: "100%",
+                  maxHeight: 320,
+                  objectFit: "cover",
+                  borderRadius: 1,
+                  mb: 2,
+                }}
+              />
+            )}
+            <Typography sx={{ whiteSpace: "pre-wrap" }}>
+              {media.news[newsIndex].content}
+            </Typography>
+          </DialogContent>
+        </Dialog>
       )}
     </Box>
   );

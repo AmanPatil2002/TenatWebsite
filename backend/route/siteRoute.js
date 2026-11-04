@@ -96,6 +96,12 @@ router.delete(
   authenticateSiteAdmin,
   deleteEntry,
 );
+router.get(
+  "/client-admin/:siteId/media",
+  authenticateSiteAdmin,
+  siteMedia.listPublishedMedia,
+);
+router.get("/:siteId/media", authenticateToken, siteMedia.listPublishedMedia);
 router.post(
   "/client-admin/:siteId/media/upload",
   authenticateSiteAdmin,

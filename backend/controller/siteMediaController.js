@@ -322,6 +322,63 @@ const createHandlers = (type) => {
   return { list, create, update, remove };
 };
 
+const listPublishedMedia = async (req, res) => {
+  const { siteId } = req.params;
+  if (!isId(siteId)) {
+    return res.status(400).json({ message: "Invalid site id" });
+  }
+
+  try {
+    if (req.siteAdmin) {
+      if (String(req.siteAdmin.siteId) !== String(siteId)) {
+        throw new HttpError(403, "This login is not assigned to the requested site");
+      }
+    } else {
+      const [[site]] = await db.query(
+        `SELECT s.id
+           FROM sites s
+           JOIN payments p ON p.id = s.paymentId
+          WHERE s.id = ? AND s.userId = ?`,
+        [siteId, req.user.userId],
+      );
+      if (!site) throw new HttpError(404, "Site not found");
+    }
+
+    await ensureActiveSite(siteId);
+    const [news, galleries, slider] = await Promise.all([
+      db.query(
+        `SELECT id, title, imageUrl, content, createdAt
+           FROM sitenews
+          WHERE siteId = ? AND status = 'active'
+          ORDER BY createdAt DESC, id DESC`,
+        [siteId],
+      ),
+      db.query(
+        `SELECT id, title, imageUrl, caption, altText, sortOrder
+           FROM sitegalleries
+          WHERE siteId = ? AND status = 'active'
+          ORDER BY sortOrder, id`,
+        [siteId],
+      ),
+      db.query(
+        `SELECT id, title, imageUrl, sortOrder
+           FROM siteslider
+          WHERE siteId = ? AND status = 'active'
+          ORDER BY sortOrder, id`,
+        [siteId],
+      ),
+    ]);
+
+    return res.json({
+      news: news[0],
+      galleries: galleries[0],
+      slider: slider[0],
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+};
+
 /* ------------------------------------------------------------------ */
 /* Upload endpoint: POST /sites/:siteId/media/upload  (field: "image") */
 /* ------------------------------------------------------------------ */
@@ -363,6 +420,7 @@ module.exports = {
   news: createHandlers("news"),
   galleries: createHandlers("galleries"),
   slider: createHandlers("slider"),
+  listPublishedMedia,
   uploadImage,
   UPLOAD_ROOT,
 };

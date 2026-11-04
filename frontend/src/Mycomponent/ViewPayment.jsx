@@ -191,10 +191,17 @@ function InvoiceDialog({ payment, admin, onClose }) {
               <ReceiptLongOutlinedIcon />
             </Avatar>
             <Box>
-              <Typography variant="overline" sx={{ opacity: 0.8, letterSpacing: 1.2 }}>
+              <Typography
+                variant="overline"
+                sx={{ opacity: 0.8, letterSpacing: 1.2 }}
+              >
                 Invoice
               </Typography>
-              <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2 }}>
+              <Typography
+                variant="h6"
+                fontWeight={700}
+                sx={{ lineHeight: 1.2 }}
+              >
                 {payment.invoiceNumber || "Invoice unavailable"}
               </Typography>
             </Box>
@@ -235,7 +242,10 @@ function InvoiceDialog({ payment, admin, onClose }) {
             {/* Invoice details */}
             <Paper
               variant="outlined"
-              sx={{ p: 2, bgcolor: (theme) => alpha(theme.palette.primary.main, 0.03) }}
+              sx={{
+                p: 2,
+                bgcolor: (theme) => alpha(theme.palette.primary.main, 0.03),
+              }}
             >
               <Box
                 sx={{
@@ -258,12 +268,21 @@ function InvoiceDialog({ payment, admin, onClose }) {
                   />
                 </MetaItem>
                 <MetaItem label="Method">
-                  <Typography variant="body2" fontWeight={600} sx={{ textTransform: "capitalize" }}>
+                  <Typography
+                    variant="body2"
+                    fontWeight={600}
+                    sx={{ textTransform: "capitalize" }}
+                  >
                     {payment.method || "—"}
                   </Typography>
                 </MetaItem>
                 <MetaItem label="Transaction ID">
-                  <Typography variant="body2" fontWeight={600} noWrap title={payment.transactionId}>
+                  <Typography
+                    variant="body2"
+                    fontWeight={600}
+                    noWrap
+                    title={payment.transactionId}
+                  >
                     {payment.transactionId || "—"}
                   </Typography>
                 </MetaItem>
@@ -275,7 +294,9 @@ function InvoiceDialog({ payment, admin, onClose }) {
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ ...headCellSx, bgcolor: "transparent", pl: 0 }}>
+                    <TableCell
+                      sx={{ ...headCellSx, bgcolor: "transparent", pl: 0 }}
+                    >
                       Description
                     </TableCell>
                     <TableCell
@@ -290,13 +311,17 @@ function InvoiceDialog({ payment, admin, onClose }) {
                   <TableRow>
                     <TableCell sx={{ pl: 0 }}>
                       <Typography variant="body2" fontWeight={600}>
-                        {payment.templateName || `Template #${payment.templateId}`}
+                        {payment.templateName ||
+                          `Template #${payment.templateId}`}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         Website template
                       </Typography>
                     </TableCell>
-                    <TableCell align="right" sx={{ pr: 0, whiteSpace: "nowrap" }}>
+                    <TableCell
+                      align="right"
+                      sx={{ pr: 0, whiteSpace: "nowrap" }}
+                    >
                       {baseAmount != null
                         ? formatMoney(baseAmount, payment.currency)
                         : "—"}
@@ -314,7 +339,10 @@ function InvoiceDialog({ payment, admin, onClose }) {
                             Page
                           </Typography>
                         </TableCell>
-                        <TableCell align="right" sx={{ pr: 0, whiteSpace: "nowrap" }}>
+                        <TableCell
+                          align="right"
+                          sx={{ pr: 0, whiteSpace: "nowrap" }}
+                        >
                           {formatMoney(page.price, payment.currency)}
                         </TableCell>
                       </TableRow>
@@ -328,12 +356,18 @@ function InvoiceDialog({ payment, admin, onClose }) {
                         <Typography variant="caption" color="text.secondary">
                           {pages.length
                             ? pages
-                                .map((page) => page.title || `Page #${page.pagesId}`)
+                                .map(
+                                  (page) =>
+                                    page.title || `Page #${page.pagesId}`,
+                                )
                                 .join(", ")
                             : "No pages recorded"}
                         </Typography>
                       </TableCell>
-                      <TableCell align="right" sx={{ pr: 0, whiteSpace: "nowrap" }}>
+                      <TableCell
+                        align="right"
+                        sx={{ pr: 0, whiteSpace: "nowrap" }}
+                      >
                         {payment.pagesAmount != null
                           ? formatMoney(payment.pagesAmount, payment.currency)
                           : "—"}
@@ -348,24 +382,36 @@ function InvoiceDialog({ payment, admin, onClose }) {
             <Box
               sx={(theme) => ({
                 p: 2,
+                width: "100%",
+                boxSizing: "border-box",
                 borderRadius: 1.5,
                 bgcolor: alpha(theme.palette.primary.main, 0.08),
                 WebkitPrintColorAdjust: "exact",
                 printColorAdjust: "exact",
               })}
             >
-              <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Stack direction="row" alignItems="center" sx={{ width: "100%" }}>
                 <Typography variant="subtitle1" fontWeight={700}>
                   Total paid
                 </Typography>
-                <Typography variant="h5" fontWeight={700} color="primary">
+
+                <Typography
+                  variant="h5"
+                  fontWeight={700}
+                  color="primary"
+                  sx={{ ml: "auto", textAlign: "right" }}
+                >
                   {formatMoney(payment.amount, payment.currency)}
                 </Typography>
               </Stack>
             </Box>
 
             <Divider />
-            <Typography variant="caption" color="text.secondary" textAlign="center">
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              textAlign="center"
+            >
               Thank you for your purchase. This is a computer-generated invoice
               and does not require a signature.
             </Typography>
@@ -510,10 +556,12 @@ export default function ViewPayment({ admin = true }) {
         ) : !loadError ? (
           <Paper variant="outlined" sx={{ overflow: "hidden" }}>
             <TableContainer sx={{ maxHeight: 560 }}>
-              <Table stickyHeader size="medium" sx={{ minWidth: 900 }}>
+              <Table>
                 <TableHead>
                   <TableRow>
-                    {admin && <TableCell sx={headCellSx}>Purchased by</TableCell>}
+                    {admin && (
+                      <TableCell sx={headCellSx}>Purchased by</TableCell>
+                    )}
                     <TableCell sx={headCellSx}>Template &amp; pages</TableCell>
                     <TableCell sx={headCellSx} align="right">
                       Amount
@@ -531,10 +579,13 @@ export default function ViewPayment({ admin = true }) {
                     const status = statusMeta(payment.status);
                     return (
                       <TableRow hover key={payment.id}>
-                        
                         {admin && (
                           <TableCell sx={{ minWidth: 220 }}>
-                            <Stack direction="row" spacing={1.5} alignItems="center">
+                            <Stack
+                              direction="row"
+                              spacing={1.5}
+                              alignItems="center"
+                            >
                               <Avatar
                                 sx={{
                                   width: 34,
@@ -546,7 +597,11 @@ export default function ViewPayment({ admin = true }) {
                                 {getInitials(payment.userName)}
                               </Avatar>
                               <Box sx={{ minWidth: 0 }}>
-                                <Typography variant="body2" fontWeight={600} noWrap>
+                                <Typography
+                                  variant="body2"
+                                  fontWeight={600}
+                                  noWrap
+                                >
                                   {payment.userName || "—"}
                                 </Typography>
                                 <Typography
@@ -621,7 +676,11 @@ export default function ViewPayment({ admin = true }) {
 
                   {!visiblePayments.length && (
                     <TableRow>
-                      <TableCell colSpan={columnCount} align="center" sx={{ py: 6 }}>
+                      <TableCell
+                        colSpan={columnCount}
+                        align="center"
+                        sx={{ py: 6 }}
+                      >
                         <Typography variant="body2" color="text.secondary">
                           {payments.length
                             ? "No purchases match your search."

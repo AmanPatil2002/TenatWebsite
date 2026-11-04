@@ -65,7 +65,7 @@ export default function SiteAdminLayout() {
     localStorage.removeItem("siteAdminToken");
     localStorage.removeItem("siteAdminSiteId");
     localStorage.removeItem("siteAdminSiteName");
-    navigate(`${siteBasePath}/login`, { replace: true });
+    navigate(`/mysite`, { replace: true });
   }, [navigate, siteBasePath]);
 
   const reloadSite = useCallback(async () => {

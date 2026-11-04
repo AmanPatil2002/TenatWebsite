@@ -55,7 +55,7 @@ function Header() {
   ];
 
   return (
-    <AppBar position="static" sx={{ backgroundColor: "#172033" }}>
+    <AppBar position="static" sx={{ backgroundColor: "#172033" ,margintop: 0,}}>
       <Container maxWidth="xl">
         <Toolbar disableGutters sx={{ gap: 1 }}>
           {/* Mobile: hamburger menu */}
@@ -179,7 +179,7 @@ function Header() {
                     <Typography>My Account</Typography>
                   </MenuItem>
                   <MenuItem component={Link} to="/mysite" onClick={handleCloseUserMenu}>
-                    <Typography>Purchased Templates</Typography>
+                    <Typography>Purchased</Typography>
                   </MenuItem>
                   <MenuItem component={Link} to="/review" onClick={handleCloseUserMenu}>
                     <Typography>Review</Typography>

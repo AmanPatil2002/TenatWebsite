@@ -139,11 +139,7 @@ export default function MySite() {
                             variant="body2"
                             color={usable && remaining <= 30 ? "warning.main" : "text.secondary"}
                           >
-                            {usable
-                              ? `Valid until ${formatDate(site.expiresAt)} (${remaining} day${
-                                  remaining === 1 ? "" : "s"
-                                } left)`
-                              : `Expired on ${formatDate(site.expiresAt)}`}
+                            {`Expired on ${formatDate(site.expiresAt)}`}
                           </Typography>
                         </Stack>
 

@@ -223,7 +223,7 @@ export default function SiteAdminAccess() {
       ) : (
         <Paper variant="outlined" sx={{ overflow: "hidden" }}>
           <TableContainer sx={{ maxHeight: 560 }}>
-            <Table stickyHeader size="medium" sx={{ minWidth: 900 }}>
+            <Table>
               <TableHead>
                 <TableRow>
                   <TableCell sx={headCellSx}>Site</TableCell>
