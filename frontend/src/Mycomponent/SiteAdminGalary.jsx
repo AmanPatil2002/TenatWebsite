@@ -412,22 +412,6 @@ export default function SiteAdminGalary() {
                           color={item.status === "active" ? "success" : "default"}
                         />
                       </Stack>
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{
-                          overflow: "hidden",
-                          display: "-webkit-box",
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: "vertical",
-                          overflowWrap: "anywhere",
-                        }}
-                      >
-                        {item.caption ||
-                          item.altText ||
-                          item.imageUrl ||
-                          "No additional details"}
-                      </Typography>
                       <Typography variant="caption" color="text.secondary">
                         Order: {item.sortOrder ?? 0}
                       </Typography>

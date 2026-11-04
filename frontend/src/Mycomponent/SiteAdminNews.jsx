@@ -156,10 +156,7 @@ export default function SiteAdminNews() {
     event.preventDefault();
     setError("");
     setNotice("");
-    if (!form.imageUrl) {
-      setError("Upload an image before saving.");
-      return;
-    }
+
     setSaving(true);
 
     const payload = {

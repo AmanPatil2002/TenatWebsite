@@ -38,13 +38,17 @@ const getToken = () =>
   localStorage.getItem("accessToken");
 
 const escapeHtml = (value) =>
-  String(value ?? "").replace(/[&<>"']/g, (character) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
-  })[character]);
+  String(value ?? "").replace(
+    /[&<>"']/g,
+    (character) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[character],
+  );
 
 const readCustomFields = (value) => {
   if (value && typeof value === "object" && !Array.isArray(value)) return value;
@@ -75,7 +79,8 @@ const renderGallery = (items) => {
     .map((item) => {
       const imageUrl = resolveMediaImage(item.imageUrl);
       if (!imageUrl) return "";
-      const title = item.title || item.caption || item.altText || "Gallery image";
+      const title =
+        item.title || item.caption || item.altText || "Gallery image";
       const description = item.caption || item.title;
       const caption = description
         ? `<figcaption>${escapeHtml(description)}</figcaption>`
@@ -100,20 +105,23 @@ const renderSlider = (items) => {
     });
 
   if (!slides.length) return "";
-  const animation = slides.length > 1
-    ? `animation: siteSlider ${slides.length * 5}s linear infinite;`
-    : "";
-  const keyframes = slides.length > 1
-    ? `@keyframes siteSlider { ${slides
-        .map((_, index) => {
-          const start = (index / slides.length) * 100;
-          const holdEnd = index === slides.length - 1
-            ? 100
-            : ((index + 1) / slides.length) * 100 - 1;
-          return `${start}% , ${holdEnd}% { transform: translateX(-${index * 100}%); }`;
-        })
-        .join(" ")} }`
-    : "";
+  const animation =
+    slides.length > 1
+      ? `animation: siteSlider ${slides.length * 5}s linear infinite;`
+      : "";
+  const keyframes =
+    slides.length > 1
+      ? `@keyframes siteSlider { ${slides
+          .map((_, index) => {
+            const start = (index / slides.length) * 100;
+            const holdEnd =
+              index === slides.length - 1
+                ? 100
+                : ((index + 1) / slides.length) * 100 - 1;
+            return `${start}% , ${holdEnd}% { transform: translateX(-${index * 100}%); }`;
+          })
+          .join(" ")} }`
+      : "";
 
   return `<section class="site-home-slider" aria-label="Image slider"><div class="site-slider-track" style="${animation}">${slides.join("")}</div></section><style>${keyframes}</style>`;
 };
@@ -148,7 +156,7 @@ const renderSiteEntries = (entries, currency, pageTitle) => {
 };
 
 const SLIDER_MARKER = /<!--\s*SITE_SLIDER\s*-->/i;
- 
+
 const buildSrcDoc = (
   html,
   background,
@@ -161,17 +169,17 @@ const buildSrcDoc = (
 ) => {
   const isHome = /home/i.test(pageTitle);
   const isGallery = /gall[ae]ry/i.test(pageTitle);
- 
+
   const sliderHtml = isHome ? renderSlider(slides) : "";
   const pageHtml = html || "<p>This page has no content yet.</p>";
- 
+
   // Marker found  -> slider replaces the marker (e.g. right below the title).
   // No marker     -> slider goes at the top of the page, as before.
   // No slider imgs-> sliderHtml is "", so the marker simply disappears.
   const bodyHtml = SLIDER_MARKER.test(pageHtml)
     ? pageHtml.replace(SLIDER_MARKER, () => sliderHtml)
     : `${sliderHtml}${pageHtml}`;
- 
+
   return `<!DOCTYPE html>
 <html>
   <head>
@@ -257,10 +265,9 @@ export default function MySiteView() {
               const previewPath = window.location.pathname.endsWith("/preview")
                 ? "/preview"
                 : "";
-              navigate(
-                `/mysite/${createSiteSlug(legacySite)}${previewPath}`,
-                { replace: true },
-              );
+              navigate(`/mysite/${createSiteSlug(legacySite)}${previewPath}`, {
+                replace: true,
+              });
               return;
             }
             setError("Site not found in your account.");
@@ -287,7 +294,9 @@ export default function MySiteView() {
 
         setPages(list);
 
-        const news = Array.isArray(mediaRes.data?.news) ? mediaRes.data.news : [];
+        const news = Array.isArray(mediaRes.data?.news)
+          ? mediaRes.data.news
+          : [];
         setNewsIndex(0);
         setNewsOpen(news.length > 0);
         setMedia({
@@ -305,7 +314,8 @@ export default function MySiteView() {
         );
         setSite({
           color: meta?.color || pagesRes.data?.color || "#222222",
-          background: meta?.background || pagesRes.data?.background || "#ffffff",
+          background:
+            meta?.background || pagesRes.data?.background || "#ffffff",
           currency: pagesRes.data?.currency || "INR",
         });
       } catch (err) {
@@ -331,20 +341,21 @@ export default function MySiteView() {
     if (!media.news.length) return undefined;
 
     let nextIndex = 0;
-    const timer = window.setInterval(() => {
-      nextIndex = (nextIndex + 1) % media.news.length;
-      setNewsIndex(nextIndex);
-      setNewsOpen(true);
-    }, 5 * 60 * 1000);
+    const timer = window.setInterval(
+      () => {
+        nextIndex = (nextIndex + 1) % media.news.length;
+        setNewsIndex(nextIndex);
+        setNewsOpen(true);
+      },
+      5 * 60 * 1000,
+    );
 
     return () => window.clearInterval(timer);
   }, [media.news]);
 
   const activePage = useMemo(
     () =>
-      pages.find(
-        (p) => String(p.sitePageId ?? p.pagesId) === String(activeId),
-      ),
+      pages.find((p) => String(p.sitePageId ?? p.pagesId) === String(activeId)),
     [pages, activeId],
   );
 
@@ -463,34 +474,70 @@ export default function MySiteView() {
           fullWidth
           maxWidth="sm"
           aria-labelledby="site-news-title"
+          slotProps={{
+            backdrop: {
+              sx: {
+                backgroundColor: "rgba(15, 23, 42, 0.6)",
+                backdropFilter: "blur(3px)",
+              },
+            },
+            paper: {
+              sx: {
+                borderRadius: 3,
+                overflow: "hidden",
+                boxShadow: "0 24px 60px rgba(0,0,0,0.25)",
+              },
+            },
+          }}
         >
-          <DialogTitle id="site-news-title" sx={{ pr: 7 }}>
-            {media.news[newsIndex].title}
-            <IconButton
-              aria-label="Close news"
-              onClick={() => setNewsOpen(false)}
-              sx={{ position: "absolute", right: 8, top: 8 }}
+          {resolveMediaImage(media.news[newsIndex].imageUrl) && (
+            <Box
+              component="img"
+              src={resolveMediaImage(media.news[newsIndex].imageUrl)}
+              alt={media.news[newsIndex].title || "News"}
+              sx={{
+                display: "block",
+                width: "100%",
+                height: { xs: 200, sm: 260 },
+                objectFit: "cover",
+              }}
+            />
+          )}
+
+          <IconButton
+            aria-label="Close news"
+            onClick={() => setNewsOpen(false)}
+            size="small"
+            sx={{
+              position: "absolute",
+              top: 12,
+              right: 12,
+              color: "#fff",
+              bgcolor: "rgba(0,0,0,0.5)",
+              "&:hover": { bgcolor: "rgba(0,0,0,0.75)" },
+            }}
+          >
+            <CloseIcon fontSize="small" />
+          </IconButton>
+
+          <DialogContent sx={{ px: { xs: 3, sm: 4 }, py: 3 }}>
+            <Typography
+              id="site-news-title"
+              variant="h5"
+              component="h2"
+              sx={{ fontWeight: 700, lineHeight: 1.3, mb: 2 ,textAlign:"center"}}
             >
-              <CloseIcon />
-            </IconButton>
-          </DialogTitle>
-          <DialogContent dividers>
-            {resolveMediaImage(media.news[newsIndex].imageUrl) && (
-              <Box
-                component="img"
-                src={resolveMediaImage(media.news[newsIndex].imageUrl)}
-                alt={media.news[newsIndex].title || "News"}
-                sx={{
-                  display: "block",
-                  width: "100%",
-                  maxHeight: 320,
-                  objectFit: "cover",
-                  borderRadius: 1,
-                  mb: 2,
-                }}
-              />
-            )}
-            <Typography sx={{ whiteSpace: "pre-wrap" }}>
+              {media.news[newsIndex].title}
+            </Typography>
+
+            <Typography
+              sx={{
+                whiteSpace: "pre-wrap",
+                color: "text.secondary",
+                lineHeight: 1.75,
+                textAlign: "center"
+              }}
+            >
               {media.news[newsIndex].content}
             </Typography>
           </DialogContent>

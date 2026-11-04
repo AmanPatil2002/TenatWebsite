@@ -261,7 +261,7 @@ export default function SiteAdminDashboard() {
                 <TableHead>
                   <TableRow>
                     <TableCell>Page</TableCell>
-                    <TableCell align="right">Entries</TableCell>
+                    {/* <TableCell align="right">Entries</TableCell> */}
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -270,13 +270,13 @@ export default function SiteAdminDashboard() {
                       <TableCell>
                         <Typography fontWeight={600}>{page.title}</Typography>
                       </TableCell>
-                      <TableCell align="right">
+                      {/* <TableCell align="right">
                         <Chip
                           size="small"
                           label={(page.entries || []).length}
                           variant="outlined"
                         />
-                      </TableCell>
+                      </TableCell> */}
                     </TableRow>
                   ))}
                 </TableBody>

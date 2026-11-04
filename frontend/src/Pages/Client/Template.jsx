@@ -338,10 +338,10 @@ function ThemePagePreview({ theme, pages = [] }) {
               textTransform: "none",
               fontWeight: 600,
               minHeight: 48,
-              color,
+              color: "#555555",
             },
             "& .Mui-selected": {
-              color: `${color} !important`,
+              color: `black !important`,
             },
             "& .MuiTabs-indicator": {
               backgroundColor: color,
