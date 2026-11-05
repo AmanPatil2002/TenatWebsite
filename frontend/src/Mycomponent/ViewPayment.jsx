@@ -36,12 +36,7 @@ const API_URL = (
   import.meta.env.VITE_API_URL || "http://localhost:5000"
 ).replace(/\/+$/, "");
 
-// Edit these to show your business details on the invoice.
-const COMPANY = {
-  name: "Your Company Name",
-  line1: "Street address, City, State",
-  line2: "support@yourcompany.com",
-};
+const CONTACT_URL = `${API_URL}/contact/acontact`;
 
 const formatMoney = (amount, currency) => {
   const value = Number(amount) || 0;
@@ -54,14 +49,6 @@ const formatMoney = (amount, currency) => {
     return `${value.toFixed(2)} ${currency || ""}`.trim();
   }
 };
-
-const formatDate = (value) =>
-  value
-    ? new Date(value).toLocaleString(undefined, {
-        dateStyle: "medium",
-        timeStyle: "short",
-      })
-    : "—";
 
 const formatShortDate = (value) =>
   value
@@ -118,22 +105,8 @@ const headCellSx = {
 
 /* ---------------- Invoice dialog ---------------- */
 
-function MetaItem({ label, children }) {
-  return (
-    <Box sx={{ minWidth: 0 }}>
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{ textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 600 }}
-      >
-        {label}
-      </Typography>
-      <Box sx={{ mt: 0.25 }}>{children}</Box>
-    </Box>
-  );
-}
-
-function InvoiceDialog({ payment, admin, onClose }) {
+function InvoiceDialog({ payment, admin, adminContact, onClose }) {
+  const adminemail = localStorage.getItem("email");
   if (!payment) return null;
 
   const pages = [...getPages(payment.pages)].sort(
@@ -146,9 +119,18 @@ function InvoiceDialog({ payment, admin, onClose }) {
   const baseAmount =
     payment.baseAmount ?? payment.templatePriceSnapshot ?? null;
 
+  // ---- FROM = admin contact (fallback to COMPANY) ----
+  const fromName = adminemail || "";
+  const fromEmail = adminContact?.email || "";
+  const fromAddress = adminContact?.address || "";
+  const fromPhone = adminContact?.contact || "";
+
+  // ---- BILLED TO = buyer info from payment ----
+  const billedName = payment.userName || payment.email || "—";
+  const billedEmail = payment.email || "";
+
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="sm">
-      {/* Print only the invoice, not the page behind it */}
       <GlobalStyles
         styles={{
           "@media print": {
@@ -166,7 +148,7 @@ function InvoiceDialog({ payment, admin, onClose }) {
       />
 
       <Box className="invoice-print">
-        {/* Header band */}
+        {/* Invoice header */}
         <Box
           sx={(theme) => ({
             px: 3,
@@ -182,18 +164,21 @@ function InvoiceDialog({ payment, admin, onClose }) {
             className="no-print"
             aria-label="Close invoice"
             onClick={onClose}
+            size="small"
             sx={{ position: "absolute", right: 8, top: 8, color: "inherit" }}
           >
-            <CloseIcon />
+            <CloseIcon fontSize="small" />
           </IconButton>
-          <Stack direction="row" spacing={1.5} alignItems="center">
-            <Avatar sx={{ bgcolor: "rgba(255,255,255,.2)", color: "inherit" }}>
-              <ReceiptLongOutlinedIcon />
-            </Avatar>
+
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="flex-start"
+          >
             <Box>
               <Typography
                 variant="overline"
-                sx={{ opacity: 0.8, letterSpacing: 1.2 }}
+                sx={{ opacity: 0.85, letterSpacing: 1.2 }}
               >
                 Invoice
               </Typography>
@@ -202,8 +187,24 @@ function InvoiceDialog({ payment, admin, onClose }) {
                 fontWeight={700}
                 sx={{ lineHeight: 1.2 }}
               >
-                {payment.invoiceNumber || "Invoice unavailable"}
+                {payment.invoiceNumber || "—"}
               </Typography>
+            </Box>
+            <Box sx={{ textAlign: "right" }}>
+              <Box sx={{ mt: 0.5 }}>
+                <Chip
+                  size="small"
+                  label={status.label}
+                  color={status.color}
+                  sx={{
+                    textTransform: "capitalize",
+                    fontWeight: 600,
+                    color: "common.white",
+                    borderColor: "rgba(255,255,255,.5)",
+                  }}
+                  variant="outlined"
+                />
+              </Box>
             </Box>
           </Stack>
         </Box>
@@ -213,81 +214,93 @@ function InvoiceDialog({ payment, admin, onClose }) {
             {/* From / Billed to */}
             <Stack
               direction={{ xs: "column", sm: "row" }}
+              spacing={{ xs: 3, sm: 4 }}
               justifyContent="space-between"
-              spacing={2}
+              alignItems={{ xs: "stretch", sm: "flex-start" }}
+              sx={{ width: "100%" }}
             >
-              <MetaItem label="From">
-                <Typography variant="body2" fontWeight={700}>
-                  {COMPANY.name}
+              {/* From: Business / Admin details */}
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography
+                  variant="overline"
+                  color="text.secondary"
+                  sx={{ letterSpacing: 1, fontWeight: 700 }}
+                >
+                  From
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {COMPANY.line1}
+
+                <Typography variant="body1" fontWeight={700} sx={{ mt: 0.5 }}>
+                  {fromName}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {COMPANY.line2}
-                </Typography>
-              </MetaItem>
-              <MetaItem label="Billed to">
-                <Typography variant="body2" fontWeight={700}>
-                  {payment.userName || "—"}
-                </Typography>
-                {payment.email && (
-                  <Typography variant="body2" color="text.secondary">
-                    {payment.email}
+
+                {fromAddress && (
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{
+                      mt: 0.5,
+                      whiteSpace: "pre-line",
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {fromAddress}
                   </Typography>
                 )}
-              </MetaItem>
-            </Stack>
 
-            {/* Invoice details */}
-            <Paper
-              variant="outlined"
-              sx={{
-                p: 2,
-                bgcolor: (theme) => alpha(theme.palette.primary.main, 0.03),
-              }}
-            >
+                {fromEmail && (
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: 0.5, wordBreak: "break-word" }}
+                  >
+                    {fromEmail}
+                  </Typography>
+                )}
+
+                {fromPhone && (
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: 0.5 }}
+                  >
+                    {fromPhone}
+                  </Typography>
+                )}
+              </Box>
+
+              {/* Billed to: Customer details */}
               <Box
                 sx={{
-                  display: "grid",
-                  gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(4, 1fr)" },
-                  gap: 2,
+                  flex: 1,
+                  minWidth: 0,
+                  textAlign: { xs: "left", sm: "right" },
                 }}
               >
-                <MetaItem label="Date">
-                  <Typography variant="body2" fontWeight={600}>
-                    {formatShortDate(payment.paidAt || payment.createdAt)}
-                  </Typography>
-                </MetaItem>
-                <MetaItem label="Status">
-                  <Chip
-                    size="small"
-                    label={status.label}
-                    color={status.color}
-                    sx={{ textTransform: "capitalize", fontWeight: 600 }}
-                  />
-                </MetaItem>
-                <MetaItem label="Method">
+                <Typography
+                  variant="overline"
+                  color="text.secondary"
+                  sx={{ letterSpacing: 1, fontWeight: 700 }}
+                >
+                  Billed to
+                </Typography>
+
+                <Typography variant="body1" fontWeight={700} sx={{ mt: 0.5 }}>
+                  {billedName}
+                </Typography>
+
+                {billedEmail && billedEmail !== billedName && (
                   <Typography
                     variant="body2"
-                    fontWeight={600}
-                    sx={{ textTransform: "capitalize" }}
+                    color="text.secondary"
+                    sx={{ mt: 0.5, wordBreak: "break-word" }}
                   >
-                    {payment.method || "—"}
+                    {billedEmail}
                   </Typography>
-                </MetaItem>
-                <MetaItem label="Transaction ID">
-                  <Typography
-                    variant="body2"
-                    fontWeight={600}
-                    noWrap
-                    title={payment.transactionId}
-                  >
-                    {payment.transactionId || "—"}
-                  </Typography>
-                </MetaItem>
+                )}
               </Box>
-            </Paper>
+            </Stack>
+
+            <Divider />
 
             {/* Line items */}
             <TableContainer>
@@ -382,19 +395,16 @@ function InvoiceDialog({ payment, admin, onClose }) {
             <Box
               sx={(theme) => ({
                 p: 2,
-                width: "100%",
-                boxSizing: "border-box",
                 borderRadius: 1.5,
                 bgcolor: alpha(theme.palette.primary.main, 0.08),
                 WebkitPrintColorAdjust: "exact",
                 printColorAdjust: "exact",
               })}
             >
-              <Stack direction="row" alignItems="center" sx={{ width: "100%" }}>
+              <Stack direction="row" alignItems="center">
                 <Typography variant="subtitle1" fontWeight={700}>
                   Total paid
                 </Typography>
-
                 <Typography
                   variant="h5"
                   fontWeight={700}
@@ -405,26 +415,20 @@ function InvoiceDialog({ payment, admin, onClose }) {
                 </Typography>
               </Stack>
             </Box>
-
-            <Divider />
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              textAlign="center"
-            >
-              Thank you for your purchase. This is a computer-generated invoice
-              and does not require a signature.
-            </Typography>
           </Stack>
         </DialogContent>
       </Box>
 
       <DialogActions className="no-print" sx={{ px: 3, pb: 2.5, pt: 0 }}>
-        <Button onClick={onClose}>Close</Button>
+        <Button onClick={onClose} sx={{ textTransform: "none" }}>
+          Close
+        </Button>
         <Button
           variant="contained"
-          startIcon={<PrintOutlinedIcon />}
+          disableElevation
+          startIcon={<PrintOutlinedIcon fontSize="small" />}
           onClick={() => window.print()}
+          sx={{ textTransform: "none", fontWeight: 600 }}
         >
           Print / Save PDF
         </Button>
@@ -435,7 +439,6 @@ function InvoiceDialog({ payment, admin, onClose }) {
 
 /* ---------------- Page ---------------- */
 
-// The admin invoice page shows all purchases; pass admin={false} for a client's own payments.
 export default function ViewPayment({ admin = true }) {
   const [payments, setPayments] = useState([]);
   const [selectedPayment, setSelectedPayment] = useState(null);
@@ -444,6 +447,10 @@ export default function ViewPayment({ admin = true }) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  // Admin contact (email + address + phone) used on the invoice "From" block
+  const [adminContact, setAdminContact] = useState(null);
+
   const token =
     localStorage.getItem("token") ||
     localStorage.getItem("authToken") ||
@@ -451,6 +458,7 @@ export default function ViewPayment({ admin = true }) {
   const loadError = error || (!token ? "Please log in first." : "");
   const columnCount = admin ? 7 : 6;
 
+  // Load payments
   useEffect(() => {
     if (!token) return undefined;
 
@@ -480,6 +488,31 @@ export default function ViewPayment({ admin = true }) {
     };
   }, [admin, token]);
 
+  // Load admin contact for the invoice "From" block
+  useEffect(() => {
+    if (!token) return undefined;
+
+    let cancelled = false;
+    axios
+      .get(CONTACT_URL, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then((response) => {
+        if (cancelled) return;
+        const data = response.data;
+        const first = Array.isArray(data) ? data[0] : data;
+        setAdminContact(first || null);
+      })
+      .catch(() => {
+        // Non-fatal: invoice falls back to COMPANY details
+        if (!cancelled) setAdminContact(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
   const filteredPayments = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return payments;
@@ -503,8 +536,15 @@ export default function ViewPayment({ admin = true }) {
   );
 
   return (
-    <Box sx={{ p: { xs: 1.5, sm: 3 } }}>
+    <Box
+      sx={{
+        p: { xs: 2, sm: 3, md: 4 },
+        minHeight: "100vh",
+        bgcolor: "#f4f6f8",
+      }}
+    >
       <Box sx={{ maxWidth: 1500, mx: "auto" }}>
+        {/* Page header */}
         <Stack
           direction={{ xs: "column", sm: "row" }}
           justifyContent="space-between"
@@ -512,16 +552,36 @@ export default function ViewPayment({ admin = true }) {
           spacing={2}
           sx={{ mb: 3 }}
         >
-          <Box>
-            <Typography variant="h5" fontWeight={700}>
-              Purchased templates
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {admin
-                ? "All template purchases and their invoices."
-                : "Your template purchases and invoices."}
-            </Typography>
-          </Box>
+          <Stack direction="row" alignItems="center" spacing={1.5}>
+            <Box
+              sx={{
+                display: "grid",
+                placeItems: "center",
+                width: 40,
+                height: 40,
+                borderRadius: 2,
+                bgcolor: "primary.main",
+                color: "primary.contrastText",
+              }}
+            >
+              <ReceiptLongOutlinedIcon fontSize="small" />
+            </Box>
+            <Box>
+              <Typography
+                variant="h5"
+                fontWeight={700}
+                sx={{ lineHeight: 1.2 }}
+              >
+                Purchased Templates
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {admin
+                  ? "All template purchases and their invoices."
+                  : "Your template purchases and invoices."}
+              </Typography>
+            </Box>
+          </Stack>
+
           <TextField
             size="small"
             placeholder="Search invoice, user, template..."
@@ -530,7 +590,7 @@ export default function ViewPayment({ admin = true }) {
               setSearch(event.target.value);
               setPage(0);
             }}
-            sx={{ width: { xs: "100%", sm: 300 } }}
+            sx={{ width: { xs: "100%", sm: 320 }, bgcolor: "background.paper" }}
             slotProps={{
               input: {
                 startAdornment: (
@@ -544,7 +604,7 @@ export default function ViewPayment({ admin = true }) {
         </Stack>
 
         {loadError && (
-          <Alert severity="error" sx={{ mb: 2 }}>
+          <Alert severity="error" sx={{ mb: 2, borderRadius: 1.5 }}>
             {loadError}
           </Alert>
         )}
@@ -554,9 +614,17 @@ export default function ViewPayment({ admin = true }) {
             <CircularProgress />
           </Box>
         ) : !loadError ? (
-          <Paper variant="outlined" sx={{ overflow: "hidden" }}>
-            <TableContainer sx={{ maxHeight: 560 }}>
-              <Table>
+          <Paper
+            elevation={0}
+            sx={{
+              borderRadius: 2,
+              border: "1px solid",
+              borderColor: "divider",
+              overflow: "hidden",
+            }}
+          >
+            <TableContainer sx={{ maxHeight: 600 }}>
+              <Table stickyHeader>
                 <TableHead>
                   <TableRow>
                     {admin && (
@@ -568,7 +636,7 @@ export default function ViewPayment({ admin = true }) {
                     </TableCell>
                     <TableCell sx={headCellSx}>Date</TableCell>
                     <TableCell sx={headCellSx}>Status</TableCell>
-                    <TableCell sx={headCellSx} align="center">
+                    <TableCell sx={headCellSx} align="center" width={110}>
                       Action
                     </TableCell>
                   </TableRow>
@@ -578,7 +646,11 @@ export default function ViewPayment({ admin = true }) {
                     const pages = getPages(payment.pages);
                     const status = statusMeta(payment.status);
                     return (
-                      <TableRow hover key={payment.id}>
+                      <TableRow
+                        hover
+                        key={payment.id}
+                        sx={{ "& td": { verticalAlign: "middle" } }}
+                      >
                         {admin && (
                           <TableCell sx={{ minWidth: 220 }}>
                             <Stack
@@ -656,7 +728,10 @@ export default function ViewPayment({ admin = true }) {
                             label={status.label}
                             color={status.color}
                             variant="outlined"
-                            sx={{ textTransform: "capitalize" }}
+                            sx={{
+                              textTransform: "capitalize",
+                              fontWeight: 600,
+                            }}
                           />
                         </TableCell>
 
@@ -664,8 +739,15 @@ export default function ViewPayment({ admin = true }) {
                           <Button
                             size="small"
                             variant="outlined"
-                            startIcon={<ReceiptLongOutlinedIcon />}
+                            startIcon={
+                              <ReceiptLongOutlinedIcon fontSize="small" />
+                            }
                             onClick={() => setSelectedPayment(payment)}
+                            sx={{
+                              textTransform: "none",
+                              fontWeight: 600,
+                              whiteSpace: "nowrap",
+                            }}
                           >
                             View
                           </Button>
@@ -681,10 +763,18 @@ export default function ViewPayment({ admin = true }) {
                         align="center"
                         sx={{ py: 6 }}
                       >
+                        <Typography
+                          variant="subtitle1"
+                          sx={{ fontWeight: 600, mb: 0.5 }}
+                        >
+                          {payments.length
+                            ? "No matching purchases"
+                            : "No purchases yet"}
+                        </Typography>
                         <Typography variant="body2" color="text.secondary">
                           {payments.length
-                            ? "No purchases match your search."
-                            : "No purchases yet."}
+                            ? "Try a different search term."
+                            : "Purchases will appear here."}
                         </Typography>
                       </TableCell>
                     </TableRow>
@@ -713,6 +803,7 @@ export default function ViewPayment({ admin = true }) {
       <InvoiceDialog
         payment={selectedPayment}
         admin={admin}
+        adminContact={adminContact}
         onClose={() => setSelectedPayment(null)}
       />
     </Box>

@@ -1,8 +1,7 @@
-const path = require("path");
 const db = require("../config/db");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
+require("dotenv").config();
 const crypto = require("crypto");
 
 const { sendPasswordResetEmail } = require("../utils/mailer");

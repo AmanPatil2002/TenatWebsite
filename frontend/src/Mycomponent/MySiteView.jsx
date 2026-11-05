@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import {
@@ -8,20 +8,163 @@ import {
   CircularProgress,
   Dialog,
   DialogContent,
-  DialogTitle,
   IconButton,
+  Link,
+  Stack,
   Tab,
   Tabs,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
 } from "@mui/material";
-import LaptopIcon from "@mui/icons-material/Laptop";
-import TabletAndroidIcon from "@mui/icons-material/TabletAndroid";
-import PhoneAndroidIcon from "@mui/icons-material/PhoneAndroid";
-import CloseIcon from "@mui/icons-material/Close";
 import { createSiteSlug } from "../utils/siteSlug";
 
+/* ------------------------------------------------------------------ */
+/* Inline SVG icons (no @mui/icons-material dependency)                */
+/* ------------------------------------------------------------------ */
+const LaptopIcon = (props) => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    {...props}
+  >
+    <rect x="3" y="4" width="18" height="12" rx="1.5" />
+    <path d="M2 20h20" />
+  </svg>
+);
+
+const TabletIcon = (props) => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    {...props}
+  >
+    <rect x="4" y="2" width="16" height="20" rx="2" />
+    <path d="M12 18h.01" />
+  </svg>
+);
+
+const PhoneIcon = (props) => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    {...props}
+  >
+    <rect x="6" y="2" width="12" height="20" rx="2.5" />
+    <path d="M11 18h2" />
+  </svg>
+);
+
+const CloseIcon = (props) => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    {...props}
+  >
+    <path d="M18 6 6 18M6 6l12 12" />
+  </svg>
+);
+
+const ArrowLeftIcon = (props) => (
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    {...props}
+  >
+    <path d="M19 12H5M12 19l-7-7 7-7" />
+  </svg>
+);
+
+const FacebookIcon = (props) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+    <path d="M13.5 21v-7.5h2.5l.4-3H13.5V8.6c0-.9.3-1.5 1.6-1.5h1.5V4.4c-.3 0-1.2-.1-2.3-.1-2.3 0-3.8 1.4-3.8 3.9v2.3H8v3h2.5V21h3z" />
+  </svg>
+);
+
+const InstagramIcon = (props) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+    <rect x="3" y="3" width="18" height="18" rx="5" />
+    <circle cx="12" cy="12" r="4" />
+    <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+  </svg>
+);
+
+const YouTubeIcon = (props) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+    <path d="M21.6 7.2a2.6 2.6 0 0 0-1.8-1.8C18.2 5 12 5 12 5s-6.2 0-7.8.4A2.6 2.6 0 0 0 2.4 7.2 27 27 0 0 0 2 12a27 27 0 0 0 .4 4.8 2.6 2.6 0 0 0 1.8 1.8C5.8 19 12 19 12 19s6.2 0 7.8-.4a2.6 2.6 0 0 0 1.8-1.8A27 27 0 0 0 22 12a27 27 0 0 0-.4-4.8zM10 15V9l5.2 3L10 15z" />
+  </svg>
+);
+
+const TwitterIcon = (props) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+    <path d="M17.5 3h3l-6.6 7.6L21.8 21h-6.1l-4.8-6.2L5.4 21H2.4l7-8L2.6 3h6.2l4.3 5.7L17.5 3zm-1.1 16.1h1.7L7.7 4.8H5.9l10.5 14.3z" />
+  </svg>
+);
+
+const LinkedInIcon = (props) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+    <path d="M4.98 3.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM3 9h4v12H3V9zm7 0h3.8v1.7h.1c.5-.9 1.8-1.9 3.7-1.9 4 0 4.7 2.6 4.7 6V21h-4v-5.3c0-1.3 0-2.9-1.8-2.9s-2.1 1.4-2.1 2.8V21h-4V9z" />
+  </svg>
+);
+
+const PlaceIcon = (props) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z" />
+    <circle cx="12" cy="10" r="3" />
+  </svg>
+);
+
+const PhoneOutlineIcon = (props) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+    <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.7 2.6a2 2 0 0 1-.5 2.1L8.1 9.6a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.8.4 1.7.6 2.6.7a2 2 0 0 1 1.7 2z" />
+  </svg>
+);
+
+const EmailIcon = (props) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="m3 7 9 6 9-6" />
+  </svg>
+);
+
+/* ------------------------------------------------------------------ */
+/* Constants & helpers                                                 */
+/* ------------------------------------------------------------------ */
 const API_URL = (
   import.meta.env.VITE_API_URL || "http://localhost:5000"
 ).replace(/\/+$/, "");
@@ -32,10 +175,22 @@ const DEVICE_WIDTHS = {
   phone: 390,
 };
 
+const TOOLBAR_HEIGHT = 64;
+
+const SOCIALS = [
+  { key: "facebook", label: "Facebook", Icon: FacebookIcon },
+  { key: "instagram", label: "Instagram", Icon: InstagramIcon },
+  { key: "youtube", label: "YouTube", Icon: YouTubeIcon },
+  { key: "twitter", label: "Twitter", Icon: TwitterIcon },
+  { key: "linkedin", label: "LinkedIn", Icon: LinkedInIcon },
+];
+
 const getToken = () =>
   localStorage.getItem("token") ||
   localStorage.getItem("authToken") ||
   localStorage.getItem("accessToken");
+
+const pageKey = (page) => String(page.sitePageId ?? page.pagesId);
 
 const escapeHtml = (value) =>
   String(value ?? "").replace(
@@ -50,19 +205,14 @@ const escapeHtml = (value) =>
       })[character],
   );
 
-const readCustomFields = (value) => {
-  if (value && typeof value === "object" && !Array.isArray(value)) return value;
-  if (typeof value === "string") {
-    try {
-      const parsed = JSON.parse(value);
-      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-        ? parsed
-        : {};
-    } catch {
-      return {};
-    }
+const isSafeExternalUrl = (value) => {
+  if (typeof value !== "string") return false;
+  try {
+    const { protocol } = new URL(value);
+    return protocol === "https:" || protocol === "http:";
+  } catch {
+    return false;
   }
-  return {};
 };
 
 const resolveMediaImage = (url) => {
@@ -71,8 +221,16 @@ const resolveMediaImage = (url) => {
   return /^https?:\/\/\S+$/i.test(url) ? url : "";
 };
 
-// Gallery grid: built ONLY from gallery images.
-// The "Gallery" heading comes from the CKEditor gallery page, so it is not added here.
+const buildTheme = (background, color) => ({
+  background,
+  color,
+  border: `color-mix(in srgb, ${color} 18%, transparent)`,
+  headerBg: `color-mix(in srgb, ${color} 6%, ${background})`,
+  footerBg: `color-mix(in srgb, ${color} 10%, ${background})`,
+  muted: `color-mix(in srgb, ${color} 70%, transparent)`,
+  hover: `color-mix(in srgb, ${color} 12%, transparent)`,
+});
+
 const renderGallery = (items) => {
   if (!Array.isArray(items)) return "";
   const cards = items
@@ -94,7 +252,6 @@ const renderGallery = (items) => {
   return `<section class="site-gallery"><div class="site-gallery-grid">${cards}</div></section>`;
 };
 
-// Home slider: built ONLY from slider images. Renders nothing when there are none.
 const renderSlider = (items) => {
   if (!Array.isArray(items)) return "";
   const slides = items
@@ -126,56 +283,22 @@ const renderSlider = (items) => {
   return `<section class="site-home-slider" aria-label="Image slider"><div class="site-slider-track" style="${animation}">${slides.join("")}</div></section><style>${keyframes}</style>`;
 };
 
-const renderSiteEntries = (entries, currency, pageTitle) => {
-  if (!Array.isArray(entries) || !entries.length) return "";
-  const cards = entries
-    .map((entry) => {
-      const image =
-        typeof entry.imageUrl === "string" &&
-        /^https?:\/\/\S+$/i.test(entry.imageUrl)
-          ? `<img src="${escapeHtml(entry.imageUrl)}" alt="${escapeHtml(entry.name)}" style="width:100%;max-height:240px;object-fit:cover;border-radius:8px" />`
-          : "";
-      const description = entry.description
-        ? `<p>${escapeHtml(entry.description)}</p>`
-        : "";
-      const price =
-        entry.price !== null && entry.price !== undefined
-          ? `<p><strong>${escapeHtml(currency || "")} ${escapeHtml(entry.price)}</strong></p>`
-          : "";
-      const fields = Object.entries(readCustomFields(entry.customFields))
-        .map(
-          ([name, value]) =>
-            `<p><strong>${escapeHtml(name)}:</strong> ${escapeHtml(value)}</p>`,
-        )
-        .join("");
-      return `<article style="border:1px solid #ddd;border-radius:12px;padding:16px;min-width:220px;max-width:320px">${image}<h3>${escapeHtml(entry.name)}</h3>${description}${price}${fields}</article>`;
-    })
-    .join("");
-
-  return `<section style="margin-top:32px"><h2>${escapeHtml(pageTitle)} items</h2><div style="display:flex;flex-wrap:wrap;gap:16px">${cards}</div></section>`;
-};
-
 const SLIDER_MARKER = /<!--\s*SITE_SLIDER\s*-->/i;
 
-const buildSrcDoc = (
+const buildSrcDoc = ({
   html,
   background,
   color,
-  entries,
-  currency,
   pageTitle,
   galleries,
   slides,
-) => {
+}) => {
   const isHome = /home/i.test(pageTitle);
   const isGallery = /gall[ae]ry/i.test(pageTitle);
 
   const sliderHtml = isHome ? renderSlider(slides) : "";
   const pageHtml = html || "<p>This page has no content yet.</p>";
 
-  // Marker found  -> slider replaces the marker (e.g. right below the title).
-  // No marker     -> slider goes at the top of the page, as before.
-  // No slider imgs-> sliderHtml is "", so the marker simply disappears.
   const bodyHtml = SLIDER_MARKER.test(pageHtml)
     ? pageHtml.replace(SLIDER_MARKER, () => sliderHtml)
     : `${sliderHtml}${pageHtml}`;
@@ -186,15 +309,19 @@ const buildSrcDoc = (
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <style>
+      :root {
+        --site-header-bg: color-mix(in srgb, ${color} 6%, ${background});
+      }
       * { box-sizing: border-box; }
       html { scroll-behavior: smooth; }
       body {
         margin: 0;
-        padding: 16px;
+        padding: 0;
         background: ${background};
         color: ${color};
         font-family: Arial, Helvetica, sans-serif;
       }
+      .site-page { padding: 16px; }
       img { max-width: 100%; height: auto; }
       table { max-width: 100%; }
       .site-home-slider { width: 100%; margin: 22px auto 28px; overflow: hidden; border-radius: 12px; background: #f0f0f0; }
@@ -204,14 +331,410 @@ const buildSrcDoc = (
       .site-slide span { position: absolute; inset: auto 0 0; padding: 18px 22px; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,.7)); font-size: 1.15rem; text-align: left; }
       .site-gallery { margin-top: 32px; }
       .site-gallery-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 16px; }
-      .site-gallery figure { margin: 0; overflow: hidden; border-radius: 10px; background: #f3f4f6; }
+      .site-gallery figure { margin: 0; overflow: hidden; border-radius: 10px; background: var(--site-header-bg); }
       .site-gallery img { display: block; width: 100%; height: 240px; object-fit: cover; transition: transform 0.4s ease; }
       .site-gallery figure:hover img { transform: scale(1.06); }
       .site-gallery figcaption { padding: 10px 12px; }
     </style>
   </head>
-  <body>${bodyHtml}${isGallery ? renderGallery(galleries) : ""}</body>
+  <body><main class="site-page">${bodyHtml}${isGallery ? renderGallery(galleries) : ""}</main></body>
 </html>`;
+};
+
+/* ------------------------------------------------------------------ */
+/* Site Header                                                         */
+/* ------------------------------------------------------------------ */
+function SiteHeader({
+  header,
+  siteName,
+  pages,
+  activeId,
+  onNavigate,
+  theme,
+  device,
+}) {
+  const logo = resolveMediaImage(header?.logoUrl);
+  const title = header?.siteTitle || siteName;
+  const stacked = device !== "laptop";
+  const small = device === "phone";
+
+  return (
+    <Box
+      component="header"
+      sx={{
+        position: "sticky",
+        top: 0,
+        zIndex: 5,
+        color: theme.color,
+        borderBottom: `1px solid ${theme.border}`,
+        backgroundColor: theme.background,
+        backgroundImage: `linear-gradient(${theme.headerBg}, ${theme.headerBg})`,
+      }}
+    >
+      <Box
+        sx={{
+          maxWidth: 1200,
+          mx: "auto",
+          px: small ? 2 : 3,
+          display: "flex",
+          flexDirection: stacked ? "column" : "row",
+          alignItems: stacked ? "stretch" : "center",
+          justifyContent: "space-between",
+          gap: stacked ? 0 : 4,
+        }}
+      >
+        {(logo || title) && (
+          <Box
+            component="a"
+            href="#"
+            onClick={(event) => {
+              event.preventDefault();
+              if (pages[0]) onNavigate(pageKey(pages[0]));
+            }}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1.25,
+              py: 1,
+              minHeight: small ? 56 : 64,
+              color: "inherit",
+              textDecoration: "none",
+              minWidth: 0,
+              flexShrink: 0,
+            }}
+          >
+            {logo && (
+              <Box
+                sx={{
+                  width: small ? 36 : 44,
+                  height: small ? 36 : 44,
+                  borderRadius: "50%",
+                  overflow: "hidden",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <Box
+                  component="img"
+                  src={logo}
+                  alt={title || "Site logo"}
+                  sx={{
+                    display: "block",
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                  }}
+                />
+              </Box>
+            )}
+            {title && (
+              <Typography
+                component="span"
+                noWrap
+                sx={{
+                  fontSize: small ? "1.1rem" : "1.3rem",
+                  fontWeight: 700,
+                  lineHeight: 1.2,
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                {title}
+              </Typography>
+            )}
+          </Box>
+        )}
+
+        <Tabs
+          component="nav"
+          aria-label="Site navigation"
+          value={activeId}
+          onChange={(_, value) => onNavigate(value)}
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
+          sx={{
+            minHeight: 48,
+            minWidth: 0,
+            color: theme.color,
+            "& .MuiTabs-flexContainer": { gap: 0.5 },
+            "& .MuiTabs-indicator": {
+              backgroundColor: theme.color,
+              height: 3,
+              borderRadius: "3px 3px 0 0",
+            },
+            "& .MuiTabScrollButton-root": { color: theme.color },
+            "& .MuiTab-root": {
+              minHeight: 48,
+              minWidth: 0,
+              px: 2,
+              textTransform: "none",
+              fontWeight: 600,
+              fontSize: "0.95rem",
+              color: theme.color,
+              opacity: 0.7,
+              borderRadius: 1,
+              transition: "opacity .2s, background-color .2s",
+              "&:hover": { opacity: 1, bgcolor: theme.hover },
+            },
+            "& .MuiTab-root.Mui-selected": {
+              color: theme.color,
+              opacity: 1,
+            },
+          }}
+        >
+          {pages.map((p) => (
+            <Tab key={pageKey(p)} value={pageKey(p)} label={p.title} />
+          ))}
+        </Tabs>
+      </Box>
+    </Box>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Site Footer                                                         */
+/* ------------------------------------------------------------------ */
+function FooterHeading({ children }) {
+  return (
+    <Typography
+      component="h3"
+      sx={{
+        fontSize: "0.8rem",
+        fontWeight: 700,
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+        mb: 1.5,
+      }}
+    >
+      {children}
+    </Typography>
+  );
+}
+
+function SiteFooter({
+  header,
+  siteName,
+  pages,
+  activeId,
+  onNavigate,
+  theme,
+  device,
+}) {
+  const title = header?.siteTitle || siteName;
+  const socialLinks =
+    header?.socialLinks && typeof header.socialLinks === "object"
+      ? header.socialLinks
+      : {};
+  const socials = SOCIALS.filter(({ key }) =>
+    isSafeExternalUrl(socialLinks[key]),
+  );
+
+  const contacts = [
+    header?.footerAddress && {
+      key: "address",
+      Icon: PlaceIcon,
+      text: header.footerAddress,
+    },
+    header?.footerPhone && {
+      key: "phone",
+      Icon: PhoneOutlineIcon,
+      text: header.footerPhone,
+      href: `tel:${header.footerPhone}`,
+    },
+    header?.footerEmail && {
+      key: "email",
+      Icon: EmailIcon,
+      text: header.footerEmail,
+      href: `mailto:${header.footerEmail}`,
+    },
+  ].filter(Boolean);
+
+  const hasAbout = Boolean(header?.footerText || title);
+  const hasLinks = pages.length > 1;
+  const copyright =
+    header?.copyrightText ||
+    (title ? `© ${new Date().getFullYear()} ${title}` : "");
+
+  const small = device === "phone";
+  const columns =
+    device === "phone"
+      ? "1fr"
+      : device === "tablet"
+        ? "repeat(2, 1fr)"
+        : "repeat(auto-fit, minmax(210px, 1fr))";
+
+  const linkSx = {
+    color: "inherit",
+    textDecoration: "none",
+    opacity: 0.85,
+    "&:hover": { opacity: 1, textDecoration: "underline" },
+  };
+
+  if (
+    !hasAbout &&
+    !hasLinks &&
+    !contacts.length &&
+    !socials.length &&
+    !copyright
+  ) {
+    return null;
+  }
+
+  return (
+    <Box
+      component="footer"
+      sx={{
+        backgroundColor: theme.background,
+        backgroundImage: `linear-gradient(${theme.footerBg}, ${theme.footerBg})`,
+        color: theme.color,
+        borderTop: `1px solid ${theme.border}`,
+      }}
+    >
+      <Box sx={{ maxWidth: 1200, mx: "auto", px: small ? 2 : 3, py: 5 }}>
+        <Box
+          sx={{
+            display: "grid",
+            gap: small ? 4 : 5,
+            gridTemplateColumns: columns,
+            overflowWrap: "anywhere",
+          }}
+        >
+          {hasAbout && (
+            <Box>
+              {title && (
+                <Typography
+                  sx={{ fontSize: "1.2rem", fontWeight: 700, mb: 1 }}
+                >
+                  {title}
+                </Typography>
+              )}
+              {header?.footerText && (
+                <Typography
+                  sx={{
+                    color: theme.muted,
+                    lineHeight: 1.7,
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {header.footerText}
+                </Typography>
+              )}
+            </Box>
+          )}
+
+          {hasLinks && (
+            <Box component="nav" aria-label="Footer navigation">
+              <FooterHeading>Quick links</FooterHeading>
+              <Box sx={{ display: "grid", gap: 1 }}>
+                {pages.map((p) => (
+                  <Link
+                    key={pageKey(p)}
+                    component="button"
+                    type="button"
+                    onClick={() => onNavigate(pageKey(p))}
+                    sx={{
+                      ...linkSx,
+                      textAlign: "left",
+                      font: "inherit",
+                      fontWeight: pageKey(p) === activeId ? 700 : 400,
+                      justifySelf: "start",
+                    }}
+                  >
+                    {p.title}
+                  </Link>
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          {contacts.length > 0 && (
+            <Box>
+              <FooterHeading>Contact</FooterHeading>
+              <Box sx={{ display: "grid", gap: 1.25 }}>
+                {contacts.map(({ key, Icon, text, href }) => (
+                  <Box
+                    key={key}
+                    sx={{
+                      display: "flex",
+                      gap: 1.25,
+                      alignItems: "flex-start",
+                    }}
+                  >
+                    <Icon
+                      style={{ marginTop: 2, opacity: 0.8, flexShrink: 0 }}
+                    />
+                    {href ? (
+                      <Link href={href} sx={linkSx}>
+                        {text}
+                      </Link>
+                    ) : (
+                      <Typography sx={{ opacity: 0.85 }}>{text}</Typography>
+                    )}
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          {socials.length > 0 && (
+            <Box>
+              <FooterHeading>Follow us</FooterHeading>
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                {socials.map(({ key, label, Icon }) => (
+                  <IconButton
+                    key={key}
+                    component="a"
+                    href={socialLinks[key]}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={label}
+                    sx={{
+                      color: theme.color,
+                      border: `1px solid ${theme.border}`,
+                      width: 38,
+                      height: 38,
+                      "&:hover": { bgcolor: theme.hover },
+                    }}
+                  >
+                    <Icon />
+                  </IconButton>
+                ))}
+              </Box>
+            </Box>
+          )}
+        </Box>
+      </Box>
+
+      {copyright && (
+        <Box sx={{ borderTop: `1px solid ${theme.border}` }}>
+          <Typography
+            sx={{
+              maxWidth: 1200,
+              mx: "auto",
+              px: small ? 2 : 3,
+              py: 2,
+              textAlign: "center",
+              fontSize: "0.85rem",
+              color: theme.muted,
+            }}
+          >
+            {copyright}
+          </Typography>
+        </Box>
+      )}
+    </Box>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Main view                                                           */
+/* ------------------------------------------------------------------ */
+const DEVICE_META = {
+  laptop: { label: "Desktop", Icon: LaptopIcon },
+  tablet: { label: "Tablet", Icon: TabletIcon },
+  phone: { label: "Mobile", Icon: PhoneIcon },
 };
 
 export default function MySiteView() {
@@ -220,7 +743,10 @@ export default function MySiteView() {
   const siteAdminMode = window.location.pathname.startsWith("/site-admin/");
   const routeSiteKey = siteAdminMode ? adminSiteId : siteSlug;
 
-  const [site, setSite] = useState({ color: "#222222", background: "#ffffff" });
+  const [site, setSite] = useState({
+    color: "#222222",
+    background: "#ffffff",
+  });
   const [pages, setPages] = useState([]);
   const [media, setMedia] = useState({ news: [], galleries: [], slider: [] });
   const [activeId, setActiveId] = useState("");
@@ -229,9 +755,11 @@ export default function MySiteView() {
   const [newsOpen, setNewsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const scrollRef = useRef(null);
+  const observerRef = useRef(null);
 
   const handleDevices = (_, value) => {
-    if (value) setDevices(value); // ignore deselect so one is always active
+    if (value) setDevices(value);
   };
 
   useEffect(() => {
@@ -265,9 +793,10 @@ export default function MySiteView() {
               const previewPath = window.location.pathname.endsWith("/preview")
                 ? "/preview"
                 : "";
-              navigate(`/mysite/${createSiteSlug(legacySite)}${previewPath}`, {
-                replace: true,
-              });
+              navigate(
+                `/mysite/${createSiteSlug(legacySite)}${previewPath}`,
+                { replace: true },
+              );
               return;
             }
             setError("Site not found in your account.");
@@ -309,14 +838,14 @@ export default function MySiteView() {
             : [],
         });
 
-        setActiveId(
-          list[0] ? String(list[0].sitePageId ?? list[0].pagesId) : "",
-        );
+        setActiveId(list[0] ? pageKey(list[0]) : "");
         setSite({
           color: meta?.color || pagesRes.data?.color || "#222222",
           background:
             meta?.background || pagesRes.data?.background || "#ffffff",
           currency: pagesRes.data?.currency || "INR",
+          siteName: pagesRes.data?.siteName || meta?.name || "",
+          header: pagesRes.data?.header || {},
         });
       } catch (err) {
         if (cancelled) return;
@@ -336,7 +865,6 @@ export default function MySiteView() {
     };
   }, [routeSiteKey, siteSlug, navigate, siteAdminMode]);
 
-  // News pop-up: re-open every 5 minutes, rotating through the news items.
   useEffect(() => {
     if (!media.news.length) return undefined;
 
@@ -353,120 +881,295 @@ export default function MySiteView() {
     return () => window.clearInterval(timer);
   }, [media.news]);
 
+  useEffect(() => () => observerRef.current?.disconnect(), []);
+
   const activePage = useMemo(
-    () =>
-      pages.find((p) => String(p.sitePageId ?? p.pagesId) === String(activeId)),
+    () => pages.find((p) => pageKey(p) === String(activeId)),
     [pages, activeId],
   );
 
+  const theme = useMemo(
+    () => buildTheme(site.background || "#ffffff", site.color || "#222222"),
+    [site.background, site.color],
+  );
+
+  const srcDoc = useMemo(
+    () =>
+      buildSrcDoc({
+        html: activePage?.page,
+        background: theme.background,
+        color: theme.color,
+        pageTitle: activePage?.title || "Site",
+        galleries: media.galleries,
+        slides: media.slider,
+      }),
+    [activePage, theme, media.galleries, media.slider],
+  );
+
+  const handleNavigate = (id) => {
+    setActiveId(String(id));
+    scrollRef.current?.scrollTo({ top: 0 });
+  };
+
+  const handleFrameLoad = (event) => {
+    const frame = event.currentTarget;
+    const doc = frame.contentDocument;
+    if (!doc?.body) return;
+
+    observerRef.current?.disconnect();
+    const resize = () => {
+      frame.style.height = `${doc.documentElement.scrollHeight}px`;
+    };
+    resize();
+
+    if (typeof ResizeObserver !== "undefined") {
+      observerRef.current = new ResizeObserver(resize);
+      observerRef.current.observe(doc.body);
+    }
+  };
+
+  const framed = devices !== "laptop";
+  const deviceMeta = DEVICE_META[devices];
+
   return (
-    <Box sx={{ bgcolor: "#f7f7f8", minHeight: "100vh", width: "100%" }}>
+    <Box
+      sx={{
+        minHeight: "100vh",
+        width: "100%",
+        bgcolor: "#f3f4f6",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      {/* ---------- Admin toolbar ---------- */}
       <Box
+        component="header"
         sx={{
+          height: TOOLBAR_HEIGHT,
+          flexShrink: 0,
+          bgcolor: "#ffffff",
+          borderBottom: "1px solid",
+          borderColor: "divider",
+          px: { xs: 1.5, sm: 3 },
           display: "flex",
-          justifyContent: "space-between",
           alignItems: "center",
-          width: "100%",
+          justifyContent: "space-between",
+          gap: 2,
+          position: "sticky",
+          top: 0,
+          zIndex: 20,
         }}
       >
-        <Button
-          onClick={() =>
-            navigate(
-              siteAdminMode ? `/site-admin/${adminSiteId}/panel` : "/mysite",
-            )
-          }
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={1.5}
+          sx={{ minWidth: 0 }}
         >
-          ← Back
-        </Button>
-
-        <ToggleButtonGroup
-          size="small"
-          exclusive
-          value={devices}
-          onChange={handleDevices}
-          aria-label="device"
-        >
-          <ToggleButton value="laptop" aria-label="laptop">
-            <LaptopIcon />
-          </ToggleButton>
-          <ToggleButton value="tablet" aria-label="tablet">
-            <TabletAndroidIcon />
-          </ToggleButton>
-          <ToggleButton value="phone" aria-label="phone">
-            <PhoneAndroidIcon />
-          </ToggleButton>
-        </ToggleButtonGroup>
-      </Box>
-
-      {loading ? (
-        <Box sx={{ display: "grid", placeItems: "center", minHeight: 300 }}>
-          <CircularProgress />
-        </Box>
-      ) : error ? (
-        <Alert severity="error" sx={{ m: 2 }}>
-          {error}
-        </Alert>
-      ) : pages.length === 0 ? (
-        <Alert severity="info" sx={{ m: 2 }}>
-          This site has no pages yet.
-        </Alert>
-      ) : (
-        <>
-          <Tabs
-            value={activeId}
-            onChange={(_, value) => setActiveId(value)}
-            variant="scrollable"
-            scrollButtons="auto"
-            allowScrollButtonsMobile
-            sx={{ borderBottom: 1, borderColor: "divider", bgcolor: "#fff" }}
+          <Button
+            onClick={() =>
+              navigate(
+                siteAdminMode
+                  ? `/site-admin/${adminSiteId}/panel`
+                  : "/mysite",
+              )
+            }
+            startIcon={<ArrowLeftIcon />}
+            size="small"
+            sx={{
+              textTransform: "none",
+              color: "text.secondary",
+              fontWeight: 600,
+              flexShrink: 0,
+              "& .MuiButton-startIcon": { mr: 0.75 },
+            }}
           >
-            {pages.map((p) => (
-              <Tab
-                key={p.sitePageId ?? p.pagesId}
-                value={String(p.sitePageId ?? p.pagesId)}
-                label={p.title}
-                sx={{ textTransform: "none", fontWeight: 600 }}
-              />
-            ))}
-          </Tabs>
+            Back
+          </Button>
 
           <Box
             sx={{
-              display: "flex",
-              justifyContent: "center",
-              bgcolor: devices === "laptop" ? "transparent" : "#e5e7eb",
-              p: devices === "laptop" ? 0 : { xs: 1, sm: 2 },
+              width: "1px",
+              height: 24,
+              bgcolor: "divider",
+              display: { xs: "none", sm: "block" },
+            }}
+          />
+
+          <Box sx={{ minWidth: 0, display: { xs: "none", sm: "block" } }}>
+            <Typography
+              variant="subtitle2"
+              fontWeight={700}
+              noWrap
+              sx={{ lineHeight: 1.3 }}
+            >
+              Site Preview
+            </Typography>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              noWrap
+              sx={{ lineHeight: 1.2 }}
+            >
+              {site.siteName || "Previewing your site"}
+            </Typography>
+          </Box>
+        </Stack>
+
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1.5,
+            flexShrink: 0,
+          }}
+        >
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ display: { xs: "none", md: "block" } }}
+          >
+            {deviceMeta.label}
+          </Typography>
+          <ToggleButtonGroup
+            size="small"
+            exclusive
+            value={devices}
+            onChange={handleDevices}
+            aria-label="Preview device"
+            sx={{
+              "& .MuiToggleButton-root": {
+                px: 1.25,
+                py: 0.75,
+                borderColor: "divider",
+                color: "text.secondary",
+                "&.Mui-selected": {
+                  color: "primary.main",
+                  bgcolor: "primary.50",
+                  borderColor: "primary.main",
+                  "&:hover": { bgcolor: "primary.100" },
+                },
+              },
+            }}
+          >
+            <ToggleButton value="laptop" aria-label="Desktop preview">
+              <LaptopIcon />
+            </ToggleButton>
+            <ToggleButton value="tablet" aria-label="Tablet preview">
+              <TabletIcon />
+            </ToggleButton>
+            <ToggleButton value="phone" aria-label="Mobile preview">
+              <PhoneIcon />
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
+      </Box>
+
+      {/* ---------- Stage ---------- */}
+      <Box
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "flex-start",
+          bgcolor: framed ? "#e5e7eb" : "transparent",
+          p: framed ? { xs: 1.5, sm: 3 } : 0,
+          overflow: "hidden",
+        }}
+      >
+        {loading ? (
+          <Box
+            sx={{
+              display: "grid",
+              placeItems: "center",
+              minHeight: 320,
+              width: "100%",
+            }}
+          >
+            <CircularProgress />
+          </Box>
+        ) : error ? (
+          <Box sx={{ width: "100%", maxWidth: 720, mt: 4 }}>
+            <Alert severity="error">{error}</Alert>
+          </Box>
+        ) : pages.length === 0 ? (
+          <Box sx={{ width: "100%", maxWidth: 720, mt: 4 }}>
+            <Alert severity="info">This site has no pages yet.</Alert>
+          </Box>
+        ) : (
+          <Box
+            ref={scrollRef}
+            sx={{
+              width: DEVICE_WIDTHS[devices],
+              maxWidth: "100%",
+              height: framed
+                ? `calc(100vh - ${TOOLBAR_HEIGHT + 48}px)`
+                : `calc(100vh - ${TOOLBAR_HEIGHT}px)`,
+              overflowY: "auto",
+              overflowX: "hidden",
+              border: framed ? "1px solid" : 0,
+              borderColor: "divider",
+              borderRadius: framed ? 3 : 0,
+              bgcolor: theme.background,
+              boxShadow: framed
+                ? "0 10px 30px rgba(15,23,42,0.12)"
+                : "none",
             }}
           >
             <Box
-              component="iframe"
-              key={`${activeId}-${devices}`}
-              title={activePage?.title || "Page preview"}
-              sandbox=""
-              srcDoc={buildSrcDoc(
-                activePage?.page,
-                site.background,
-                site.color,
-                activePage?.entries,
-                site.currency,
-                activePage?.title || "Site",
-                media.galleries, // gallery page -> gallery images only
-                media.slider, //    home page    -> slider images only
-              )}
               sx={{
-                width: DEVICE_WIDTHS[devices],
-                maxWidth: "100%",
-                height: "calc(100vh - 110px)",
-                border: devices === "laptop" ? 0 : "1px solid #d1d5db",
-                borderRadius: devices === "laptop" ? 0 : 1,
-                bgcolor: site.background || "#fff",
-                display: "block",
+                minHeight: "100%",
+                display: "flex",
+                flexDirection: "column",
               }}
-            />
-          </Box>
-        </>
-      )}
+            >
+              <SiteHeader
+                header={site.header}
+                siteName={site.siteName}
+                pages={pages}
+                activeId={String(activeId)}
+                onNavigate={handleNavigate}
+                theme={theme}
+                device={devices}
+              />
 
+              <Box
+                component="main"
+                sx={{ flex: "1 0 auto", bgcolor: theme.background }}
+              >
+                <Box
+                  component="iframe"
+                  key={`${activeId}-${devices}`}
+                  title={activePage?.title || "Page preview"}
+                  sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+                  srcDoc={srcDoc}
+                  onLoad={handleFrameLoad}
+                  sx={{
+                    display: "block",
+                    width: "100%",
+                    minHeight: 300,
+                    border: 0,
+                    bgcolor: theme.background,
+                  }}
+                />
+              </Box>
+
+              <SiteFooter
+                header={site.header}
+                siteName={site.siteName}
+                pages={pages}
+                activeId={String(activeId)}
+                onNavigate={handleNavigate}
+                theme={theme}
+                device={devices}
+              />
+            </Box>
+          </Box>
+        )}
+      </Box>
+
+      {/* ---------- News dialog ---------- */}
       {media.news[newsIndex] && (
         <Dialog
           open={newsOpen}
@@ -486,6 +1189,7 @@ export default function MySiteView() {
                 borderRadius: 3,
                 overflow: "hidden",
                 boxShadow: "0 24px 60px rgba(0,0,0,0.25)",
+                position: "relative",
               },
             },
           }}
@@ -517,7 +1221,7 @@ export default function MySiteView() {
               "&:hover": { bgcolor: "rgba(0,0,0,0.75)" },
             }}
           >
-            <CloseIcon fontSize="small" />
+            <CloseIcon />
           </IconButton>
 
           <DialogContent sx={{ px: { xs: 3, sm: 4 }, py: 3 }}>
@@ -525,7 +1229,12 @@ export default function MySiteView() {
               id="site-news-title"
               variant="h5"
               component="h2"
-              sx={{ fontWeight: 700, lineHeight: 1.3, mb: 2 ,textAlign:"center"}}
+              sx={{
+                fontWeight: 700,
+                lineHeight: 1.3,
+                mb: 2,
+                textAlign: "center",
+              }}
             >
               {media.news[newsIndex].title}
             </Typography>
@@ -535,7 +1244,7 @@ export default function MySiteView() {
                 whiteSpace: "pre-wrap",
                 color: "text.secondary",
                 lineHeight: 1.75,
-                textAlign: "center"
+                textAlign: "center",
               }}
             >
               {media.news[newsIndex].content}

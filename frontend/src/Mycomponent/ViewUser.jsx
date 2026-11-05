@@ -17,6 +17,11 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Alert from "@mui/material/Alert";
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
+import InputAdornment from "@mui/material/InputAdornment";
+import Divider from "@mui/material/Divider";
+import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
+import SearchIcon from "@mui/icons-material/Search";
+import CloseIcon from "@mui/icons-material/Close";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const COLUMN_COUNT = 6;
@@ -50,6 +55,18 @@ function filterUsers(users, query) {
   );
 }
 
+const headCellSx = {
+  fontWeight: 700,
+  bgcolor: "grey.50",
+  whiteSpace: "nowrap",
+  color: "text.primary",
+  fontSize: "0.8rem",
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+  borderBottom: "1px solid",
+  borderColor: "divider",
+};
+
 export default function ViewUser() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +85,6 @@ export default function ViewUser() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || "Failed to load users");
         if (!Array.isArray(data)) throw new Error("Invalid users response");
-        // Show clients only
         setUsers(data.filter((user) => user.role === "client"));
       } catch (err) {
         setError(err.message);
@@ -136,159 +152,241 @@ export default function ViewUser() {
       : filteredUsers;
 
   return (
-    <Box>
-      <Typography
-        variant="h5"
-        fontWeight="bold"
-        sx={{ textAlign: "center", mb: 2 }}
-      >
-        View Users
-      </Typography>
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
-
-      <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
-        <TextField
-          size="small"
-          fullWidth
-          label="Search by ID, name, email or phone"
-          value={query}
-          onChange={handleSearch}
-          sx={{ bgcolor: "background.paper" }}
-        />
-        {searching && (
-          <Button
-            onClick={() => {
-              setQuery("");
-              setPage(0);
+    <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, minHeight: "100vh", bgcolor: "#f4f6f8" }}>
+      <Box sx={{ maxWidth: 1280, mx: "auto" }}>
+        {/* Page header */}
+        <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: { xs: 2, md: 3 } }}>
+          <Box
+            sx={{
+              display: "grid",
+              placeItems: "center",
+              width: 40,
+              height: 40,
+              borderRadius: 2,
+              bgcolor: "primary.main",
+              color: "primary.contrastText",
             }}
-            sx={{ flexShrink: 0 }}
           >
-            Clear
-          </Button>
+            <PeopleAltOutlinedIcon fontSize="small" />
+          </Box>
+          <Box>
+            <Typography variant="h5" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+              View Users
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Review registered clients and manage their account status.
+            </Typography>
+          </Box>
+        </Stack>
+
+        {error && (
+          <Alert
+            severity="error"
+            sx={{ mb: 2, borderRadius: 1.5 }}
+            onClose={() => setError("")}
+          >
+            {error}
+          </Alert>
         )}
-      </Stack>
 
-      {!loading && (
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          {filteredUsers.length} {filteredUsers.length === 1 ? "user" : "users"}
-          {searching ? " match your search" : ""}
-        </Typography>
-      )}
-
-      <TableContainer component={Paper}>
-        <Table sx={{ minWidth: 500 }} aria-label="users table">
-          <TableHead>
-            <TableRow sx={{ bgcolor: "primary.main" }}>
-              {[
-                "No.",
-                "User",
-                "Status",
-                "Contact & Address",
-                "Action",
-                "Created At",
-              ].map((h) => (
-                <TableCell key={h} sx={{ color: "white", fontWeight: "bold" }}>
-                  {h}
-                </TableCell>
-              ))}
-            </TableRow>
-          </TableHead>
-
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={COLUMN_COUNT} align="center" sx={{ py: 5 }}>
-                  <CircularProgress size={28} />
-                </TableCell>
-              </TableRow>
-            ) : visibleRows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={COLUMN_COUNT} align="center" sx={{ py: 4 }}>
-                  {searching ? "No users match your search" : "No users found"}
-                </TableCell>
-              </TableRow>
-            ) : (
-              visibleRows.map((user, index) => (
-                <TableRow key={user.userId} hover>
-                  <TableCell>
-                    {rowsPerPage > 0 ? page * rowsPerPage + index + 1 : index + 1}
-                  </TableCell>
-
-                  <TableCell>
-                    <Typography variant="body2" fontWeight="medium">
-                      {user.name}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {user.email}
-                    </Typography>
-                  </TableCell>
-
-                  <TableCell>
-                    <Chip
-                      label={user.status}
-                      size="small"
-                      variant="outlined"
-                      color={user.status === "active" ? "success" : "error"}
-                    />
-                  </TableCell>
-
-                  <TableCell>
-                    <Typography variant="body2">{user.phone || "-"}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {user.address || "-"}
-                    </Typography>
-                  </TableCell>
-
-                  <TableCell>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={() => toggleUserStatus(user.userId, user.status)}
-                      color={user.status === "active" ? "error" : "success"}
-                      sx={{ textTransform: "none" }}
-                    >
-                      {user.status === "active" ? "Deactivate" : "Activate"}
-                    </Button>
-                  </TableCell>
-
-                  <TableCell>{formatDate(user.createdAt)}</TableCell>
-                </TableRow>
-              ))
-            )}
-
-            {emptyRows > 0 && (
-              <TableRow style={{ height: 53 * emptyRows }}>
-                <TableCell colSpan={COLUMN_COUNT} />
-              </TableRow>
-            )}
-          </TableBody>
-
-          <TableFooter>
-            <TableRow>
-              <TablePagination
-                rowsPerPageOptions={[5, 10, 25, { label: "All", value: -1 }]}
-                colSpan={COLUMN_COUNT}
-                count={filteredUsers.length}
-                rowsPerPage={rowsPerPage}
-                page={page}
+        <Paper
+          elevation={0}
+          sx={{
+            borderRadius: 2,
+            border: "1px solid",
+            borderColor: "divider",
+            overflow: "hidden",
+          }}
+        >
+          {/* Toolbar */}
+          <Box sx={{ p: { xs: 2, sm: 2.5 } }}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={1.5}
+              alignItems={{ xs: "stretch", sm: "center" }}
+            >
+              <TextField
+                size="small"
+                fullWidth
+                label="Search users"
+                placeholder="Search by ID, name, email or phone"
+                value={query}
+                onChange={handleSearch}
                 slotProps={{
-                  select: {
-                    inputProps: { "aria-label": "rows per page" },
-                    native: true,
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon fontSize="small" />
+                      </InputAdornment>
+                    ),
+                    endAdornment: searching ? (
+                      <InputAdornment position="end">
+                        <CloseIcon
+                          fontSize="small"
+                          sx={{ cursor: "pointer", color: "text.secondary" }}
+                          onClick={() => {
+                            setQuery("");
+                            setPage(0);
+                          }}
+                        />
+                      </InputAdornment>
+                    ) : null,
                   },
                 }}
-                onPageChange={handleChangePage}
-                onRowsPerPageChange={handleChangeRowsPerPage}
               />
-            </TableRow>
-          </TableFooter>
-        </Table>
-      </TableContainer>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ whiteSpace: "nowrap", flexShrink: 0 }}
+              >
+                {loading
+                  ? "Loading…"
+                  : `${filteredUsers.length} ${
+                      filteredUsers.length === 1 ? "user" : "users"
+                    }${searching ? " matched" : ""}`}
+              </Typography>
+            </Stack>
+          </Box>
+
+          <Divider />
+
+          <TableContainer sx={{ maxWidth: "100%" }}>
+            <Table sx={{ minWidth: 720 }} aria-label="users table">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ ...headCellSx, width: 64 }}>No.</TableCell>
+                  <TableCell sx={headCellSx}>User</TableCell>
+                  <TableCell sx={headCellSx}>Status</TableCell>
+                  <TableCell sx={headCellSx}>Contact &amp; Address</TableCell>
+                  <TableCell sx={{ ...headCellSx, width: 130 }}>Action</TableCell>
+                  <TableCell sx={{ ...headCellSx, width: 130 }}>Created At</TableCell>
+                </TableRow>
+              </TableHead>
+
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={COLUMN_COUNT} align="center" sx={{ py: 6 }}>
+                      <CircularProgress size={28} />
+                    </TableCell>
+                  </TableRow>
+                ) : visibleRows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={COLUMN_COUNT} align="center" sx={{ py: 6 }}>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
+                        {searching ? "No matching users" : "No users found"}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {searching
+                          ? "Try a different search term."
+                          : "Registered clients will appear here."}
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  visibleRows.map((user, index) => (
+                    <TableRow
+                      key={user.userId}
+                      hover
+                      sx={{ "& td": { verticalAlign: "top", py: 1.75 } }}
+                    >
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary">
+                          {rowsPerPage > 0 ? page * rowsPerPage + index + 1 : index + 1}
+                        </Typography>
+                      </TableCell>
+
+                      <TableCell sx={{ maxWidth: 240 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {user.name || "-"}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ wordBreak: "break-word" }}
+                        >
+                          {user.email || "-"}
+                        </Typography>
+                      </TableCell>
+
+                      <TableCell>
+                        <Chip
+                          label={user.status}
+                          size="small"
+                          variant="outlined"
+                          color={user.status === "active" ? "success" : "error"}
+                          sx={{ textTransform: "capitalize", fontWeight: 600 }}
+                        />
+                      </TableCell>
+
+                      <TableCell sx={{ maxWidth: 260 }}>
+                        <Typography variant="body2">{user.phone || "-"}</Typography>
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ wordBreak: "break-word" }}
+                        >
+                          {user.address || "-"}
+                        </Typography>
+                      </TableCell>
+
+                      <TableCell>
+                        <Button
+                          size="small"
+                          variant={user.status === "active" ? "outlined" : "contained"}
+                          disableElevation
+                          onClick={() => toggleUserStatus(user.userId, user.status)}
+                          color={user.status === "active" ? "error" : "success"}
+                          sx={{
+                            textTransform: "none",
+                            fontWeight: 600,
+                            borderRadius: 1.5,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {user.status === "active" ? "Deactivate" : "Activate"}
+                        </Button>
+                      </TableCell>
+
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary">
+                          {formatDate(user.createdAt)}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+
+                {emptyRows > 0 && (
+                  <TableRow style={{ height: 53 * emptyRows }}>
+                    <TableCell colSpan={COLUMN_COUNT} />
+                  </TableRow>
+                )}
+              </TableBody>
+
+              <TableFooter>
+                <TableRow>
+                  <TablePagination
+                    rowsPerPageOptions={[5, 10, 25, { label: "All", value: -1 }]}
+                    colSpan={COLUMN_COUNT}
+                    count={filteredUsers.length}
+                    rowsPerPage={rowsPerPage}
+                    page={page}
+                    slotProps={{
+                      select: {
+                        inputProps: { "aria-label": "rows per page" },
+                        native: true,
+                      },
+                    }}
+                    onPageChange={handleChangePage}
+                    onRowsPerPageChange={handleChangeRowsPerPage}
+                  />
+                </TableRow>
+              </TableFooter>
+            </Table>
+          </TableContainer>
+        </Paper>
+      </Box>
     </Box>
   );
 }

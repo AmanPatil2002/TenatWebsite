@@ -108,6 +108,7 @@ const readEntry = (body) => {
       ? null
       : Number(body.price);
   const customFields = parseCustomFields(body.customFields);
+  const category = body.category || "generic";
 
   if (!name || name.length > 190) {
     return { error: "Entry name is required and must be at most 190 characters" };
@@ -117,6 +118,9 @@ const readEntry = (body) => {
   }
   if (imageUrl.length > 1000) {
     return { error: "Image URL must be at most 1,000 characters" };
+  }
+  if (!["student", "restaurant", "product", "menu", "generic"].includes(category)) {
+    return { error: "Category must be one of: student, restaurant, product, menu, generic" };
   }
   if (
     price !== null &&
@@ -132,7 +136,7 @@ const readEntry = (body) => {
       error: "Custom fields must contain at most 30 key/value pairs of text, numbers, or booleans",
     };
   }
-  return { name, description, imageUrl, price, status, customFields };
+  return { name, description, imageUrl, price, status, customFields, category };
 };
 
 const getEmployees = async (req, res) => {
@@ -209,41 +213,54 @@ const deleteEmployee = async (req, res) => {
   }
 };
 
-const getEntries = async (req, res) => {
+const getEntries = async (req, res, fixedCategory) => {
   try {
     const siteId = getSiteId(req);
     await ensureActiveSite(siteId);
-    const [rows] = await db.query(
-      `SELECT e.id, e.sitePageId, e.name, e.description, e.price,
-              e.imageUrl, e.status, e.customFields, e.createdAt, e.updatedAt,
+    const category = fixedCategory || req.query.category;
+
+    let query = `
+      SELECT e.id, e.sitePageId, e.name, e.description, e.price,
+              e.imageUrl, e.status, e.customFields, e.category, e.createdAt, e.updatedAt,
               sp.title AS pageTitle
-         FROM siteentries e
+         FROM siteEntries e
          JOIN sitepages sp ON sp.id = e.sitePageId AND sp.siteId = e.siteId
-        WHERE e.siteId = ?
-        ORDER BY sp.sortOrder, sp.title, e.name`,
-      [siteId],
-    );
+        WHERE e.siteId = ?`;
+
+    const queryParams = [siteId];
+
+    if (category) {
+      query += ` AND e.category = ?`;
+      queryParams.push(category);
+    }
+
+    query += ` ORDER BY sp.sortOrder, sp.title, e.name`;
+
+    const [rows] = await db.query(query, queryParams);
     return res.json(rows);
   } catch (error) {
     return sendError(res, error);
   }
 };
 
-const createEntry = async (req, res) => {
-  const { sitePageId } = req.body ?? {};
+const createEntry = async (req, res, fixedCategory) => {
+  const sitePageId = req.body?.sitePageId;
   if (!isId(sitePageId)) {
     return res.status(400).json({ message: "Choose a valid site page" });
   }
-  const entry = readEntry(req.body ?? {});
+  const entry = readEntry({
+    ...(req.body ?? {}),
+    ...(fixedCategory ? { category: fixedCategory } : {}),
+  });
   if (entry.error) return res.status(400).json({ message: entry.error });
 
   try {
     const siteId = getSiteId(req);
     await ensureActiveSite(siteId);
     const [result] = await db.query(
-      `INSERT INTO siteentries
-         (siteId, sitePageId, name, description, price, imageUrl, status, customFields)
-       SELECT ?, sp.id, ?, ?, ?, ?, ?, ?
+      `INSERT INTO siteEntries
+         (siteId, sitePageId, name, description, price, imageUrl, status, customFields, category)
+       SELECT ?, sp.id, ?, ?, ?, ?, ?, ?, ?
          FROM sitepages sp
         WHERE sp.id = ? AND sp.siteId = ?`,
       [
@@ -254,6 +271,7 @@ const createEntry = async (req, res) => {
         entry.imageUrl || null,
         entry.status,
         JSON.stringify(entry.customFields),
+        entry.category || "generic",
         sitePageId,
         siteId,
       ],
@@ -265,26 +283,31 @@ const createEntry = async (req, res) => {
   }
 };
 
-const updateEntry = async (req, res) => {
+const updateEntry = async (req, res, fixedCategory) => {
   if (!isId(req.params.entryId)) {
     return res.status(400).json({ message: "Invalid entry id" });
   }
   if (req.body?.sitePageId !== undefined && !isId(req.body.sitePageId)) {
     return res.status(400).json({ message: "Choose a valid site page" });
   }
-  const entry = readEntry(req.body ?? {});
+  const entry = readEntry({
+    ...(req.body ?? {}),
+    ...(fixedCategory ? { category: fixedCategory } : {}),
+  });
   if (entry.error) return res.status(400).json({ message: entry.error });
 
   try {
     const siteId = getSiteId(req);
     await ensureActiveSite(siteId);
     const pageId = req.body.sitePageId;
+    const category = fixedCategory || entry.category;
     const [result] = await db.query(
-      `UPDATE siteentries e
+      `UPDATE siteEntries e
          JOIN sitepages sp ON sp.id = ? AND sp.siteId = e.siteId
           SET e.sitePageId = sp.id, e.name = ?, e.description = ?,
-              e.price = ?, e.imageUrl = ?, e.status = ?, e.customFields = ?
-        WHERE e.id = ? AND e.siteId = ?`,
+              e.price = ?, e.imageUrl = ?, e.status = ?, e.customFields = ?,
+              e.category = ?
+        WHERE e.id = ? AND e.siteId = ?${fixedCategory ? " AND e.category = ?" : ""}`,
       [
         pageId,
         entry.name,
@@ -293,8 +316,10 @@ const updateEntry = async (req, res) => {
         entry.imageUrl || null,
         entry.status,
         JSON.stringify(entry.customFields),
+        category || "generic",
         req.params.entryId,
         siteId,
+        ...(fixedCategory ? [fixedCategory] : []),
       ],
     );
     if (!result.affectedRows) throw new HttpError(404, "Entry or page not found");
@@ -304,7 +329,7 @@ const updateEntry = async (req, res) => {
   }
 };
 
-const deleteEntry = async (req, res) => {
+const deleteEntry = async (req, res, fixedCategory) => {
   if (!isId(req.params.entryId)) {
     return res.status(400).json({ message: "Invalid entry id" });
   }
@@ -312,8 +337,8 @@ const deleteEntry = async (req, res) => {
     const siteId = getSiteId(req);
     await ensureActiveSite(siteId);
     const [result] = await db.query(
-      "DELETE FROM siteentries WHERE id = ? AND siteId = ?",
-      [req.params.entryId, siteId],
+      `DELETE FROM siteEntries WHERE id = ? AND siteId = ?${fixedCategory ? " AND category = ?" : ""}`,
+      [req.params.entryId, siteId, ...(fixedCategory ? [fixedCategory] : [])],
     );
     if (!result.affectedRows) throw new HttpError(404, "Business entry not found");
     return res.json({ message: "Business entry deleted" });
@@ -321,6 +346,13 @@ const deleteEntry = async (req, res) => {
     return sendError(res, error);
   }
 };
+
+const createCategoryController = (category) => ({
+  get: (req, res) => getEntries(req, res, category),
+  create: (req, res) => createEntry(req, res, category),
+  update: (req, res) => updateEntry(req, res, category),
+  delete: (req, res) => deleteEntry(req, res, category),
+});
 
 module.exports = {
   getEmployees,
@@ -331,4 +363,5 @@ module.exports = {
   createEntry,
   updateEntry,
   deleteEntry,
+  createCategoryController,
 };

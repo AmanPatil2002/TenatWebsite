@@ -21,11 +21,20 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import CategoryOutlinedIcon from "@mui/icons-material/CategoryOutlined";
 import axios from "axios";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+const BRAND = {
+  indigo: "#4f46e5",
+  indigoDeep: "#3730a3",
+  ink: "#0f172a",
+  muted: "#64748b",
+};
 
 // Limits mirror the backend and the categories table (VARCHAR(500)).
 const NAME_MAX = 500;
@@ -41,7 +50,6 @@ const contentToText = (content) => {
 };
 
 // The API only accepts a JSON object/array (or empty) for `content`.
-// Returns { value } (null when empty) or { error }.
 const parseContent = (text) => {
   const trimmed = text.trim();
   if (!trimmed) return { value: null };
@@ -65,13 +73,28 @@ const errorMessage = (error, fallback) => {
   return error.response?.data?.message || fallback;
 };
 
-// 409 = category still has templates; a warning fits better than an error.
 const errorSeverity = (error) =>
   error.response?.status === 409 ? "warning" : "error";
 
+/* Section label helper */
+function SectionLabel({ children }) {
+  return (
+    <Typography
+      variant="overline"
+      sx={{
+        display: "block",
+        fontWeight: 700,
+        letterSpacing: "0.1em",
+        color: BRAND.indigo,
+        lineHeight: 1.6,
+      }}
+    >
+      {children}
+    </Typography>
+  );
+}
+
 // ---- Shared form (add + edit) -------------------------------------------
-// The parent gives this form a new `key` whenever the record being edited
-// changes (or after a successful add), so no reset effect is needed here.
 function CategoryForm({
   initialValues,
   submitLabel,
@@ -114,90 +137,116 @@ function CategoryForm({
     if (!ok) return;
     onSubmit({
       name: formData.name.trim(),
-      tag: formData.tag.trim(), // empty string is stored as NULL by the API
-      content, // parsed JSON, or null when empty
+      tag: formData.tag.trim(),
+      content,
     });
   };
 
   return (
     <Box component="form" onSubmit={handleSubmit} noValidate>
-      <Grid container spacing={2}>
-        <Grid size={12}>
-          <TextField
-            fullWidth
-            size="small"
-            name="name"
-            label="Category name"
-            value={formData.name}
-            onChange={handleChange}
-            error={!!errors.name}
-            helperText={errors.name}
-            slotProps={{ htmlInput: { maxLength: NAME_MAX } }}
-            required
-            autoFocus
-          />
-        </Grid>
-        <Grid size={12}>
-          <TextField
-            fullWidth
-            size="small"
-            name="tag"
-            label="Tag (optional)"
-            value={formData.tag}
-            onChange={handleChange}
-            error={!!errors.tag}
-            helperText={errors.tag || "A short label, e.g. portfolio"}
-            slotProps={{ htmlInput: { maxLength: TAG_MAX } }}
-          />
-        </Grid>
-        <Grid size={12}>
-          <TextField
-            fullWidth
-            size="small"
-            name="content"
-            label="Content (optional, JSON)"
-            multiline
-            minRows={4}
-            maxRows={12}
-            value={formData.content}
-            onChange={handleChange}
-            error={!!errors.content}
-            helperText={
-              errors.content || 'A JSON object or array, e.g. {"icon": "store"}'
-            }
-            slotProps={{
-              htmlInput: {
-                spellCheck: false,
-                style: { fontFamily: "monospace", fontSize: "0.85rem" },
+      <Stack spacing={2}>
+        <TextField
+          fullWidth
+          size="small"
+          name="name"
+          label="Category name"
+          value={formData.name}
+          onChange={handleChange}
+          error={!!errors.name}
+          helperText={errors.name || " "}
+          slotProps={{ htmlInput: { maxLength: NAME_MAX } }}
+          required
+          autoFocus
+          sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+        />
+        <TextField
+          fullWidth
+          size="small"
+          name="tag"
+          label="Tag (optional)"
+          value={formData.tag}
+          onChange={handleChange}
+          error={!!errors.tag}
+          helperText={errors.tag || "A short label, e.g. portfolio"}
+          slotProps={{ htmlInput: { maxLength: TAG_MAX } }}
+          sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+        />
+        <TextField
+          fullWidth
+          size="small"
+          name="content"
+          label="Content (optional, JSON)"
+          multiline
+          minRows={5}
+          maxRows={12}
+          value={formData.content}
+          onChange={handleChange}
+          error={!!errors.content}
+          helperText={
+            errors.content || 'A JSON object or array, e.g. {"icon": "store"}'
+          }
+          slotProps={{
+            htmlInput: {
+              spellCheck: false,
+              style: { fontFamily: "monospace", fontSize: "0.85rem" },
+            },
+          }}
+          sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+        />
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1.5}
+          sx={{ pt: 0.5 }}
+        >
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={submitting}
+            sx={{
+              flex: 1,
+              py: 1.1,
+              borderRadius: 2,
+              textTransform: "none",
+              fontWeight: 700,
+              fontSize: "0.95rem",
+              bgcolor: BRAND.indigo,
+              boxShadow: `0 8px 20px ${alpha(BRAND.indigo, 0.25)}`,
+              "&:hover": {
+                bgcolor: BRAND.indigoDeep,
+                boxShadow: `0 10px 24px ${alpha(BRAND.indigo, 0.32)}`,
+              },
+              "&.Mui-disabled": {
+                bgcolor: alpha(BRAND.indigo, 0.35),
+                color: "#fff",
               },
             }}
-          />
-        </Grid>
-        <Grid size={12}>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+          >
+            {submitting ? "Saving…" : submitLabel}
+          </Button>
+          {onCancel && (
             <Button
-              type="submit"
-              variant="contained"
-              fullWidth
+              variant="outlined"
               disabled={submitting}
-              sx={{ py: 1.25, fontSize: "0.95rem", fontWeight: "bold" }}
+              onClick={onCancel}
+              sx={{
+                flex: 1,
+                py: 1.1,
+                borderRadius: 2,
+                textTransform: "none",
+                fontWeight: 600,
+                borderColor: alpha(BRAND.indigo, 0.35),
+                color: BRAND.indigo,
+                "&:hover": {
+                  borderColor: BRAND.indigo,
+                  bgcolor: alpha(BRAND.indigo, 0.04),
+                },
+              }}
             >
-              {submitting ? "Saving…" : submitLabel}
+              Cancel
             </Button>
-            {onCancel && (
-              <Button
-                variant="outlined"
-                fullWidth
-                disabled={submitting}
-                onClick={onCancel}
-                sx={{ py: 1.25, fontSize: "0.95rem" }}
-              >
-                Cancel
-              </Button>
-            )}
-          </Stack>
-        </Grid>
-      </Grid>
+          )}
+        </Stack>
+      </Stack>
     </Box>
   );
 }
@@ -209,7 +258,7 @@ export default function AddCategory() {
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
-  const [createKey, setCreateKey] = useState(0); // bump to clear the add form
+  const [createKey, setCreateKey] = useState(0);
   const [snack, setSnack] = useState({
     open: false,
     message: "",
@@ -250,7 +299,7 @@ export default function AddCategory() {
         headers: { Authorization: `Bearer ${token}` },
       });
       showSnack("Category added successfully!");
-      setCreateKey((k) => k + 1); // fresh, empty form
+      setCreateKey((k) => k + 1);
       fetchCategories();
     } catch (error) {
       showSnack(
@@ -299,7 +348,6 @@ export default function AddCategory() {
       if (editingId === category.categoryId) setEditingId(null);
       fetchCategories();
     } catch (error) {
-      // 409 message from the API: "Category has templates. Move or delete them first"
       showSnack(
         errorMessage(error, "Failed to delete category."),
         errorSeverity(error),
@@ -317,197 +365,370 @@ export default function AddCategory() {
   return (
     <Box
       sx={{
-        p: { xs: 1.5, sm: 2, md: 1 },
         minHeight: "100vh",
-        backgroundColor: "#f5f5f5",
+        py: { xs: 3, md: 5 },
+        background:
+          "linear-gradient(160deg, #f8fafc 0%, #eef2ff 45%, #f0fdfa 100%)",
       }}
     >
-      <Grid
-        container
-        spacing={{ xs: 2, md: 3 }}
-        sx={{ maxWidth: 1200, mx: "auto" }}
-      >
-        {/* -------- Form card -------- */}
-        <Grid size={{ xs: 12, md: 4 }}>
-          <Paper elevation={1} sx={{ p: { xs: 2, sm: 3 } }}>
-            <Typography
-              variant="h5"
+      <Box sx={{ maxWidth: 1280, mx: "auto", px: { xs: 2, sm: 3 } }}>
+        {/* Page header */}
+        <Box sx={{ mb: { xs: 3, md: 4 }, textAlign: "center" }}>
+          <Typography
+            variant="overline"
+            sx={{
+              display: "block",
+              fontWeight: 700,
+              letterSpacing: "0.12em",
+              color: BRAND.indigo,
+            }}
+          >
+            Catalog
+          </Typography>
+          <Typography
+            component="h1"
+            variant="h4"
+            sx={{
+              fontWeight: 800,
+              letterSpacing: "-0.02em",
+              color: BRAND.ink,
+              mt: 0.5,
+            }}
+          >
+            {editingCategory ? "Edit category" : "Add category"}
+          </Typography>
+          <Typography
+            color="text.secondary"
+            sx={{ mt: 1, maxWidth: 520, mx: "auto" }}
+          >
+            Categories group templates in the storefront dropdown.
+          </Typography>
+        </Box>
+
+        <Grid container spacing={{ xs: 2.5, md: 3 }}>
+          {/* -------- Form card -------- */}
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Paper
+              elevation={0}
+              variant="outlined"
               sx={{
-                fontWeight: "bold",
-                mb: 0.5,
-                fontSize: { xs: "1.2rem", sm: "1.5rem" },
+                p: { xs: 2.5, sm: 3 },
+                borderRadius: 3,
+                borderColor: "divider",
+                boxShadow: "0 12px 30px rgba(15,23,42,0.05)",
+                // No height: "100%" — let it size to its content
               }}
             >
-              {editingCategory ? "Edit category" : "Add category"}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Categories group templates in the storefront dropdown.
-            </Typography>
-
-            <CategoryForm
-              key={
-                editingCategory
-                  ? `edit-${editingCategory.categoryId}`
-                  : `new-${createKey}`
-              }
-              initialValues={
-                editingCategory
-                  ? {
-                      name: editingCategory.name || "",
-                      tag: editingCategory.tag || "",
-                      content: contentToText(editingCategory.content),
-                    }
-                  : getInitialForm()
-              }
-              submitLabel={editingCategory ? "Save changes" : "Add category"}
-              onSubmit={editingCategory ? handleUpdate : handleCreate}
-              onCancel={editingCategory ? () => setEditingId(null) : undefined}
-              submitting={submitting}
-            />
-          </Paper>
-        </Grid>
-
-        {/* -------- Table card -------- */}
-        <Grid size={{ xs: 12, md: 8 }}>
-          <Paper elevation={1} sx={{ p: { xs: 2, sm: 3 } }}>
-            <Typography variant="h6" sx={{ fontWeight: "bold", mb: 1 }}>
-              Existing categories
-            </Typography>
-            <Divider sx={{ mb: 2 }} />
-
-            {loadingList ? (
-              <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
-                <CircularProgress size={24} />
-              </Box>
-            ) : categories.length === 0 ? (
-              <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
-                No categories yet. Add your first one using the form.
-              </Typography>
-            ) : (
-              <TableContainer
+              <Box
                 sx={{
-                  width: "100%",
-                  overflowX: "auto",
-                  overflowY: "auto",
-                  WebkitOverflowScrolling: "touch",
-                  borderRadius: 1,
-                  height: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1.25,
+                  mb: 2,
                 }}
               >
-                <Table
-                 
+                <Box
+                  aria-hidden="true"
                   sx={{
-                    minWidth: 580,
-                    tableLayout: "auto",
+                    width: 40,
+                    height: 40,
+                    flexShrink: 0,
+                    display: "grid",
+                    placeItems: "center",
+                    borderRadius: 2,
+                    color: BRAND.indigo,
+                    bgcolor: alpha(BRAND.indigo, 0.08),
+                    "& .MuiSvgIcon-root": { fontSize: "1.25rem" },
                   }}
                 >
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ minWidth: 180, fontWeight: "bold" }}>
-                        Name
-                      </TableCell>
+                  <CategoryOutlinedIcon />
+                </Box>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography
+                    variant="h6"
+                    sx={{ fontWeight: 700, color: BRAND.ink, lineHeight: 1.25 }}
+                  >
+                    {editingCategory ? "Edit category" : "New category"}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: BRAND.muted }}>
+                    {editingCategory
+                      ? "Update the details below."
+                      : "Fill in the details below."}
+                  </Typography>
+                </Box>
+              </Box>
 
-                      <TableCell
-                        align="right"
-                        sx={{
-                          minWidth: 80,
-                          whiteSpace: "nowrap",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        Actions
-                      </TableCell>
-                    </TableRow>
-                  </TableHead>
+              <Divider sx={{ mb: 2.5 }} />
 
-                  <TableBody>
-                    {categories.map((c) => (
-                      <TableRow
-                        key={c.categoryId}
-                        hover
-                        selected={editingId === c.categoryId}
-                      >
+              <CategoryForm
+                key={
+                  editingCategory
+                    ? `edit-${editingCategory.categoryId}`
+                    : `new-${createKey}`
+                }
+                initialValues={
+                  editingCategory
+                    ? {
+                        name: editingCategory.name || "",
+                        tag: editingCategory.tag || "",
+                        content: contentToText(editingCategory.content),
+                      }
+                    : getInitialForm()
+                }
+                submitLabel={editingCategory ? "Save changes" : "Add category"}
+                onSubmit={editingCategory ? handleUpdate : handleCreate}
+                onCancel={
+                  editingCategory ? () => setEditingId(null) : undefined
+                }
+                submitting={submitting}
+              />
+            </Paper>
+          </Grid>
+
+          {/* -------- Table card -------- */}
+          <Grid size={{ xs: 12, md: 8 }}>
+            <Paper
+              elevation={0}
+              variant="outlined"
+              sx={{
+                p: { xs: 2.5, sm: 3 },
+                borderRadius: 3,
+                borderColor: "divider",
+                boxShadow: "0 12px 30px rgba(15,23,42,0.05)",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  gap: 2,
+                  mb: 2,
+                }}
+              >
+                <Box sx={{ minWidth: 0 }}>
+                  <SectionLabel>Existing categories</SectionLabel>
+                  <Typography variant="body2" sx={{ color: BRAND.muted }}>
+                    {categories.length > 0
+                      ? `${categories.length} categor${
+                          categories.length === 1 ? "y" : "ies"
+                        } available`
+                      : "No categories yet."}
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Divider sx={{ mb: 2 }} />
+
+              {loadingList ? (
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    py: 6,
+                  }}
+                >
+                  <CircularProgress
+                    size={28}
+                    sx={{ color: BRAND.indigo }}
+                    aria-label="Loading categories"
+                  />
+                </Box>
+              ) : categories.length === 0 ? (
+                <Box
+                  sx={{
+                    textAlign: "center",
+                    py: 8,
+                    px: 2,
+                    borderRadius: 3,
+                    border: "1px dashed",
+                    borderColor: alpha(BRAND.indigo, 0.25),
+                    bgcolor: alpha(BRAND.indigo, 0.03),
+                  }}
+                >
+                  <Typography fontWeight={700} color={BRAND.ink} gutterBottom>
+                    No categories yet
+                  </Typography>
+                  <Typography color="text.secondary">
+                    Add your first category using the form on the left.
+                  </Typography>
+                </Box>
+              ) : (
+                <TableContainer
+                  sx={{
+                    width: "100%",
+                    overflowX: "auto",
+                    overflowY: "auto",
+                    WebkitOverflowScrolling: "touch",
+                    maxHeight: 560,
+                    borderRadius: 2,
+                    border: "1px solid",
+                    borderColor: "divider",
+                    "&::-webkit-scrollbar": { width: 6, height: 6 },
+                    "&::-webkit-scrollbar-thumb": {
+                      bgcolor: alpha(BRAND.indigo, 0.25),
+                      borderRadius: 3,
+                    },
+                  }}
+                >
+                  <Table
+                    size="small"
+                    stickyHeader
+                    sx={{ minWidth: 520, tableLayout: "auto" }}
+                  >
+                    <TableHead>
+                      <TableRow>
                         <TableCell
                           sx={{
-                            minWidth: 180,
-                            overflowWrap: "anywhere",
-                            verticalAlign: "middle",
+                            minWidth: 200,
+                            fontWeight: 700,
+                            bgcolor: alpha(BRAND.indigo, 0.04),
+                            color: BRAND.ink,
                           }}
                         >
-                          {c.name}
-                          <br/>
-                          {c.tag ? (
-                            <Chip
-                              size="small"
-                              label={c.tag}
-                              sx={{
-                                maxWidth: "100%",
-                                height: "auto",
-                                "& .MuiChip-label": {
-                                  display: "block",
-                                  whiteSpace: "normal",
-                                  overflowWrap: "anywhere",
-                                  py: 0.5,
-                                },
-                              }}
-                            />
-                          ) : (
-                            "—"
-                          )}
+                          Name
                         </TableCell>
-
                         <TableCell
                           align="right"
                           sx={{
-                            minWidth: 80,
+                            minWidth: 100,
                             whiteSpace: "nowrap",
-                            verticalAlign: "middle",
+                            fontWeight: 700,
+                            bgcolor: alpha(BRAND.indigo, 0.04),
+                            color: BRAND.ink,
                           }}
                         >
-                          <Tooltip title="Edit">
-                            <span>
-                              <IconButton
-                                size="small"
-                                aria-label={`Edit ${c.name}`}
-                                onClick={() => setEditingId(c.categoryId)}
-                                disabled={
-                                  submitting || deletingId === c.categoryId
-                                }
-                              >
-                                <EditIcon fontSize="small" />
-                              </IconButton>
-                            </span>
-                          </Tooltip>
-
-                          <Tooltip title="Delete">
-                            <span>
-                              <IconButton
-                                size="small"
-                                color="error"
-                                aria-label={`Delete ${c.name}`}
-                                onClick={() => handleDelete(c)}
-                                disabled={
-                                  submitting || deletingId === c.categoryId
-                                }
-                              >
-                                {deletingId === c.categoryId ? (
-                                  <CircularProgress size={16} />
-                                ) : (
-                                  <DeleteIcon fontSize="small" />
-                                )}
-                              </IconButton>
-                            </span>
-                          </Tooltip>
+                          Actions
                         </TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            )}
-          </Paper>
+                    </TableHead>
+
+                    <TableBody>
+                      {categories.map((c) => (
+                        <TableRow
+                          key={c.categoryId}
+                          hover
+                          selected={editingId === c.categoryId}
+                          sx={{
+                            "&.Mui-selected": {
+                              bgcolor: alpha(BRAND.indigo, 0.06),
+                            },
+                            "&.Mui-selected:hover": {
+                              bgcolor: alpha(BRAND.indigo, 0.1),
+                            },
+                          }}
+                        >
+                          <TableCell
+                            sx={{
+                              minWidth: 200,
+                              overflowWrap: "anywhere",
+                              verticalAlign: "middle",
+                              py: 1.5,
+                            }}
+                          >
+                            <Typography
+                              variant="body2"
+                              sx={{ fontWeight: 600, color: BRAND.ink }}
+                            >
+                              {c.name}
+                            </Typography>
+                            {c.tag ? (
+                              <Chip
+                                size="small"
+                                label={c.tag}
+                                sx={{
+                                  mt: 0.75,
+                                  maxWidth: "100%",
+                                  height: "auto",
+                                  bgcolor: alpha(BRAND.indigo, 0.08),
+                                  color: BRAND.indigo,
+                                  fontWeight: 600,
+                                  fontSize: "0.72rem",
+                                  "& .MuiChip-label": {
+                                    display: "block",
+                                    whiteSpace: "normal",
+                                    overflowWrap: "anywhere",
+                                    py: 0.5,
+                                  },
+                                }}
+                              />
+                            ) : (
+                              <Typography
+                                variant="caption"
+                                sx={{ color: BRAND.muted }}
+                              >
+                                No tag
+                              </Typography>
+                            )}
+                          </TableCell>
+
+                          <TableCell
+                            align="right"
+                            sx={{
+                              minWidth: 100,
+                              whiteSpace: "nowrap",
+                              verticalAlign: "middle",
+                            }}
+                          >
+                            <Tooltip title="Edit" arrow>
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  aria-label={`Edit ${c.name}`}
+                                  onClick={() => setEditingId(c.categoryId)}
+                                  disabled={
+                                    submitting || deletingId === c.categoryId
+                                  }
+                                  sx={{
+                                    color: BRAND.indigo,
+                                    "&:hover": {
+                                      bgcolor: alpha(BRAND.indigo, 0.08),
+                                    },
+                                  }}
+                                >
+                                  <EditIcon fontSize="small" />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+
+                            <Tooltip title="Delete" arrow>
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  aria-label={`Delete ${c.name}`}
+                                  onClick={() => handleDelete(c)}
+                                  disabled={
+                                    submitting || deletingId === c.categoryId
+                                  }
+                                  sx={{
+                                    "&:hover": {
+                                      bgcolor: alpha("#dc2626", 0.08),
+                                    },
+                                  }}
+                                >
+                                  {deletingId === c.categoryId ? (
+                                    <CircularProgress size={16} />
+                                  ) : (
+                                    <DeleteIcon fontSize="small" />
+                                  )}
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </Paper>
+          </Grid>
         </Grid>
-      </Grid>
+      </Box>
 
       <Snackbar
         open={snack.open}
@@ -522,7 +743,7 @@ export default function AddCategory() {
           onClose={() => setSnack((s) => ({ ...s, open: false }))}
           severity={snack.severity}
           variant="filled"
-          sx={{ width: "100%" }}
+          sx={{ width: "100%", borderRadius: 2 }}
         >
           {snack.message}
         </Alert>

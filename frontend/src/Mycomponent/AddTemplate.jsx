@@ -7,16 +7,12 @@ import {
   CircularProgress,
   Divider,
   FormControl,
-  FormControlLabel,
-  FormGroup,
   FormHelperText,
-  Grid,
   InputLabel,
   MenuItem,
   Paper,
   Select,
   Stack,
-  Switch,
   TextField,
   Typography,
 } from "@mui/material";
@@ -24,8 +20,13 @@ import {
   AddPhotoAlternateOutlined,
   CloudUploadOutlined,
   SaveOutlined,
+  DeleteOutlineOutlined,
+  CategoryOutlined,
+  PaletteOutlined,
+  DescriptionOutlined,
+  PaymentsOutlined,
+  ImageOutlined,
 } from "@mui/icons-material";
-import DeleteIcon from "@mui/icons-material/Delete";
 
 const API_URL = (
   import.meta.env.VITE_API_URL || "http://localhost:5000"
@@ -125,6 +126,40 @@ const getPagePrice = (page) =>
 const getPageCategoryId = (page) =>
   page?.categoryId ?? page?.category_id ?? page?.pageCategoryId ?? null;
 
+/* ---------------------------------- UI bits --------------------------------- */
+
+function SectionHeader({ icon, title, description }) {
+  return (
+    <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.25, mb: 2 }}>
+      <Box
+        sx={{
+          width: 36,
+          height: 36,
+          borderRadius: 1.5,
+          bgcolor: "primary.50",
+          color: "primary.main",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flex: "0 0 auto",
+        }}
+      >
+        {icon}
+      </Box>
+      <Box sx={{ minWidth: 0 }}>
+        <Typography variant="subtitle1" fontWeight={700} lineHeight={1.3}>
+          {title}
+        </Typography>
+        {description && (
+          <Typography variant="body2" color="text.secondary">
+            {description}
+          </Typography>
+        )}
+      </Box>
+    </Box>
+  );
+}
+
 function MultiplePhotoUpload({ value = [], onChange, disabled = false }) {
   const inputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
@@ -140,14 +175,12 @@ function MultiplePhotoUpload({ value = [], onChange, disabled = false }) {
       if (!files.length) return;
 
       const invalidFile = files.find((file) => !file.type.startsWith("image/"));
-
       if (invalidFile) {
         setError("Please select image files only.");
         return;
       }
 
       const oversizedFile = files.find((file) => file.size > 10 * 1024 * 1024);
-
       if (oversizedFile) {
         setError("Each image must be 10 MB or smaller.");
         return;
@@ -192,7 +225,6 @@ function MultiplePhotoUpload({ value = [], onChange, disabled = false }) {
         onChange([...photos, ...uploadedUrls]);
       } catch (err) {
         console.error("Photo upload failed:", err);
-
         setError(
           err.response?.data?.message ||
             err.response?.data?.error ||
@@ -212,15 +244,6 @@ function MultiplePhotoUpload({ value = [], onChange, disabled = false }) {
 
   return (
     <Box>
-      <Typography variant="subtitle1" fontWeight={700} gutterBottom>
-        Additional Template Photos
-      </Typography>
-
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Select multiple images. Each image is uploaded and its URL is saved with
-        the template.
-      </Typography>
-
       <input
         ref={inputRef}
         hidden
@@ -231,16 +254,57 @@ function MultiplePhotoUpload({ value = [], onChange, disabled = false }) {
         disabled={disabled || uploading}
       />
 
-      <Button
-        variant="outlined"
-        startIcon={
-          uploading ? <CircularProgress size={18} /> : <CloudUploadOutlined />
-        }
-        onClick={() => inputRef.current?.click()}
-        disabled={disabled || uploading}
+      {/* Dropzone-style clickable area */}
+      <Box
+        onClick={() => !disabled && !uploading && inputRef.current?.click()}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if ((e.key === "Enter" || e.key === " ") && !disabled && !uploading) {
+            inputRef.current?.click();
+          }
+        }}
+        sx={{
+          border: "1.5px dashed",
+          borderColor: "divider",
+          borderRadius: 2,
+          p: 3,
+          textAlign: "center",
+          cursor: disabled || uploading ? "not-allowed" : "pointer",
+          bgcolor: "grey.50",
+          transition: "all 120ms ease",
+          "&:hover": {
+            bgcolor: disabled || uploading ? "grey.50" : "action.hover",
+            borderColor: disabled || uploading ? "divider" : "primary.main",
+          },
+        }}
       >
-        {uploading ? "Uploading photos..." : "Choose Photos"}
-      </Button>
+        <Box
+          sx={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 48,
+            height: 48,
+            borderRadius: "50%",
+            bgcolor: "background.paper",
+            mb: 1,
+            boxShadow: 1,
+          }}
+        >
+          {uploading ? (
+            <CircularProgress size={22} />
+          ) : (
+            <CloudUploadOutlined color="primary" />
+          )}
+        </Box>
+        <Typography variant="subtitle2" fontWeight={600}>
+          {uploading ? "Uploading photos..." : "Click to upload photos"}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Multiple images supported · PNG, JPG, WEBP · max 10 MB each
+        </Typography>
+      </Box>
 
       {error && (
         <Alert severity="error" sx={{ mt: 2 }}>
@@ -249,62 +313,72 @@ function MultiplePhotoUpload({ value = [], onChange, disabled = false }) {
       )}
 
       {photos.length > 0 && (
-        <Grid container spacing={2} sx={{ mt: 1 }}>
+        <Box
+          sx={{
+            mt: 2,
+            display: "grid",
+            gap: 1.5,
+            gridTemplateColumns: {
+              xs: "repeat(2, minmax(0, 1fr))",
+              sm: "repeat(3, minmax(0, 1fr))",
+              md: "repeat(4, minmax(0, 1fr))",
+            },
+          }}
+        >
           {photos.map((photo, index) => (
-            <Grid item xs={6} sm={4} md={3} key={`${photo}-${index}`}>
-              <Paper
-                variant="outlined"
+            <Paper
+              key={`${photo}-${index}`}
+              variant="outlined"
+              sx={{ overflow: "hidden", borderRadius: 2 }}
+            >
+              <Box
+                component="img"
+                src={photo}
+                alt={`Template photo ${index + 1}`}
                 sx={{
-                  overflow: "hidden",
-                  borderRadius: 2,
-                  height: "100%",
+                  display: "block",
+                  width: "100%",
+                  height: 120,
+                  objectFit: "cover",
+                  bgcolor: "grey.100",
+                }}
+              />
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  px: 1,
+                  py: 0.5,
                 }}
               >
-                <Box
-                  component="img"
-                  src={photo}
-                  alt={`Template photo ${index + 1}`}
-                  sx={{
-                    display: "block",
-                    width: "100%",
-                    height: 130,
-                    objectFit: "cover",
-                  }}
-                />
-
-                <Stack
-                  direction="row"
-                  justifyContent="space-between"
-                  alignItems="center"
-                  sx={{ p: 1 }}
+                <Typography variant="caption" color="text.secondary" noWrap>
+                  Photo {index + 1}
+                </Typography>
+                <Button
+                  color="error"
+                  size="small"
+                  aria-label={`Remove photo ${index + 1}`}
+                  onClick={() => removePhoto(index)}
+                  disabled={disabled || uploading}
+                  sx={{ minWidth: 32, p: 0.5 }}
                 >
-                  <Typography variant="caption" noWrap>
-                    Photo {index + 1}
-                  </Typography>
-
-                  <Button
-                    color="error"
-                    size="small"
-                    aria-label={`Remove photo ${index + 1}`}
-                    onClick={() => removePhoto(index)}
-                    disabled={disabled || uploading}
-                    sx={{ minWidth: 36 }}
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </Button>
-                </Stack>
-              </Paper>
-            </Grid>
+                  <DeleteOutlineOutlined fontSize="small" />
+                </Button>
+              </Box>
+            </Paper>
           ))}
-        </Grid>
+        </Box>
       )}
 
-      <FormHelperText>
+      <FormHelperText sx={{ mt: 1 }}>
         {photos.length} photo{photos.length === 1 ? "" : "s"} selected
       </FormHelperText>
     </Box>
   );
 }
+
+/* ------------------------------- Main component ----------------------------- */
 
 export default function AddTemplate() {
   const [form, setForm] = useState(EMPTY_FORM);
@@ -331,7 +405,6 @@ export default function AddTemplate() {
       setThemes(getArray(themeResponse));
     } catch (err) {
       console.error("Failed to load template form data:", err);
-
       setError(
         err.response?.data?.message ||
           "Unable to load categories or themes. Check your API routes.",
@@ -381,7 +454,6 @@ export default function AddTemplate() {
         if (!controller.signal.aborted) setPages(allPages);
       } catch (err) {
         if (controller.signal.aborted) return;
-
         console.error("Failed to load pages for the selected category:", err);
         setPages([]);
         setError(
@@ -399,20 +471,15 @@ export default function AddTemplate() {
 
   const handleChange = (event) => {
     const { name, value } = event.target;
-
-    setForm((previous) => ({
-      ...previous,
-      [name]: value,
-    }));
+    setForm((previous) => ({ ...previous, [name]: value }));
   };
 
   const handleCategoryChange = (event) => {
     const { value } = event.target;
-
     setForm((previous) => ({
       ...previous,
       categoryId: value,
-      pageIds: [], // pages belong to a category, so reset them
+      pageIds: [],
     }));
     setPages([]);
     setPagesLoading(Boolean(value));
@@ -420,15 +487,11 @@ export default function AddTemplate() {
   };
 
   const handlePhotoChange = (photos) => {
-    setForm((previous) => ({
-      ...previous,
-      photos,
-    }));
+    setForm((previous) => ({ ...previous, photos }));
   };
 
   const handleThemeChange = (event) => {
     const values = event.target.value;
-
     setForm((previous) => ({
       ...previous,
       themeIds: typeof values === "string" ? values.split(",") : values,
@@ -437,7 +500,6 @@ export default function AddTemplate() {
 
   const handlePageChange = (event) => {
     const values = event.target.value;
-
     setForm((previous) => ({
       ...previous,
       pageIds: typeof values === "string" ? values.split(",") : values,
@@ -473,17 +535,14 @@ export default function AddTemplate() {
       setError("Please select a category.");
       return;
     }
-
     if (!form.name.trim()) {
       setError("Please enter a template name.");
       return;
     }
-
     if (form.price === "" || !(Number(form.price) > 0)) {
       setError("Please enter a template price greater than 0.");
       return;
     }
-
     if (
       !Number.isInteger(Number(form.validityDays)) ||
       Number(form.validityDays) < 1
@@ -502,17 +561,11 @@ export default function AddTemplate() {
         shortDescription: form.shortDescription.trim() || null,
         description: form.description.trim() || null,
         thumbnailUrl: form.thumbnailUrl.trim() || null,
-
-        // IMPORTANT: Send an array. The backend validates each URL
-        // and serializes the array before storing it in MySQL.
         photos: parsePhotos(form.photos),
-
         price: Number(form.price),
         currency: form.currency.trim().toUpperCase(),
         validityDays: Number(form.validityDays),
         status: form.status,
-
-        // Included for APIs that support template-theme/page associations.
         themeIds: form.themeIds.map(Number),
         pageIds: form.pageIds.map(Number),
       };
@@ -524,13 +577,12 @@ export default function AddTemplate() {
       );
 
       setSuccess(response.data?.message || "Template created successfully.");
-
       setForm({ ...EMPTY_FORM });
+      setPages([]);
+      setPagesLoading(false);
     } catch (err) {
       console.error("Create template failed:", err);
-
       const responseData = err.response?.data;
-
       setError(
         responseData?.message ||
           responseData?.error ||
@@ -544,62 +596,92 @@ export default function AddTemplate() {
     }
   };
 
+  const handleReset = () => {
+    setForm({ ...EMPTY_FORM });
+    setPages([]);
+    setPagesLoading(false);
+    setError("");
+    setSuccess("");
+  };
+
   if (loading) {
     return (
       <Box
         sx={{
-          minHeight: 250,
+          minHeight: 320,
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
           gap: 2,
         }}
       >
         <CircularProgress />
-        <Typography>Loading template form...</Typography>
+        <Typography color="text.secondary">Loading template form…</Typography>
       </Box>
     );
   }
 
+  /* Shared grid template for field rows */
+  const gridSx = {
+    display: "grid",
+    gap: 2,
+    gridTemplateColumns: {
+      xs: "1fr",
+      sm: "repeat(2, minmax(0, 1fr))",
+      md: "repeat(3, minmax(0, 1fr))",
+    },
+  };
+
   return (
-    <Box sx={{ maxWidth: 1100, mx: "auto", p: { xs: 2, md: 4 } }}>
-      <Typography variant="h4" fontWeight={800} gutterBottom>
-        Add Template
-      </Typography>
+    <Box sx={{ maxWidth: 1080, mx: "auto", px: { xs: 2, sm: 3 }, py: 4 }}>
+      {/* Header */}
+      <Box sx={{ mb: 3 }}>
+        <Typography
+          variant="overline"
+          sx={{ letterSpacing: 1.2, color: "text.secondary" }}
+        >
+          Admin · Templates
+        </Typography>
+        <Typography variant="h4" fontWeight={700} sx={{ lineHeight: 1.2 }}>
+          Add Template
+        </Typography>
+        <Typography color="text.secondary" sx={{ mt: 1, maxWidth: 720 }}>
+          Create a template, upload photos, and select its category, themes, and
+          pages.
+        </Typography>
+      </Box>
 
-      <Typography color="text.secondary" sx={{ mb: 3 }}>
-        Create a template, upload its photos, and select its category, themes,
-        and pages.
-      </Typography>
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>
-          {error}
-        </Alert>
-      )}
-
-      {success && (
-        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess("")}>
-          {success}
-        </Alert>
-      )}
+      {/* Alerts */}
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2 }}>
+        {error && (
+          <Alert severity="error" onClose={() => setError("")}>
+            {error}
+          </Alert>
+        )}
+        {success && (
+          <Alert severity="success" onClose={() => setSuccess("")}>
+            {success}
+          </Alert>
+        )}
+      </Box>
 
       <Paper
         component="form"
         onSubmit={handleSubmit}
-        elevation={2}
-        sx={{
-          p: { xs: 2, md: 4 },
-          borderRadius: 3,
-        }}
+        variant="outlined"
+        sx={{ borderRadius: 2, overflow: "hidden" }}
       >
-        <Stack spacing={3}>
-          <Grid
-            container
-            spacing={{ xs: 2, md: 3 }}
-            columns={{ xs: 4, sm: 8, md: 12 }}
-          >
-            <Grid size={{ xs: 2, sm: 4, md: 5 }}>
+        <Stack spacing={0}>
+          {/* ------------------------- Section: Basic info ------------------------ */}
+          <Box sx={{ p: { xs: 2, sm: 3 } }}>
+            <SectionHeader
+              icon={<DescriptionOutlined fontSize="small" />}
+              title="Basic Information"
+              description="Category, name, and short summary of this template."
+            />
+
+            <Box sx={gridSx}>
               <FormControl fullWidth required>
                 <InputLabel id="category-label">Category</InputLabel>
                 <Select
@@ -616,8 +698,7 @@ export default function AddTemplate() {
                   ))}
                 </Select>
               </FormControl>
-            </Grid>
-            <Grid size={{ xs: 2, sm: 4, md: 5 }}>
+
               <TextField
                 label="Template Name"
                 name="name"
@@ -627,34 +708,15 @@ export default function AddTemplate() {
                 fullWidth
                 inputProps={{ maxLength: 150 }}
               />
-            </Grid>
-            <Grid size={{ xs: 2, sm: 4, md: 2 }}>
-              {/* <TextField
+
+              <TextField
                 label="Currency"
                 name="currency"
-                value={form.currency}
-                onChange={handleChange}
-                required
+                value="INR"
+                disabled
                 fullWidth
-                inputProps={{ maxLength: 3 }}
-              /> */}
-              
-  <TextField
-    label="Currency"
-    name="currency"
-    value="INR"
-    disabled
-    fullWidth
-  />
-            </Grid>
-          </Grid>
+              />
 
-          <Grid
-            container
-            spacing={{ xs: 2, md: 3 }}
-            columns={{ xs: 4, sm: 8, md: 12 }}
-          >
-            <Grid size={{ xs: 2, sm: 4, md: 5 }}>
               <TextField
                 label="Language"
                 name="language"
@@ -662,71 +724,109 @@ export default function AddTemplate() {
                 onChange={handleChange}
                 fullWidth
               />
-            </Grid>
 
-            <Grid size={{ xs: 2, sm: 4, md: 7 }}>
+              <Box sx={{ gridColumn: { xs: "auto", sm: "span 2" } }}>
+                <TextField
+                  label="Short Description"
+                  name="shortDescription"
+                  value={form.shortDescription}
+                  onChange={handleChange}
+                  fullWidth
+                  inputProps={{ maxLength: 300 }}
+                />
+              </Box>
+            </Box>
+
+            <Box sx={{ mt: 2 }}>
               <TextField
-                label="Short Description"
-                name="shortDescription"
-                value={form.shortDescription}
+                label="Description"
+                name="description"
+                value={form.description}
                 onChange={handleChange}
                 fullWidth
-                inputProps={{ maxLength: 300 }}
+                multiline
+                minRows={4}
               />
-            </Grid>
-          </Grid>
-
-          <TextField
-            label="Description"
-            name="description"
-            value={form.description}
-            onChange={handleChange}
-            fullWidth
-            multiline
-            minRows={4}
-          />
-
-          <TextField
-            label="Thumbnail URL"
-            name="thumbnailUrl"
-            value={form.thumbnailUrl}
-            onChange={handleChange}
-            fullWidth
-            placeholder="https://example.com/thumbnail.jpg"
-            helperText="Optional main image URL. Additional photos can be uploaded below."
-          />
-
-          {form.thumbnailUrl && (
-            <Box
-              component="img"
-              src={form.thumbnailUrl}
-              alt="Template thumbnail preview"
-              onError={(event) => {
-                event.currentTarget.style.display = "none";
-              }}
-              sx={{
-                width: "100%",
-                maxWidth: 400,
-                maxHeight: 220,
-                objectFit: "cover",
-                borderRadius: 2,
-              }}
-            />
-          )}
-
-          <MultiplePhotoUpload
-            value={form.photos}
-            onChange={handlePhotoChange}
-            disabled={saving}
-          />
+            </Box>
+          </Box>
 
           <Divider />
-          <Grid
-            container
-            spacing={{ xs: 2, md: 3 }}
-            columns={{ xs: 4, sm: 8, md: 12 }}
-          >
-            <Grid size={{ xs: 2, sm: 4, md: 6 }}>
+
+          {/* -------------------------- Section: Media --------------------------- */}
+          <Box sx={{ p: { xs: 2, sm: 3 } }}>
+            <SectionHeader
+              icon={<ImageOutlined fontSize="small" />}
+              title="Media"
+              description="Main thumbnail plus additional gallery photos."
+            />
+
+            <TextField
+              label="Thumbnail URL"
+              name="thumbnailUrl"
+              value={form.thumbnailUrl}
+              onChange={handleChange}
+              fullWidth
+              placeholder="https://example.com/thumbnail.jpg"
+              helperText="Optional main image URL. Additional photos can be uploaded below."
+            />
+
+            {form.thumbnailUrl && (
+              <Box
+                sx={{
+                  mt: 2,
+                  display: "flex",
+                  justifyContent: "flex-start",
+                }}
+              >
+                <Box
+                  component="img"
+                  src={form.thumbnailUrl}
+                  alt="Template thumbnail preview"
+                  onError={(event) => {
+                    event.currentTarget.style.display = "none";
+                  }}
+                  sx={{
+                    width: "100%",
+                    maxWidth: 360,
+                    maxHeight: 200,
+                    objectFit: "cover",
+                    borderRadius: 2,
+                    border: "1px solid",
+                    borderColor: "divider",
+                  }}
+                />
+              </Box>
+            )}
+
+            <Box sx={{ mt: 3 }}>
+              <MultiplePhotoUpload
+                value={form.photos}
+                onChange={handlePhotoChange}
+                disabled={saving}
+              />
+            </Box>
+          </Box>
+
+          <Divider />
+
+          {/* ----------------------- Section: Associations ----------------------- */}
+          <Box sx={{ p: { xs: 2, sm: 3 } }}>
+            <SectionHeader
+              icon={<CategoryOutlined fontSize="small" />}
+              title="Associations"
+              description="Attach themes and pages that belong to the selected category."
+            />
+
+            <Box
+              sx={{
+                display: "grid",
+                gap: 2,
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  md: "repeat(2, minmax(0, 1fr))",
+                },
+              }}
+            >
               <FormControl fullWidth>
                 <InputLabel id="themes-label">Themes</InputLabel>
                 <Select
@@ -740,60 +840,67 @@ export default function AddTemplate() {
                     const chosen = themes.filter((theme) =>
                       selected.map(String).includes(String(getId(theme))),
                     );
-
                     if (!chosen.length) return "";
-
                     return (
-                      <Stack
-                        direction="row"
-                        spacing={1}
-                        alignItems="center"
-                        flexWrap="wrap"
-                        useFlexGap
+                      <Box
+                        sx={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: 0.75,
+                          alignItems: "center",
+                        }}
                       >
                         {chosen.map((theme) => (
-                          <Stack
+                          <Box
                             key={getId(theme)}
-                            direction="row"
-                            spacing={0.75}
-                            alignItems="center"
+                            sx={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 0.5,
+                              px: 0.75,
+                              py: 0.25,
+                              borderRadius: 1,
+                              border: "1px solid",
+                              borderColor: "divider",
+                              bgcolor: theme.background || "#fff",
+                              color: theme.color || "#111",
+                              fontSize: 11,
+                              fontWeight: 700,
+                              maxWidth: "100%",
+                            }}
                           >
+                            <PaletteOutlined sx={{ fontSize: 12 }} />
                             <Box
-                              aria-hidden
+                              component="span"
                               sx={{
-                                width: 40,
-                                height: 20,
-                                minWidth: 18,
-                                borderRadius: 0.5,
-                                backgroundColor: theme.background || "#fff",
-                                color: theme.color || "#111",
-                                border: "1px solid",
-                                borderColor: "divider",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                fontSize: 10,
-                                fontWeight: 700,
-                                lineHeight: 1,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
                               }}
                             >
-                              Theme
+                              {getName(theme)}
                             </Box>
-                          </Stack>
+                          </Box>
                         ))}
-                      </Stack>
+                      </Box>
                     );
                   }}
                 >
                   {themes.map((theme) => (
                     <MenuItem key={getId(theme)} value={String(getId(theme))}>
-                      <Stack direction="row" spacing={1} alignItems="center">
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                          minWidth: 0,
+                        }}
+                      >
                         <Box
                           aria-hidden
                           sx={{
-                            width: 50,
-                            height: 35,
-                            minWidth: 20,
+                            width: 36,
+                            height: 24,
                             borderRadius: 0.5,
                             backgroundColor: theme.background || "#fff",
                             color: theme.color || "#111",
@@ -802,89 +909,100 @@ export default function AddTemplate() {
                             display: "inline-flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            fontSize: 11,
+                            fontSize: 10,
                             fontWeight: 700,
-                            lineHeight: 1,
+                            flex: "0 0 auto",
                           }}
                         >
                           Theme
                         </Box>
-                        <span>{getName(theme)}</span>
-                      </Stack>
+                        <Box
+                          component="span"
+                          sx={{
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {getName(theme)}
+                        </Box>
+                      </Box>
                     </MenuItem>
                   ))}
                 </Select>
                 <FormHelperText>Select one or more themes.</FormHelperText>
               </FormControl>
-            </Grid>
-            <Grid size={{ xs: 2, sm: 4, md: 6 }}>
-              <FormControl
-                fullWidth
-                disabled={!form.categoryId || pagesLoading}
-              >
-                <InputLabel id="pages-label">Pages</InputLabel>
-                <Select
-                  labelId="pages-label"
-                  multiple
-                  name="pageIds"
-                  value={form.pageIds}
-                  label="Pages"
-                  onChange={handlePageChange}
-                  renderValue={(selected) =>
-                    filteredPages
-                      .filter((page) =>
-                        selected.map(String).includes(String(getId(page))),
-                      )
-                      .map(getName)
-                      .join(", ")
-                  }
-                >
-                  {filteredPages.length === 0 && (
-                    <MenuItem disabled value="">
-                      {pagesLoading
-                        ? "Loading pages..."
-                        : "No pages found for this category"}
-                    </MenuItem>
-                  )}
-                  {filteredPages.map((page) => (
-                    <MenuItem key={getId(page)} value={String(getId(page))}>
-                      {getName(page)}
-                      {getPagePrice(page) > 0
-                        ? ` — ${form.currency} ${getPagePrice(page).toFixed(2)}`
-                        : ""}
-                    </MenuItem>
-                  ))}
-                </Select>
-                <FormHelperText>
-                  {form.categoryId
-                    ? pagesLoading
-                      ? "Loading all pages for this category..."
-                      : "Only pages added to this category are shown."
-                    : "Select a category first to see its pages."}
-                </FormHelperText>
-              </FormControl>
 
-              {form.pageIds.length > 0 && (
-                <Alert severity="info">
-                  Selected page total: {form.currency}{" "}
-                  {calculatedPagePrice.toFixed(2)}
-                </Alert>
-              )}
-            </Grid>
-          </Grid>
+              <Box>
+                <FormControl
+                  fullWidth
+                  disabled={!form.categoryId || pagesLoading}
+                >
+                  <InputLabel id="pages-label">Pages</InputLabel>
+                  <Select
+                    labelId="pages-label"
+                    multiple
+                    name="pageIds"
+                    value={form.pageIds}
+                    label="Pages"
+                    onChange={handlePageChange}
+                    renderValue={(selected) =>
+                      filteredPages
+                        .filter((page) =>
+                          selected.map(String).includes(String(getId(page))),
+                        )
+                        .map(getName)
+                        .join(", ")
+                    }
+                  >
+                    {filteredPages.length === 0 && (
+                      <MenuItem disabled value="">
+                        {pagesLoading
+                          ? "Loading pages..."
+                          : "No pages found for this category"}
+                      </MenuItem>
+                    )}
+                    {filteredPages.map((page) => (
+                      <MenuItem key={getId(page)} value={String(getId(page))}>
+                        {getName(page)}
+                        {getPagePrice(page) > 0
+                          ? ` — ${form.currency} ${getPagePrice(page).toFixed(
+                              2,
+                            )}`
+                          : ""}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                  <FormHelperText>
+                    {form.categoryId
+                      ? pagesLoading
+                        ? "Loading all pages for this category..."
+                        : "Only pages added to this category are shown."
+                      : "Select a category first to see its pages."}
+                  </FormHelperText>
+                </FormControl>
+
+                {form.pageIds.length > 0 && (
+                  <Alert severity="info" sx={{ mt: 1.5 }}>
+                    Selected page total: {form.currency}{" "}
+                    {calculatedPagePrice.toFixed(2)}
+                  </Alert>
+                )}
+              </Box>
+            </Box>
+          </Box>
 
           <Divider />
 
-          <Typography variant="h6" fontWeight={700}>
-            Pricing and Publishing
-          </Typography>
+          {/* ----------------------- Section: Pricing & Status ------------------- */}
+          <Box sx={{ p: { xs: 2, sm: 3 } }}>
+            <SectionHeader
+              icon={<PaymentsOutlined fontSize="small" />}
+              title="Pricing & Publishing"
+              description="Set price, validity, and publication status."
+            />
 
-          <Grid
-            container
-            spacing={{ xs: 2, md: 3 }}
-            columns={{ xs: 6, sm: 12, md: 12 }}
-          >
-            <Grid size={{ xs: 2, sm: 4, md: 4 }}>
+            <Box sx={gridSx}>
               <TextField
                 label="Template Price"
                 name="price"
@@ -895,9 +1013,7 @@ export default function AddTemplate() {
                 fullWidth
                 inputProps={{ min: 0, step: "0.01" }}
               />
-            </Grid>
 
-            <Grid size={{ xs: 2, sm: 4, md: 4 }}>
               <TextField
                 label="Validity (days)"
                 name="validityDays"
@@ -908,8 +1024,7 @@ export default function AddTemplate() {
                 fullWidth
                 inputProps={{ min: 1, step: 1 }}
               />
-            </Grid>
-            <Grid size={{ xs: 2, sm: 4, md: 4 }}>
+
               <FormControl fullWidth required>
                 <InputLabel id="status-label">Status</InputLabel>
                 <Select
@@ -924,27 +1039,27 @@ export default function AddTemplate() {
                   <MenuItem value="archived">Archived</MenuItem>
                 </Select>
               </FormControl>
-            </Grid>
-          </Grid>
+            </Box>
+          </Box>
 
+          {/* Footer actions */}
           <Divider />
-
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={2}
-            justifyContent="flex-end"
+          <Box
+            sx={{
+              p: { xs: 2, sm: 3 },
+              display: "flex",
+              flexDirection: { xs: "column-reverse", sm: "row" },
+              justifyContent: "flex-end",
+              gap: 1.5,
+              bgcolor: "grey.50",
+            }}
           >
             <Button
               type="button"
               variant="outlined"
-              onClick={() => {
-                setForm({ ...EMPTY_FORM });
-                setPages([]);
-                setPagesLoading(false);
-                setError("");
-                setSuccess("");
-              }}
+              onClick={handleReset}
               disabled={saving}
+              fullWidth={false}
             >
               Reset
             </Button>
@@ -963,7 +1078,7 @@ export default function AddTemplate() {
             >
               {saving ? "Saving..." : "Save Template"}
             </Button>
-          </Stack>
+          </Box>
         </Stack>
       </Paper>
     </Box>

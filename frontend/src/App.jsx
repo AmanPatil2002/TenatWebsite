@@ -17,6 +17,7 @@ import ViewReview from "./Mycomponent/ViewReview";
 import Myaccount from "./Pages/Client/Myaccount";
 import Contact from "./Pages/Client/Contact";
 import MySite from "./Pages/Client/MySite";
+import ErrorReport from "./Pages/Client/ErrorReport";
 
 import Review from "./Pages/Client/Review";
 import AdminDashboard from "./Mycomponent/AdminDashboard";
@@ -24,6 +25,7 @@ import AddTemplate from "./Mycomponent/AddTemplate";
 import AddCategory from "./Mycomponent/AddCategory";
 import Payment from "./Mycomponent/Payment";
 import Template from "./Pages/Client/Template";
+
 import ViewPayment from "./Mycomponent/ViewPayment";
 import AddContact from "./Mycomponent/AddContact";
 import AddFaq from "./Mycomponent/AddFaq";
@@ -40,8 +42,10 @@ import SiteAdminEmployees from "./Mycomponent/SiteAdminEmployees";
 import ArrangeTemplatePages from "./Mycomponent/ArrangeTemplatePages";
 import SiteAdminNews from "./Mycomponent/SiteAdminNews";
 import SiteAdminGalary from "./Mycomponent/SiteAdminGalary";
-import SiteAdminMediaManager from "./Mycomponent/SiteAdminMediaManager";
-
+import SiteAdminSlider from "./Mycomponent/SiteAdminSlider";
+import BugReports from "./Mycomponent/BugReports";
+import SiteHeader from "./Mycomponent/SiteHeader";
+import Site from "./Pages/Client/Site";
 
 function App() {
   return (
@@ -60,8 +64,9 @@ function App() {
           <Route path="manage" element={<SiteAdminManagePages />} />
           <Route path="employees" element={<SiteAdminEmployees />} />
           <Route path="news" element={<SiteAdminNews />} />
-          <Route path="slider" element={<SiteAdminMediaManager />} />
+          <Route path="slider" element={<SiteAdminSlider />} />
           <Route path="gallery" element={<SiteAdminGalary />} />
+          <Route path="header-footer" element={<SiteHeader />} />
         </Route>
 
         {/* Client */}
@@ -71,13 +76,17 @@ function App() {
           <Route element={<ProtectedRoutes />}>
             <Route path="/contact" element={<Contact />} />
             <Route path="/review" element={<Review />} />
+            <Route path="/error-report" element={<ErrorReport />} />
             <Route path="/myaccount" element={<Myaccount />} />
             <Route path="/templates" element={<Template />} />
             <Route path="/payment" element={<Payment />} />
-            <Route path="/mysite" element={<MySite />} />
-            <Route path="/mysite/:siteSlug" element={<MySiteView />} />
-            <Route path="/mysite/:siteSlug/preview" element={<MySiteView />} />
+             <Route path="/mysite" element={<MySite />} />
           </Route>
+        </Route>
+
+        <Route element={<ProtectedRoutes />}>
+         
+          <Route path="/mysite/:siteSlug" element={<Site />} />
         </Route>
 
         {/* Admin */}
@@ -98,6 +107,7 @@ function App() {
             <Route path="admindashboard" element={<AdminDashboard />} />
             <Route path="invoice" element={<ViewPayment />} />
             <Route path="site-admins" element={<SiteAdminAccess />} />
+            <Route path="bug-reports" element={<BugReports />} />
             <Route path="faq" element={<AddFaq />} />
             <Route path="contact" element={<AddContact />} />
           </Route>

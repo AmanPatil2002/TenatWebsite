@@ -20,9 +20,11 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import PaletteOutlinedIcon from "@mui/icons-material/PaletteOutlined";
 import axios from "axios";
 
 const API_URL = (
@@ -30,6 +32,13 @@ const API_URL = (
 ).replace(/\/+$/, "");
 
 const THEME_URL = `${API_URL}/theme`;
+
+const BRAND = {
+  indigo: "#4f46e5",
+  indigoDeep: "#3730a3",
+  ink: "#0f172a",
+  muted: "#64748b",
+};
 
 const getInitialForm = () => ({
   name: "",
@@ -58,6 +67,24 @@ const getErrorMessage = (error, fallback) => {
 
   return error.response?.data?.message || fallback;
 };
+
+/* Section label helper */
+function SectionLabel({ children }) {
+  return (
+    <Typography
+      variant="overline"
+      sx={{
+        display: "block",
+        fontWeight: 700,
+        letterSpacing: "0.1em",
+        color: BRAND.indigo,
+        lineHeight: 1.6,
+      }}
+    >
+      {children}
+    </Typography>
+  );
+}
 
 function ThemeForm({
   initialValues,
@@ -129,77 +156,179 @@ function ThemeForm({
 
   return (
     <Box component="form" onSubmit={handleSubmit} noValidate>
-      <Grid container spacing={2}>
-        <Grid size={12}>
-          <TextField
-            fullWidth
-            size="small"
-            name="name"
-            label="Name"
-            value={formData.name}
-            onChange={handleChange}
-            error={!!errors.name}
-            helperText={errors.name || "e.g. Dark, Light"}
-          />
-        </Grid>
+      <Stack spacing={2}>
+        <TextField
+          fullWidth
+          size="small"
+          name="name"
+          label="Name"
+          value={formData.name}
+          onChange={handleChange}
+          error={!!errors.name}
+          helperText={errors.name || "e.g. Dark, Light"}
+          sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+        />
 
-        <Grid size={12}>
-          <TextField
-            fullWidth
-            size="small"
-            name="color"
-            label="Text Color"
-            value={formData.color}
-            onChange={handleChange}
-            error={!!errors.color}
-            helperText={errors.color || "e.g. #ffffff"}
-          />
-        </Grid>
+        <TextField
+          fullWidth
+          size="small"
+          name="color"
+          label="Text Color"
+          value={formData.color}
+          onChange={handleChange}
+          error={!!errors.color}
+          helperText={errors.color || "e.g. #ffffff"}
+          sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+          InputProps={{
+            startAdornment: formData.color && HEX.test(formData.color.trim()) ? (
+              <Box
+                aria-hidden="true"
+                sx={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 0.75,
+                  bgcolor: formData.color.trim(),
+                  border: "1px solid",
+                  borderColor: "divider",
+                  mr: 1,
+                  flexShrink: 0,
+                }}
+              />
+            ) : null,
+          }}
+        />
 
-        <Grid size={12}>
-          <TextField
-            fullWidth
-            size="small"
-            name="background"
-            label="Background Color"
-            value={formData.background}
-            onChange={handleChange}
-            error={!!errors.background}
-            helperText={errors.background || "e.g. #121212"}
-          />
-        </Grid>
+        <TextField
+          fullWidth
+          size="small"
+          name="background"
+          label="Background Color"
+          value={formData.background}
+          onChange={handleChange}
+          error={!!errors.background}
+          helperText={errors.background || "e.g. #121212"}
+          sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+          InputProps={{
+            startAdornment:
+              formData.background && HEX.test(formData.background.trim()) ? (
+                <Box
+                  aria-hidden="true"
+                  sx={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: 0.75,
+                    bgcolor: formData.background.trim(),
+                    border: "1px solid",
+                    borderColor: "divider",
+                    mr: 1,
+                    flexShrink: 0,
+                  }}
+                />
+              ) : null,
+          }}
+        />
 
-        <Grid size={12}>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+        {/* Live preview */}
+        <Box
+          sx={{
+            p: 1.75,
+            borderRadius: 2,
+            border: "1px solid",
+            borderColor: "divider",
+            bgcolor: alpha(BRAND.indigo, 0.03),
+          }}
+        >
+          <Typography
+            variant="caption"
+            sx={{
+              color: BRAND.muted,
+              fontWeight: 600,
+              letterSpacing: "0.05em",
+              display: "block",
+              mb: 1,
+            }}
+          >
+            PREVIEW
+          </Typography>
+          <Box
+            sx={{
+              p: 2,
+              borderRadius: 1.5,
+              bgcolor:
+                formData.background && HEX.test(formData.background.trim())
+                  ? formData.background.trim()
+                  : "#f1f5f9",
+              color:
+                formData.color && HEX.test(formData.color.trim())
+                  ? formData.color.trim()
+                  : BRAND.ink,
+              border: "1px solid",
+              borderColor: "divider",
+              fontWeight: 700,
+              fontSize: "0.95rem",
+              textAlign: "center",
+            }}
+          >
+            Aa — The quick brown fox
+          </Box>
+        </Box>
+
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1.5}
+          sx={{ pt: 0.5 }}
+        >
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={submitting}
+            sx={{
+              flex: 1,
+              py: 1.1,
+              borderRadius: 2,
+              textTransform: "none",
+              fontWeight: 700,
+              fontSize: "0.95rem",
+              bgcolor: BRAND.indigo,
+              boxShadow: `0 8px 20px ${alpha(BRAND.indigo, 0.25)}`,
+              "&:hover": {
+                bgcolor: BRAND.indigoDeep,
+                boxShadow: `0 10px 24px ${alpha(BRAND.indigo, 0.32)}`,
+              },
+              "&.Mui-disabled": {
+                bgcolor: alpha(BRAND.indigo, 0.35),
+                color: "#fff",
+              },
+            }}
+          >
+            {submitting ? "Saving…" : submitLabel}
+          </Button>
+
+          {onCancel && (
             <Button
-              type="submit"
-              variant="contained"
-              fullWidth
+              type="button"
+              variant="outlined"
               disabled={submitting}
+              onClick={onCancel}
               sx={{
-                py: 1.25,
-                fontSize: "0.95rem",
-                fontWeight: "bold",
+                flex: 1,
+                py: 1.1,
+                borderRadius: 2,
+                textTransform: "none",
+                fontWeight: 600,
+                borderColor: alpha(BRAND.indigo, 0.35),
+                color: BRAND.indigo,
+                "&:hover": {
+                  borderColor: BRAND.indigo,
+                  bgcolor: alpha(BRAND.indigo, 0.04),
+                },
               }}
             >
-              {submitting ? "Saving..." : submitLabel}
+              Cancel
             </Button>
-
-            {onCancel && (
-              <Button
-                type="button"
-                variant="outlined"
-                fullWidth
-                disabled={submitting}
-                onClick={onCancel}
-                sx={{ py: 1.25, fontSize: "0.95rem" }}
-              >
-                Cancel
-              </Button>
-            )}
-          </Stack>
-        </Grid>
-      </Grid>
+          )}
+        </Stack>
+      </Stack>
     </Box>
   );
 }
@@ -360,252 +489,443 @@ export default function AddTheme() {
   return (
     <Box
       sx={{
-        p: { xs: 1.5, sm: 2, md: 3 },
         minHeight: "100vh",
-        backgroundColor: "#f5f5f5",
+        py: { xs: 3, md: 5 },
+        background:
+          "linear-gradient(160deg, #f8fafc 0%, #eef2ff 45%, #f0fdfa 100%)",
       }}
     >
-      <Grid
-        container
-        spacing={{ xs: 2, md: 3 }}
-        sx={{ maxWidth: 1200, mx: "auto" }}
-      >
-        {/* Add / Edit Theme */}
-        <Grid size={{ xs: 12, md: 5 }}>
-          <Paper elevation={1} sx={{ p: { xs: 2, sm: 3 } }}>
-            <Typography
-              variant="h5"
+      <Box sx={{ maxWidth: 1280, mx: "auto", px: { xs: 2, sm: 3 } }}>
+        {/* Page header */}
+        <Box sx={{ mb: { xs: 3, md: 4 }, textAlign: "center" }}>
+          <Typography
+            variant="overline"
+            sx={{
+              display: "block",
+              fontWeight: 700,
+              letterSpacing: "0.12em",
+              color: BRAND.indigo,
+            }}
+          >
+            Design system
+          </Typography>
+          <Typography
+            component="h1"
+            variant="h4"
+            sx={{
+              fontWeight: 800,
+              letterSpacing: "-0.02em",
+              color: BRAND.ink,
+              mt: 0.5,
+            }}
+          >
+            {editingTheme ? "Edit theme" : "Add theme"}
+          </Typography>
+          <Typography
+            color="text.secondary"
+            sx={{ mt: 1, maxWidth: 520, mx: "auto" }}
+          >
+            Create and manage website color themes.
+          </Typography>
+        </Box>
+
+        <Grid container spacing={{ xs: 2.5, md: 3 }} alignItems="flex-start">
+          {/* Add / Edit Theme */}
+          <Grid size={{ xs: 12, md: 5 }}>
+            <Paper
+              elevation={0}
+              variant="outlined"
               sx={{
-                fontWeight: "bold",
-                mb: 0.5,
-                fontSize: { xs: "1.2rem", sm: "1.5rem" },
+                p: { xs: 2.5, sm: 3 },
+                borderRadius: 3,
+                borderColor: "divider",
+                boxShadow: "0 12px 30px rgba(15,23,42,0.05)",
               }}
             >
-              {editingTheme ? "Edit Theme" : "Add Theme"}
-            </Typography>
-
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Create and manage website color themes.
-            </Typography>
-
-            <ThemeForm
-              key={editingTheme?.themeId ?? "new"}
-              initialValues={
-                editingTheme
-                  ? {
-                      name: editingTheme.name || "",
-                      color: editingTheme.color || "",
-                      background: editingTheme.background || "",
-                    }
-                  : getInitialForm()
-              }
-              submitLabel={editingTheme ? "Save Changes" : "Add Theme"}
-              onSubmit={editingTheme ? handleUpdate : handleCreate}
-              onCancel={editingTheme ? () => setEditingId(null) : undefined}
-              submitting={submitting}
-            />
-          </Paper>
-        </Grid>
-
-        {/* Existing Themes */}
-        <Grid size={{ xs: 12, md: 7 }}>
-          <Paper elevation={1} sx={{ p: { xs: 2, sm: 3 } }}>
-            <Stack
-              direction="row"
-              justifyContent="space-between"
-              alignItems="center"
-              spacing={1}
-              sx={{ mb: 1 }}
-            >
-              <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-                Existing Themes
-              </Typography>
-
-              <Button size="small" onClick={fetchThemes} disabled={loadingList}>
-                Refresh
-              </Button>
-            </Stack>
-
-            <Divider sx={{ mb: 2 }} />
-
-            {loadingList ? (
               <Box
                 sx={{
                   display: "flex",
-                  justifyContent: "center",
-                  py: 3,
+                  alignItems: "center",
+                  gap: 1.25,
+                  mb: 2,
                 }}
               >
-                <CircularProgress size={24} />
-              </Box>
-            ) : themes.length === 0 ? (
-              <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
-                No themes available. Log in with a valid account and add your
-                first theme.
-              </Typography>
-            ) : (
-              <TableContainer
-                sx={{
-                  width: "100%",
-                  overflowX: "auto",
-                  overflowY: "auto",
-                  WebkitOverflowScrolling: "touch",
-                  borderRadius: 1,
-                  height: 500,
-                }}
-              >
-                <Table
-                  size="small"
+                <Box
+                  aria-hidden="true"
                   sx={{
-                    minWidth: 500,
-                    tableLayout: "auto",
+                    width: 40,
+                    height: 40,
+                    flexShrink: 0,
+                    display: "grid",
+                    placeItems: "center",
+                    borderRadius: 2,
+                    color: BRAND.indigo,
+                    bgcolor: alpha(BRAND.indigo, 0.08),
+                    "& .MuiSvgIcon-root": { fontSize: "1.25rem" },
                   }}
                 >
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Name</TableCell>
-                      <TableCell>Colors</TableCell>
-                      <TableCell align="right">Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
+                  <PaletteOutlinedIcon />
+                </Box>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography
+                    variant="h6"
+                    sx={{ fontWeight: 700, color: BRAND.ink, lineHeight: 1.25 }}
+                  >
+                    {editingTheme ? "Edit theme" : "New theme"}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: BRAND.muted }}>
+                    {editingTheme
+                      ? "Update the colors below."
+                      : "Define colors for your storefront."}
+                  </Typography>
+                </Box>
+              </Box>
 
-                  <TableBody>
-                    {themes.map((theme) => (
-                      <TableRow
-                        key={theme.themeId}
-                        hover
-                        selected={String(editingId) === String(theme.themeId)}
-                      >
+              <Divider sx={{ mb: 2.5 }} />
+
+              <ThemeForm
+                key={editingTheme?.themeId ?? "new"}
+                initialValues={
+                  editingTheme
+                    ? {
+                        name: editingTheme.name || "",
+                        color: editingTheme.color || "",
+                        background: editingTheme.background || "",
+                      }
+                    : getInitialForm()
+                }
+                submitLabel={editingTheme ? "Save changes" : "Add theme"}
+                onSubmit={editingTheme ? handleUpdate : handleCreate}
+                onCancel={editingTheme ? () => setEditingId(null) : undefined}
+                submitting={submitting}
+              />
+            </Paper>
+          </Grid>
+
+          {/* Existing Themes */}
+          <Grid size={{ xs: 12, md: 7 }}>
+            <Paper
+              elevation={0}
+              variant="outlined"
+              sx={{
+                p: { xs: 2.5, sm: 3 },
+                borderRadius: 3,
+                borderColor: "divider",
+                boxShadow: "0 12px 30px rgba(15,23,42,0.05)",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  gap: 2,
+                  mb: 2,
+                }}
+              >
+                <Box sx={{ minWidth: 0 }}>
+                  <SectionLabel>Existing themes</SectionLabel>
+                  <Typography variant="body2" sx={{ color: BRAND.muted }}>
+                    {themes.length > 0
+                      ? `${themes.length} theme${
+                          themes.length === 1 ? "" : "s"
+                        } available`
+                      : "No themes yet."}
+                  </Typography>
+                </Box>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={fetchThemes}
+                  disabled={loadingList}
+                  sx={{
+                    flexShrink: 0,
+                    textTransform: "none",
+                    fontWeight: 600,
+                    borderRadius: 2,
+                    borderColor: alpha(BRAND.indigo, 0.35),
+                    color: BRAND.indigo,
+                    "&:hover": {
+                      borderColor: BRAND.indigo,
+                      bgcolor: alpha(BRAND.indigo, 0.04),
+                    },
+                  }}
+                >
+                  Refresh
+                </Button>
+              </Box>
+
+              <Divider sx={{ mb: 2 }} />
+
+              {loadingList ? (
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    py: 6,
+                  }}
+                >
+                  <CircularProgress
+                    size={28}
+                    sx={{ color: BRAND.indigo }}
+                    aria-label="Loading themes"
+                  />
+                </Box>
+              ) : themes.length === 0 ? (
+                <Box
+                  sx={{
+                    textAlign: "center",
+                    py: 8,
+                    px: 2,
+                    borderRadius: 3,
+                    border: "1px dashed",
+                    borderColor: alpha(BRAND.indigo, 0.25),
+                    bgcolor: alpha(BRAND.indigo, 0.03),
+                  }}
+                >
+                  <Typography
+                    fontWeight={700}
+                    color={BRAND.ink}
+                    gutterBottom
+                  >
+                    No themes available
+                  </Typography>
+                  <Typography color="text.secondary">
+                    Log in with a valid account and add your first theme.
+                  </Typography>
+                </Box>
+              ) : (
+                <TableContainer
+                  sx={{
+                    width: "100%",
+                    overflowX: "auto",
+                    overflowY: "auto",
+                    WebkitOverflowScrolling: "touch",
+                    maxHeight: 560,
+                    borderRadius: 2,
+                    border: "1px solid",
+                    borderColor: "divider",
+                    "&::-webkit-scrollbar": { width: 6, height: 6 },
+                    "&::-webkit-scrollbar-thumb": {
+                      bgcolor: alpha(BRAND.indigo, 0.25),
+                      borderRadius: 3,
+                    },
+                  }}
+                >
+                  <Table size="small" stickyHeader sx={{ minWidth: 520 }}>
+                    <TableHead>
+                      <TableRow>
                         <TableCell
                           sx={{
-                            maxWidth: 180,
-                            overflowWrap: "anywhere",
-                            verticalAlign: "middle",
+                            fontWeight: 700,
+                            bgcolor: alpha(BRAND.indigo, 0.04),
+                            color: BRAND.ink,
                           }}
                         >
-                          <Typography variant="body2">{theme.name}</Typography>
+                          Name
                         </TableCell>
-
-                        <TableCell sx={{ verticalAlign: "middle" }}>
-                          <Stack
-                            direction="row"
-                            spacing={1}
-                            alignItems="center"
-                          >
-                            {/* Text color square */}
-                            <Tooltip
-                              title={`Text color: ${theme.color}`}
-                              placement="top"
-                            >
-                              <Box
-                                aria-label={`Text color ${theme.color}`}
-                                sx={{
-                                  width: 28,
-                                  height: 28,
-                                  minWidth: 28,
-                                  backgroundColor: theme.color,
-                                  border: "1px solid #bdbdbd",
-                                  borderRadius: 1,
-                                  boxShadow: 1,
-                                }}
-                              />
-                            </Tooltip>
-
-                            {/* Background preview with text color */}
-                            <Tooltip
-                              title={`Background: ${theme.background}`}
-                              placement="top"
-                            >
-                              <Box
-                                sx={{
-                                  width: 38,
-                                  height: 28,
-                                  minWidth: 38,
-                                  backgroundColor: theme.background,
-                                  color: theme.color,
-                                  border: "1px solid #bdbdbd",
-                                  borderRadius: 1,
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  fontSize: 11,
-                                  fontWeight: "bold",
-                                  overflow: "hidden",
-                                }}
-                              >
-                                Aa
-                              </Box>
-                            </Tooltip>
-
-                            <Stack spacing={0.25}>
-                              <Typography
-                                variant="caption"
-                                sx={{ fontWeight: 600 }}
-                              >
-                                {theme.color}
-                              </Typography>
-
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                {theme.background}
-                              </Typography>
-                            </Stack>
-                          </Stack>
+                        <TableCell
+                          sx={{
+                            fontWeight: 700,
+                            bgcolor: alpha(BRAND.indigo, 0.04),
+                            color: BRAND.ink,
+                          }}
+                        >
+                          Colors
                         </TableCell>
-
                         <TableCell
                           align="right"
                           sx={{
+                            fontWeight: 700,
+                            bgcolor: alpha(BRAND.indigo, 0.04),
+                            color: BRAND.ink,
                             whiteSpace: "nowrap",
-                            verticalAlign: "middle",
                           }}
                         >
-                          <Tooltip title="Edit theme">
-                            <span>
-                              <IconButton
-                                size="small"
-                                aria-label={`Edit ${theme.name}`}
-                                onClick={() => setEditingId(theme.themeId)}
-                                disabled={
-                                  submitting || deletingId === theme.themeId
-                                }
-                              >
-                                <EditIcon fontSize="small" />
-                              </IconButton>
-                            </span>
-                          </Tooltip>
-
-                          <Tooltip title="Delete theme">
-                            <span>
-                              <IconButton
-                                size="small"
-                                color="error"
-                                aria-label={`Delete ${theme.name}`}
-                                onClick={() => handleDelete(theme)}
-                                disabled={
-                                  submitting || deletingId === theme.themeId
-                                }
-                              >
-                                {deletingId === theme.themeId ? (
-                                  <CircularProgress size={16} />
-                                ) : (
-                                  <DeleteIcon fontSize="small" />
-                                )}
-                              </IconButton>
-                            </span>
-                          </Tooltip>
+                          Actions
                         </TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            )}
-          </Paper>
+                    </TableHead>
+
+                    <TableBody>
+                      {themes.map((theme) => (
+                        <TableRow
+                          key={theme.themeId}
+                          hover
+                          selected={
+                            String(editingId) === String(theme.themeId)
+                          }
+                          sx={{
+                            "&.Mui-selected": {
+                              bgcolor: alpha(BRAND.indigo, 0.06),
+                            },
+                            "&.Mui-selected:hover": {
+                              bgcolor: alpha(BRAND.indigo, 0.1),
+                            },
+                          }}
+                        >
+                          <TableCell
+                            sx={{
+                              maxWidth: 180,
+                              overflowWrap: "anywhere",
+                              verticalAlign: "middle",
+                              py: 1.5,
+                            }}
+                          >
+                            <Typography
+                              variant="body2"
+                              sx={{ fontWeight: 600, color: BRAND.ink }}
+                            >
+                              {theme.name}
+                            </Typography>
+                          </TableCell>
+
+                          <TableCell sx={{ verticalAlign: "middle" }}>
+                            <Stack
+                              direction="row"
+                              spacing={1}
+                              alignItems="center"
+                            >
+                              <Tooltip
+                                title={`Text color: ${theme.color}`}
+                                placement="top"
+                                arrow
+                              >
+                                <Box
+                                  aria-label={`Text color ${theme.color}`}
+                                  sx={{
+                                    width: 28,
+                                    height: 28,
+                                    minWidth: 28,
+                                    backgroundColor: theme.color,
+                                    border: "1px solid",
+                                    borderColor: "divider",
+                                    borderRadius: 1,
+                                    boxShadow: `0 2px 6px ${alpha(
+                                      "#0f172a",
+                                      0.08,
+                                    )}`,
+                                  }}
+                                />
+                              </Tooltip>
+
+                              <Tooltip
+                                title={`Background: ${theme.background}`}
+                                placement="top"
+                                arrow
+                              >
+                                <Box
+                                  sx={{
+                                    width: 38,
+                                    height: 28,
+                                    minWidth: 38,
+                                    backgroundColor: theme.background,
+                                    color: theme.color,
+                                    border: "1px solid",
+                                    borderColor: "divider",
+                                    borderRadius: 1,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontSize: 11,
+                                    fontWeight: "bold",
+                                    overflow: "hidden",
+                                  }}
+                                >
+                                  Aa
+                                </Box>
+                              </Tooltip>
+
+                              <Stack spacing={0.25} sx={{ minWidth: 0 }}>
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    fontWeight: 600,
+                                    color: BRAND.ink,
+                                    fontFamily: "monospace",
+                                  }}
+                                >
+                                  {theme.color}
+                                </Typography>
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    color: BRAND.muted,
+                                    fontFamily: "monospace",
+                                  }}
+                                >
+                                  {theme.background}
+                                </Typography>
+                              </Stack>
+                            </Stack>
+                          </TableCell>
+
+                          <TableCell
+                            align="right"
+                            sx={{
+                              whiteSpace: "nowrap",
+                              verticalAlign: "middle",
+                            }}
+                          >
+                            <Tooltip title="Edit theme" arrow>
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  aria-label={`Edit ${theme.name}`}
+                                  onClick={() => setEditingId(theme.themeId)}
+                                  disabled={
+                                    submitting || deletingId === theme.themeId
+                                  }
+                                  sx={{
+                                    color: BRAND.indigo,
+                                    "&:hover": {
+                                      bgcolor: alpha(BRAND.indigo, 0.08),
+                                    },
+                                  }}
+                                >
+                                  <EditIcon fontSize="small" />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+
+                            <Tooltip title="Delete theme" arrow>
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  aria-label={`Delete ${theme.name}`}
+                                  onClick={() => handleDelete(theme)}
+                                  disabled={
+                                    submitting || deletingId === theme.themeId
+                                  }
+                                  sx={{
+                                    "&:hover": {
+                                      bgcolor: alpha("#dc2626", 0.08),
+                                    },
+                                  }}
+                                >
+                                  {deletingId === theme.themeId ? (
+                                    <CircularProgress size={16} />
+                                  ) : (
+                                    <DeleteIcon fontSize="small" />
+                                  )}
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </Paper>
+          </Grid>
         </Grid>
-      </Grid>
+      </Box>
 
       <Snackbar
         open={snack.open}
@@ -630,7 +950,7 @@ export default function AddTheme() {
           }
           severity={snack.severity}
           variant="filled"
-          sx={{ width: "100%" }}
+          sx={{ width: "100%", borderRadius: 2 }}
         >
           {snack.message}
         </Alert>

@@ -16,10 +16,10 @@ import {
   useMediaQuery,
   useTheme,
   Stack,
+  Avatar,
 } from "@mui/material";
-import AdminProfileDialog from "./AdminProfileDialog"; // adjust path
-import EditIcon from "@mui/icons-material/Edit";
-import { useLocation, useNavigate, useOutlet } from "react-router-dom";
+import { alpha } from "@mui/material/styles";
+import AdminProfileDialog from "./AdminProfileDialog";
 
 import MenuIcon from "@mui/icons-material/Menu";
 import MenuOpenIcon from "@mui/icons-material/MenuOpen";
@@ -37,42 +37,94 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 import ReorderIcon from "@mui/icons-material/Reorder";
+import BugReportOutlinedIcon from "@mui/icons-material/BugReportOutlined";
+import EditIcon from "@mui/icons-material/Edit";
+import { useLocation, useNavigate, useOutlet } from "react-router-dom";
 import AdminDashboard from "../../Mycomponent/AdminDashboard";
 
-const FULL_WIDTH = 250;
-const MINI_WIDTH = 72;
+const FULL_WIDTH = 260;
+const MINI_WIDTH = 76;
 
-const menuItems = [
-  { text: "Dashboard", icon: <DashboardIcon />, path: "/admin/admindashboard" },
-  { text: "Add Category", icon: <CategoryIcon />, path: "/admin/category" },
-  { text: "Add Theme", icon: <ViewQuiltIcon />, path: "/admin/theme" },
-  { text: "Add Pages", icon: <NoteAddIcon />, path: "/admin/page" },
+const BRAND = {
+  indigo: "#4f46e5",
+  indigoDeep: "#3730a3",
+  ink: "#0f172a",
+  muted: "#64748b",
+  sidebar: "#0f172a",
+  sidebarHover: "rgba(255,255,255,0.06)",
+  sidebarActive: "rgba(99,102,241,0.18)",
+};
+
+const menuGroups = [
   {
-    text: "Arrange Pages",
-    icon: <ReorderIcon />,
-    path: "/admin/template-pages",
+    label: "Overview",
+    items: [
+      {
+        text: "Dashboard",
+        icon: <DashboardIcon />,
+        path: "/admin/admindashboard",
+      },
+    ],
   },
   {
-    text: "Add Templates",
-    icon: <DevicesOtherIcon />,
-    path: "/admin/templates",
+    label: "Content",
+    items: [
+      { text: "Add Category", icon: <CategoryIcon />, path: "/admin/category" },
+      { text: "Add Theme", icon: <ViewQuiltIcon />, path: "/admin/theme" },
+      { text: "Add Pages", icon: <NoteAddIcon />, path: "/admin/page" },
+      {
+        text: "Arrange Pages",
+        icon: <ReorderIcon />,
+        path: "/admin/template-pages",
+      },
+      {
+        text: "Add Templates",
+        icon: <DevicesOtherIcon />,
+        path: "/admin/templates",
+      },
+      {
+        text: "View Templates",
+        icon: <FolderOpenIcon />,
+        path: "/admin/viewtemplates",
+      },
+    ],
   },
   {
-    text: "View Templates",
-    icon: <FolderOpenIcon />,
-    path: "/admin/viewtemplates",
+    label: "Engagement",
+    items: [
+      { text: "FAQ", icon: <HelpOutlineIcon />, path: "/admin/faq" },
+      { text: "Contact", icon: <ContactMailIcon />, path: "/admin/contact" },
+      { text: "View Users", icon: <PeopleIcon />, path: "/admin/users" },
+      {
+        text: "View Review",
+        icon: <RateReviewIcon />,
+        path: "/admin/usereview",
+      },
+      {
+        text: "View Payment",
+        icon: <RateReviewIcon />,
+        path: "/admin/invoice",
+      },
+    ],
   },
-  { text: "FAQ", icon: <HelpOutlineIcon />, path: "/admin/faq" },
-  { text: "Contact", icon: <ContactMailIcon />, path: "/admin/contact" },
-  { text: "View Users", icon: <PeopleIcon />, path: "/admin/users" },
-  { text: "View Review", icon: <RateReviewIcon />, path: "/admin/usereview" },
-  { text: "View Payment", icon: <RateReviewIcon />, path: "/admin/invoice" },
   {
-    text: "Site Admin Access",
-    icon: <ManageAccountsIcon />,
-    path: "/admin/site-admins",
+    label: "Administration",
+    items: [
+      {
+        text: "Site Admin Access",
+        icon: <ManageAccountsIcon />,
+        path: "/admin/site-admins",
+      },
+      {
+        text: "Bug Reports",
+        icon: <BugReportOutlinedIcon />,
+        path: "/admin/bug-reports",
+      },
+    ],
   },
 ];
+
+const allMenuItems = menuGroups.flatMap((g) => g.items);
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -82,10 +134,8 @@ export default function Admin() {
 
   const isSmallScreen = useMediaQuery(theme.breakpoints.down("md"));
 
-  // true = collapsed (icons only). Starts collapsed on small screens.
   const [collapsed, setCollapsed] = useState(isSmallScreen);
 
-  // Auto-collapse when the screen shrinks, auto-expand when it grows
   useEffect(() => {
     setCollapsed(isSmallScreen);
   }, [isSmallScreen]);
@@ -109,71 +159,137 @@ export default function Admin() {
     navigate("/");
   };
 
+  const avatarLetter = (email || "A").charAt(0).toUpperCase();
+
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#f5f7fb" }}>
+    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#f8fafc" }}>
+      {/* ----------------------------- APP BAR ----------------------------- */}
       <AppBar
         position="fixed"
+        elevation={0}
         sx={{
           width: `calc(100% - ${drawerWidth}px)`,
           ml: `${drawerWidth}px`,
-          boxShadow: 1,
+          bgcolor: "background.paper",
+          color: BRAND.ink,
+          borderBottom: "1px solid",
+          borderColor: "divider",
+          boxShadow: "0 1px 3px rgba(15,23,42,0.04)",
           transition: theme.transitions.create(["width", "margin"], {
             duration: theme.transitions.duration.shorter,
           }),
         }}
       >
-        <Toolbar>
+        <Toolbar sx={{ gap: 1.5 }}>
           <IconButton
             color="inherit"
             edge="start"
             onClick={() => setCollapsed((prev) => !prev)}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            sx={{ mr: 2 }}
+            sx={{
+              borderRadius: 2,
+              "&:hover": { bgcolor: alpha(BRAND.indigo, 0.08) },
+            }}
           >
             {collapsed ? <MenuIcon /> : <MenuOpenIcon />}
           </IconButton>
 
-          <Typography
-            variant="h6"
-            fontWeight="bold"
-            noWrap
-            sx={{ flexGrow: 1 }}
-          >
-            Admin Dashboard
-          </Typography>
+          <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: 700,
+                color: BRAND.ink,
+                lineHeight: 1.2,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+              noWrap
+            >
+              Admin Dashboard
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{ color: BRAND.muted, display: { xs: "none", sm: "block" } }}
+            >
+              Manage your platform content and users
+            </Typography>
+          </Box>
 
           <Stack direction="row" spacing={1} alignItems="center">
-            <Tooltip title="Edit my profile">
-              <Box
-                onClick={() => setProfileOpen(true)}
+            {/* Desktop profile chip */}
+            <Box
+              onClick={() => setProfileOpen(true)}
+              sx={{
+                display: { xs: "none", sm: "flex" },
+                alignItems: "center",
+                gap: 1,
+                px: 1,
+                py: 0.5,
+                borderRadius: 2,
+                cursor: "pointer",
+                border: "1px solid",
+                borderColor: "divider",
+                transition: "all 0.2s ease",
+                "&:hover": {
+                  borderColor: alpha(BRAND.indigo, 0.35),
+                  bgcolor: alpha(BRAND.indigo, 0.04),
+                },
+              }}
+            >
+              <Avatar
                 sx={{
-                  display: { xs: "none", sm: "flex" },
-                  alignItems: "center",
-                  gap: 1,
-                  border: "1px solid white",
-                  px: 1,
-                  py: 0.5,
-                  borderRadius: 1,
-                  cursor: "pointer",
-                  "&:hover": { bgcolor: "rgba(255,255,255,0.15)" },
+                  width: 30,
+                  height: 30,
+                  bgcolor: alpha(BRAND.indigo, 0.12),
+                  color: BRAND.indigo,
+                  fontWeight: 700,
+                  fontSize: 14,
                 }}
               >
-                <Typography variant="h6" fontWeight="bold" noWrap>
-                  {email}
-                </Typography>
-                <EditIcon fontSize="small" />
-              </Box>
-            </Tooltip>
+                {avatarLetter}
+              </Avatar>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 600,
+                  color: BRAND.ink,
+                  maxWidth: 180,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {email || "Admin"}
+              </Typography>
+              <EditIcon sx={{ fontSize: 15, color: BRAND.muted }} />
+            </Box>
 
-            {/* Small screens: the email box is hidden, so show an icon button */}
+            {/* Mobile profile icon */}
             <IconButton
-              color="inherit"
               onClick={() => setProfileOpen(true)}
               aria-label="Edit my profile"
-              sx={{ display: { xs: "inline-flex", sm: "none" } }}
+              sx={{
+                display: { xs: "inline-flex", sm: "none" },
+                borderRadius: 2,
+                "&:hover": { bgcolor: alpha(BRAND.indigo, 0.08) },
+              }}
             >
-              <ManageAccountsIcon />
+              <Avatar
+                sx={{
+                  width: 30,
+                  height: 30,
+                  bgcolor: alpha(BRAND.indigo, 0.12),
+                  color: BRAND.indigo,
+                  fontWeight: 700,
+                  fontSize: 14,
+                }}
+              >
+                {avatarLetter}
+              </Avatar>
             </IconButton>
+
             <AdminProfileDialog
               open={profileOpen}
               onClose={() => setProfileOpen(false)}
@@ -183,6 +299,7 @@ export default function Admin() {
         </Toolbar>
       </AppBar>
 
+      {/* ----------------------------- DRAWER ----------------------------- */}
       <Drawer
         variant="permanent"
         sx={{
@@ -195,116 +312,233 @@ export default function Admin() {
             width: drawerWidth,
             boxSizing: "border-box",
             overflowX: "hidden",
+            bgcolor: BRAND.sidebar,
+            color: "#cbd5e1",
+            borderRight: "none",
             transition: theme.transitions.create("width", {
               duration: theme.transitions.duration.shorter,
             }),
           },
         }}
       >
-        <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+        <Box
+          sx={{
+            height: "100%",
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+          }}
+        >
+          {/* Brand */}
           <Box
             sx={{
-              p: collapsed ? 2 : 3,
-              textAlign: collapsed ? "center" : "left",
+              height: 72,
+              px: collapsed ? 0 : 2.5,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: collapsed ? "center" : "flex-start",
+              gap: 1.25,
+              borderBottom: `1px solid ${alpha("#fff", 0.08)}`,
+              flexShrink: 0,
             }}
           >
-            <Typography
-              variant={collapsed ? "h6" : "h5"}
-              fontWeight="bold"
-              color="primary"
-              noWrap
+            <Box
+              sx={{
+                width: 38,
+                height: 38,
+                flexShrink: 0,
+                display: "grid",
+                placeItems: "center",
+                borderRadius: 2,
+                bgcolor: alpha("#fff", 0.08),
+                color: "#fff",
+              }}
             >
-              {collapsed ? <AdminPanelSettingsIcon /> : "Admin Panel"}
-            </Typography>
+              <AdminPanelSettingsIcon sx={{ fontSize: 22 }} />
+            </Box>
+            {!collapsed && (
+              <Box sx={{ minWidth: 0 }}>
+                <Typography
+                  sx={{
+                    fontWeight: 700,
+                    color: "#fff",
+                    fontSize: "0.95rem",
+                    lineHeight: 1.2,
+                  }}
+                  noWrap
+                >
+                  Admin Panel
+                </Typography>
+                <Typography
+                  sx={{
+                    fontSize: "0.7rem",
+                    color: alpha("#fff", 0.5),
+                    letterSpacing: "0.06em",
+                  }}
+                  noWrap
+                >
+                  CONTROL CENTER
+                </Typography>
+              </Box>
+            )}
           </Box>
 
-          <Divider />
-
-          <List sx={{ px: 1, flexGrow: 1, overflowY: "auto" }}>
-            {menuItems.map((item) => {
-              const isActive = location.pathname === item.path;
-
-              return (
-                <ListItem
-                  key={item.text}
-                  disablePadding
-                  sx={{ display: "block", mb: 0.5 }}
-                >
-                  <Tooltip title={collapsed ? item.text : ""} placement="right">
-                    <ListItemButton
-                      selected={isActive}
-                      onClick={() => navigate(item.path)}
-                      sx={{
-                        borderRadius: 2,
-                        justifyContent: collapsed ? "center" : "flex-start",
-                        px: collapsed ? 1 : 2,
-
-                        "&.Mui-selected": {
-                          backgroundColor: "primary.main",
-                          color: "white",
-                          "& .MuiListItemIcon-root": { color: "white" },
-                        },
-                        "&.Mui-selected:hover": {
-                          backgroundColor: "primary.dark",
-                        },
-                        "&:hover": {
-                          backgroundColor: "primary.light",
-                          color: "white",
-                          "& .MuiListItemIcon-root": { color: "white" },
-                        },
-                      }}
-                    >
-                      <ListItemIcon
-                        sx={{
-                          minWidth: 0,
-                          mr: collapsed ? 0 : 2,
-                          justifyContent: "center",
-                        }}
-                      >
-                        {item.icon}
-                      </ListItemIcon>
-
-                      {!collapsed && <ListItemText primary={item.text} />}
-                    </ListItemButton>
-                  </Tooltip>
-                </ListItem>
-              );
-            })}
-          </List>
-
-          <Divider />
-
-          <List sx={{ px: 1, py: 1 }}>
-            <ListItem disablePadding>
-              <Tooltip title={collapsed ? "Logout" : ""} placement="right">
-                <ListItemButton
-                  onClick={handleLogout}
-                  sx={{
-                    borderRadius: 2,
-                    color: "error.main",
-                    justifyContent: collapsed ? "center" : "flex-start",
-                    px: collapsed ? 1 : 2,
-                  }}
-                >
-                  <ListItemIcon
+          {/* Menu groups */}
+          <List
+            sx={{
+              px: 1,
+              py: 1.5,
+              flexGrow: 1,
+              overflowY: "auto",
+              overflowX: "hidden",
+              "&::-webkit-scrollbar": { width: 4 },
+              "&::-webkit-scrollbar-thumb": {
+                bgcolor: alpha("#fff", 0.12),
+                borderRadius: 3,
+              },
+            }}
+          >
+            {menuGroups.map((group, gi) => (
+              <Box key={group.label} sx={{ mb: 1 }}>
+                {!collapsed && (
+                  <Typography
                     sx={{
-                      minWidth: 0,
-                      mr: collapsed ? 0 : 2,
-                      justifyContent: "center",
-                      color: "error.main",
+                      px: 2,
+                      py: 0.75,
+                      fontSize: "0.68rem",
+                      fontWeight: 700,
+                      letterSpacing: "0.1em",
+                      color: alpha("#fff", 0.4),
+                      textTransform: "uppercase",
                     }}
                   >
-                    <LogoutIcon />
-                  </ListItemIcon>
+                    {group.label}
+                  </Typography>
+                )}
+                {collapsed && gi > 0 && (
+                  <Divider
+                    sx={{ my: 1, mx: 1.5, borderColor: alpha("#fff", 0.08) }}
+                  />
+                )}
+                {group.items.map((item) => {
+                  const isActive = location.pathname === item.path;
 
-                  {!collapsed && <ListItemText primary="Logout" />}
-                </ListItemButton>
-              </Tooltip>
-            </ListItem>
+                  return (
+                    <ListItem
+                      key={item.text}
+                      disablePadding
+                      sx={{ display: "block", mb: 0.25 }}
+                    >
+                      <Tooltip
+                        title={collapsed ? item.text : ""}
+                        placement="right"
+                        arrow
+                      >
+                        <ListItemButton
+                          selected={isActive}
+                          onClick={() => navigate(item.path)}
+                          sx={{
+                            borderRadius: 2,
+                            minHeight: 42,
+                            justifyContent: collapsed ? "center" : "flex-start",
+                            px: collapsed ? 1 : 1.75,
+                            mx: 0.5,
+                            color: alpha("#fff", 0.72),
+                            transition: "all 0.15s ease",
+                            "& .MuiListItemIcon-root": {
+                              color: alpha("#fff", 0.55),
+                              minWidth: 0,
+                              mr: collapsed ? 0 : 1.5,
+                              justifyContent: "center",
+                              transition: "color 0.15s ease",
+                            },
+                            "&:hover": {
+                              bgcolor: BRAND.sidebarHover,
+                              color: "#fff",
+                              "& .MuiListItemIcon-root": { color: "#fff" },
+                            },
+                            "&.Mui-selected": {
+                              bgcolor: BRAND.sidebarActive,
+                              color: "#fff",
+                              boxShadow: `inset 3px 0 0 ${BRAND.indigo}`,
+                              "& .MuiListItemIcon-root": {
+                                color: "#a5b4fc",
+                              },
+                              "&:hover": {
+                                bgcolor: alpha(BRAND.indigo, 0.25),
+                              },
+                            },
+                          }}
+                        >
+                          <ListItemIcon>{item.icon}</ListItemIcon>
+                          {!collapsed && (
+                            <ListItemText
+                              primary={item.text}
+                              primaryTypographyProps={{
+                                fontSize: "0.875rem",
+                                fontWeight: isActive ? 600 : 500,
+                                noWrap: true,
+                              }}
+                            />
+                          )}
+                        </ListItemButton>
+                      </Tooltip>
+                    </ListItem>
+                  );
+                })}
+              </Box>
+            ))}
           </List>
+
+          {/* Logout */}
+          <Box
+            sx={{
+              p: 1,
+              borderTop: `1px solid ${alpha("#fff", 0.08)}`,
+              flexShrink: 0,
+            }}
+          >
+            <Tooltip title={collapsed ? "Logout" : ""} placement="right" arrow>
+              <ListItemButton
+                onClick={handleLogout}
+                sx={{
+                  borderRadius: 2,
+                  minHeight: 42,
+                  justifyContent: collapsed ? "center" : "flex-start",
+                  px: collapsed ? 1 : 1.75,
+                  color: "#f87171",
+                  "& .MuiListItemIcon-root": {
+                    color: "#f87171",
+                    minWidth: 0,
+                    mr: collapsed ? 0 : 1.5,
+                    justifyContent: "center",
+                  },
+                  "&:hover": {
+                    bgcolor: alpha("#ef4444", 0.12),
+                    color: "#fca5a5",
+                    "& .MuiListItemIcon-root": { color: "#fca5a5" },
+                  },
+                }}
+              >
+                <ListItemIcon>
+                  <LogoutIcon />
+                </ListItemIcon>
+                {!collapsed && (
+                  <ListItemText
+                    primary="Logout"
+                    primaryTypographyProps={{
+                      fontSize: "0.875rem",
+                      fontWeight: 600,
+                    }}
+                  />
+                )}
+              </ListItemButton>
+            </Tooltip>
+          </Box>
         </Box>
       </Drawer>
 
+      {/* ----------------------------- MAIN ----------------------------- */}
       <Box
         component="main"
         sx={{
@@ -312,6 +546,8 @@ export default function Admin() {
           minWidth: 0,
           p: { xs: 2, sm: 3, md: 4 },
           mt: 8,
+          bgcolor: "#f8fafc",
+          minHeight: "calc(100vh - 64px)",
         }}
       >
         {outlet ?? (
@@ -320,7 +556,7 @@ export default function Admin() {
               <AdminDashboard />
             ) : (
               <Typography variant="h5" component="h1" fontWeight="bold">
-                {menuItems.find((item) => item.path === location.pathname)
+                {allMenuItems.find((item) => item.path === location.pathname)
                   ?.text ?? "Admin Dashboard"}
               </Typography>
             )}

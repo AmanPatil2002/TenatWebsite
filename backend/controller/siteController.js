@@ -64,6 +64,134 @@ const isValidPage = (value) =>
   value.trim().length > 0 &&
   Buffer.byteLength(value, "utf8") <= 60000;
 
+const SITE_HEADER_FIELDS = [
+  ["siteTitle", 150],
+  ["footerText", 65535],
+  ["footerAddress", 300],
+  ["footerPhone", 30],
+  ["footerEmail", 190],
+  ["copyrightText", 255],
+];
+const SOCIAL_PLATFORMS = ["facebook", "instagram", "youtube", "twitter", "linkedin"];
+const isHttpUrl = (value) => {
+  try {
+    const { protocol } = new URL(value);
+    return protocol === "https:" || protocol === "http:";
+  } catch {
+    return false;
+  }
+};
+
+const readSiteHeader = async (siteId) => {
+  const [[header]] = await db.query(
+    `SELECT headerid, siteId, logoUrl, siteTitle, footerText, footerAddress,
+            footerPhone, footerEmail, copyrightText, socialLinks, createdAt, updatedAt
+       FROM siteheaders
+      WHERE siteId = ?`,
+    [siteId],
+  );
+  if (header && typeof header.socialLinks === "string") {
+    try {
+      header.socialLinks = JSON.parse(header.socialLinks);
+    } catch {
+      header.socialLinks = {};
+    }
+  }
+  return header || null;
+};
+
+const getSiteHeader = async (req, res) => {
+  const { siteId } = req.params;
+  if (!isId(siteId)) return res.status(400).json({ message: "Invalid site id" });
+  try {
+    await getActiveManagedSite(siteId, req);
+    return res.json({ header: await readSiteHeader(siteId) });
+  } catch (error) {
+    return sendError(res, error);
+  }
+};
+
+const updateSiteHeader = async (req, res) => {
+  const { siteId } = req.params;
+  if (!isId(siteId)) return res.status(400).json({ message: "Invalid site id" });
+
+  const body = req.body ?? {};
+  const header = {};
+  for (const [field, maxLength] of SITE_HEADER_FIELDS) {
+    const value = body[field] ?? "";
+    if (typeof value !== "string" || value.length > maxLength) {
+      return res.status(400).json({
+        message: `${field} must be a string of at most ${maxLength} characters`,
+      });
+    }
+    header[field] = value.trim() || null;
+  }
+
+  const logoUrl = body.logoUrl ?? null;
+  if (
+    logoUrl !== null &&
+    (typeof logoUrl !== "string" ||
+      logoUrl.length > 500 ||
+      (!isHttpUrl(logoUrl) &&
+        !new RegExp(`^/uploads/sites/${siteId}/[a-f0-9]{32}\\.(jpg|png|webp|gif)$`).test(logoUrl)))
+  ) {
+    return res.status(400).json({ message: "Enter a valid logo image URL" });
+  }
+
+  const socialLinks = body.socialLinks ?? {};
+  if (
+    !socialLinks ||
+    typeof socialLinks !== "object" ||
+    Array.isArray(socialLinks) ||
+    Object.keys(socialLinks).some(
+      (platform) =>
+        !SOCIAL_PLATFORMS.includes(platform) ||
+        typeof socialLinks[platform] !== "string" ||
+        socialLinks[platform].length > 500 ||
+        (socialLinks[platform].trim() && !isHttpUrl(socialLinks[platform].trim())),
+    )
+  ) {
+    return res.status(400).json({ message: "Enter valid social media links" });
+  }
+  const cleanSocialLinks = Object.fromEntries(
+    Object.entries(socialLinks)
+      .map(([platform, url]) => [platform, url.trim()])
+      .filter(([, url]) => url),
+  );
+
+  try {
+    await getActiveManagedSite(siteId, req);
+    await db.query(
+      `INSERT INTO siteheaders
+         (siteId, logoUrl, siteTitle, footerText, footerAddress, footerPhone,
+          footerEmail, copyrightText, socialLinks)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         logoUrl = VALUES(logoUrl), siteTitle = VALUES(siteTitle),
+         footerText = VALUES(footerText), footerAddress = VALUES(footerAddress),
+         footerPhone = VALUES(footerPhone), footerEmail = VALUES(footerEmail),
+         copyrightText = VALUES(copyrightText), socialLinks = VALUES(socialLinks)`,
+      [
+        siteId,
+        logoUrl,
+        header.siteTitle,
+        header.footerText,
+        header.footerAddress,
+        header.footerPhone,
+        header.footerEmail,
+        header.copyrightText,
+        JSON.stringify(cleanSocialLinks),
+      ],
+    );
+    return res.json({
+      message: "Site header and footer saved",
+      header: await readSiteHeader(siteId),
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+};
+
 const getMySites = async (req, res) => {
   try {
     const [rows] = await db.query(
@@ -102,7 +230,7 @@ const getSitePages = async (req, res) => {
     );
     const [entries] = await db.query(
       `SELECT sitePageId, name, description, price, imageUrl, customFields
-         FROM siteentries
+         FROM siteEntries
         WHERE siteId = ? AND status = 'active'
         ORDER BY name, id`,
       [siteId],
@@ -119,16 +247,37 @@ const getSitePages = async (req, res) => {
       `SELECT s.id AS siteId, s.name AS siteName, s.templateId, s.expiresAt,
               c.categoryId, c.name AS categoryName,
               pay.currency,
-              th.themeId, th.name AS themeName, th.color, th.background
+              th.themeId, th.name AS themeName, th.color, th.background,
+              sh.logoUrl, sh.siteTitle, sh.footerText, sh.footerAddress,
+              sh.footerPhone, sh.footerEmail, sh.copyrightText, sh.socialLinks
          FROM sites s
          JOIN template t ON t.templateId = s.templateId
          JOIN categories c ON c.categoryId = t.categoryId
          JOIN payments pay ON pay.id = s.paymentId
          JOIN theme th ON th.themeId = s.themeId
+         LEFT JOIN siteheaders sh ON sh.siteId = s.id
         WHERE s.id = ?`,
       [siteId],
     );
-    return res.json({ ...site, pages });
+    let socialLinks = site.socialLinks;
+    if (typeof socialLinks === "string") {
+      try {
+        socialLinks = JSON.parse(socialLinks);
+      } catch {
+        socialLinks = {};
+      }
+    }
+    const header = {
+      logoUrl: site.logoUrl,
+      siteTitle: site.siteTitle,
+      footerText: site.footerText,
+      footerAddress: site.footerAddress,
+      footerPhone: site.footerPhone,
+      footerEmail: site.footerEmail,
+      copyrightText: site.copyrightText,
+      socialLinks: socialLinks || {},
+    };
+    return res.json({ ...site, header, pages });
   } catch (error) {
     return sendError(res, error);
   }
@@ -312,6 +461,8 @@ const reorderSitePages = async (req, res) => {
 module.exports = {
   getMySites,
   getSitePages,
+  getSiteHeader,
+  updateSiteHeader,
   getSitePageOptions,
   createSitePage,
   updateSitePage,

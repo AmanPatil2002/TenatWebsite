@@ -11,10 +11,24 @@ import {
   Typography,
   Stack,
   CircularProgress,
+  Box,
+  IconButton,
+  InputAdornment,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
+import CloseIcon from "@mui/icons-material/Close";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 
 // TODO: set this to your real auth route prefix (where /me is mounted)
 const API_URL = "http://localhost:5000/auth";
+
+const BRAND = {
+  indigo: "#4f46e5",
+  indigoDeep: "#3730a3",
+  ink: "#0f172a",
+  muted: "#64748b",
+};
 
 const authFetch = async (path, options = {}) => {
   const res = await fetch(`${API_URL}${path}`, {
@@ -31,6 +45,11 @@ const authFetch = async (path, options = {}) => {
 
 const emptyProfile = { name: "", email: "", phone: "", address: "" };
 const emptyPasswords = { currentPassword: "", newPassword: "", confirm: "" };
+const emptyVisibility = {
+  currentPassword: false,
+  newPassword: false,
+  confirm: false,
+};
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const PHONE_RE = /^\+?[0-9\s-]{7,20}$/;
@@ -43,7 +62,8 @@ const validateProfileField = (name, rawValue) => {
     case "name":
       if (!value) return "Name is required";
       if (value.length < 2) return "Name must be at least 2 characters";
-      if (!NAME_RE.test(value)) return "Name can only contain letters, spaces, . ' -";
+      if (!NAME_RE.test(value))
+        return "Name can only contain letters, spaces, . ' -";
       return "";
     case "email":
       if (!value) return "Email is required";
@@ -98,7 +118,7 @@ const validateProfile = (profile) => {
 const validatePasswords = (passwords) => {
   const wantsChange =
     passwords.currentPassword || passwords.newPassword || passwords.confirm;
-  if (!wantsChange) return {}; // password section is optional as a whole
+  if (!wantsChange) return {};
   const errors = {};
   Object.keys(emptyPasswords).forEach((k) => {
     const msg = validatePasswordField(k, passwords[k], passwords);
@@ -107,9 +127,35 @@ const validatePasswords = (passwords) => {
   return errors;
 };
 
+/* Section header helper */
+function SectionHeader({ title, description }) {
+  return (
+    <Box sx={{ mb: 2 }}>
+      <Typography
+        variant="overline"
+        sx={{
+          display: "block",
+          fontWeight: 700,
+          letterSpacing: "0.1em",
+          color: BRAND.indigo,
+          lineHeight: 1.6,
+        }}
+      >
+        {title}
+      </Typography>
+      {description && (
+        <Typography variant="body2" sx={{ color: BRAND.muted, mt: 0.25 }}>
+          {description}
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
 export default function AdminProfileDialog({ open, onClose, onSaved }) {
   const [profile, setProfile] = useState(emptyProfile);
   const [passwords, setPasswords] = useState(emptyPasswords);
+  const [showPassword, setShowPassword] = useState(emptyVisibility);
   const [profileErrors, setProfileErrors] = useState({});
   const [passwordErrors, setPasswordErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -123,6 +169,7 @@ export default function AdminProfileDialog({ open, onClose, onSaved }) {
     setError("");
     setSuccess("");
     setPasswords(emptyPasswords);
+    setShowPassword(emptyVisibility);
     setProfileErrors({});
     setPasswordErrors({});
     setLoading(true);
@@ -133,7 +180,7 @@ export default function AdminProfileDialog({ open, onClose, onSaved }) {
           email: u.email || "",
           phone: u.phone || "",
           address: u.address || "",
-        })
+        }),
       )
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -145,13 +192,19 @@ export default function AdminProfileDialog({ open, onClose, onSaved }) {
     setProfile((p) => ({ ...p, [name]: value }));
     setSuccess("");
     if (profileErrors[name]) {
-      setProfileErrors((er) => ({ ...er, [name]: validateProfileField(name, value) }));
+      setProfileErrors((er) => ({
+        ...er,
+        [name]: validateProfileField(name, value),
+      }));
     }
   };
 
   const handleProfileBlur = (e) => {
     const { name, value } = e.target;
-    setProfileErrors((er) => ({ ...er, [name]: validateProfileField(name, value) }));
+    setProfileErrors((er) => ({
+      ...er,
+      [name]: validateProfileField(name, value),
+    }));
   };
 
   const handlePasswordChange = (e) => {
@@ -159,7 +212,6 @@ export default function AdminProfileDialog({ open, onClose, onSaved }) {
     const next = { ...passwords, [name]: value };
     setPasswords(next);
     setSuccess("");
-    // Re-validate fields that already show an error (confirm depends on newPassword)
     setPasswordErrors((er) => {
       const updated = { ...er };
       Object.keys(er).forEach((k) => {
@@ -173,7 +225,6 @@ export default function AdminProfileDialog({ open, onClose, onSaved }) {
 
   const handlePasswordBlur = (e) => {
     const { name } = e.target;
-    // Only validate on blur once the user has started the password section
     const started =
       passwords.currentPassword || passwords.newPassword || passwords.confirm;
     if (!started) {
@@ -185,6 +236,9 @@ export default function AdminProfileDialog({ open, onClose, onSaved }) {
       [name]: validatePasswordField(name, passwords[name], passwords),
     }));
   };
+
+  const toggleShowPassword = (name) =>
+    setShowPassword((s) => ({ ...s, [name]: !s[name] }));
 
   const handleSave = async () => {
     setError("");
@@ -202,7 +256,6 @@ export default function AdminProfileDialog({ open, onClose, onSaved }) {
     const wantsPasswordChange =
       passwords.currentPassword || passwords.newPassword || passwords.confirm;
 
-    // Send trimmed values
     const cleanProfile = {
       name: profile.name.trim(),
       email: profile.email.trim(),
@@ -228,6 +281,7 @@ export default function AdminProfileDialog({ open, onClose, onSaved }) {
         });
         setPasswords(emptyPasswords);
         setPasswordErrors({});
+        setShowPassword(emptyVisibility);
       }
 
       setSuccess("Saved successfully");
@@ -250,6 +304,8 @@ export default function AdminProfileDialog({ open, onClose, onSaved }) {
       helperText={profileErrors[name] || " "}
       required
       fullWidth
+      size="small"
+      sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
       {...extra}
     />
   );
@@ -258,7 +314,7 @@ export default function AdminProfileDialog({ open, onClose, onSaved }) {
     <TextField
       label={label}
       name={name}
-      type="password"
+      type={showPassword[name] ? "text" : "password"}
       value={passwords[name]}
       onChange={handlePasswordChange}
       onBlur={handlePasswordBlur}
@@ -266,54 +322,227 @@ export default function AdminProfileDialog({ open, onClose, onSaved }) {
       helperText={passwordErrors[name] || " "}
       autoComplete={autoComplete}
       fullWidth
+      size="small"
+      sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+      InputProps={{
+        endAdornment: (
+          <InputAdornment position="end">
+            <IconButton
+              aria-label={
+                showPassword[name] ? `Hide ${label}` : `Show ${label}`
+              }
+              onClick={() => toggleShowPassword(name)}
+              onMouseDown={(e) => e.preventDefault()}
+              edge="end"
+              size="small"
+              sx={{
+                color: BRAND.muted,
+                "&:hover": { color: BRAND.indigo },
+              }}
+            >
+              {showPassword[name] ? (
+                <VisibilityOffIcon fontSize="small" />
+              ) : (
+                <VisibilityIcon fontSize="small" />
+              )}
+            </IconButton>
+          </InputAdornment>
+        ),
+      }}
     />
   );
 
   return (
-    <Dialog open={open} onClose={saving ? undefined : onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Edit My Profile</DialogTitle>
+    <Dialog
+      open={open}
+      onClose={saving ? undefined : onClose}
+      fullWidth
+      maxWidth="sm"
+      PaperProps={{
+        sx: {
+          borderRadius: 3,
+          overflow: "hidden",
+          boxShadow: "0 24px 60px rgba(15,23,42,0.18)",
+        },
+      }}
+    >
+      {/* Header */}
+      <DialogTitle
+        sx={{
+          px: { xs: 2.5, sm: 3.5 },
+          py: 2.5,
+          borderBottom: "1px solid",
+          borderColor: "divider",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 1,
+        }}
+      >
+        <Box sx={{ minWidth: 0 }}>
+          <Typography
+            component="h2"
+            variant="h6"
+            sx={{ fontWeight: 700, color: BRAND.ink, lineHeight: 1.25 }}
+          >
+            Edit My Profile
+          </Typography>
+          <Typography variant="body2" sx={{ color: BRAND.muted, mt: 0.25 }}>
+            Update your personal information and password.
+          </Typography>
+        </Box>
+        <IconButton
+          onClick={onClose}
+          disabled={saving}
+          aria-label="Close"
+          size="small"
+          sx={{
+            flexShrink: 0,
+            color: BRAND.muted,
+            "&:hover": { bgcolor: alpha(BRAND.indigo, 0.08) },
+          }}
+        >
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </DialogTitle>
 
-      <DialogContent dividers>
+      <DialogContent
+        dividers
+        sx={{
+          px: { xs: 2.5, sm: 3.5 },
+          py: 2.5,
+          borderColor: "divider",
+        }}
+      >
         {loading ? (
-          <Stack alignItems="center" py={4}>
-            <CircularProgress />
-          </Stack>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              py: 6,
+            }}
+          >
+            <CircularProgress
+              size={32}
+              sx={{ color: BRAND.indigo }}
+              aria-label="Loading profile"
+            />
+          </Box>
         ) : (
-          <Stack spacing={1} mt={1}>
-            {error && <Alert severity="error">{error}</Alert>}
-            {success && <Alert severity="success">{success}</Alert>}
+          <Stack spacing={2.5}>
+            {error && (
+              <Alert
+                severity="error"
+                sx={{ borderRadius: 2 }}
+                onClose={() => setError("")}
+              >
+                {error}
+              </Alert>
+            )}
+            {success && (
+              <Alert
+                severity="success"
+                sx={{ borderRadius: 2 }}
+                onClose={() => setSuccess("")}
+              >
+                {success}
+              </Alert>
+            )}
 
-            {profileField("name", "Name", { inputProps: { maxLength: 120 } })}
-            {profileField("email", "Email", {
-              type: "email",
-              inputProps: { maxLength: 190 },
-            })}
-            {profileField("phone", "Phone", {
-              type: "tel",
-              inputProps: { maxLength: 20 },
-            })}
-            {profileField("address", "Address", {
-              multiline: true,
-              minRows: 2,
-              inputProps: { maxLength: 255 },
-            })}
+            {/* Personal information */}
+            <Box>
+              <SectionHeader
+                title="Personal information"
+                description="These details are shown on your account."
+              />
+              <Stack spacing={1.5}>
+                {profileField("name", "Name", {
+                  inputProps: { maxLength: 120 },
+                })}
+                {profileField("email", "Email", {
+                  type: "email",
+                  inputProps: { maxLength: 190 },
+                })}
+                {profileField("phone", "Phone", {
+                  type: "tel",
+                  inputProps: { maxLength: 20 },
+                })}
+                {profileField("address", "Address", {
+                  multiline: true,
+                  minRows: 2,
+                  inputProps: { maxLength: 255 },
+                })}
+              </Stack>
+            </Box>
 
             <Divider />
-            <Typography variant="subtitle2" color="text.secondary">
-              Change password (leave blank to keep current)
-            </Typography>
 
-            {passwordField("currentPassword", "Current password", "current-password")}
-            {passwordField("newPassword", "New password", "new-password")}
-            {passwordField("confirm", "Confirm new password", "new-password")}
+            {/* Password */}
+            <Box>
+              <SectionHeader
+                title="Change password"
+                description="Leave these fields blank to keep your current password."
+              />
+              <Stack spacing={1.5}>
+                {passwordField(
+                  "currentPassword",
+                  "Current password",
+                  "current-password",
+                )}
+                {passwordField("newPassword", "New password", "new-password")}
+                {passwordField("confirm", "Confirm new password", "new-password")}
+              </Stack>
+            </Box>
           </Stack>
         )}
       </DialogContent>
 
-      <DialogActions>
-        <Button onClick={onClose} disabled={saving}>Close</Button>
-        <Button variant="contained" onClick={handleSave} disabled={saving || loading}>
-          {saving ? "Saving..." : "Save"}
+      <DialogActions
+        sx={{
+          px: { xs: 2.5, sm: 3.5 },
+          py: 2,
+          borderTop: "1px solid",
+          borderColor: "divider",
+          gap: 1,
+        }}
+      >
+        <Button
+          onClick={onClose}
+          disabled={saving}
+          sx={{
+            textTransform: "none",
+            fontWeight: 600,
+            color: BRAND.muted,
+            borderRadius: 2,
+            px: 2.5,
+            "&:hover": { bgcolor: alpha(BRAND.indigo, 0.06) },
+          }}
+        >
+          Cancel
+        </Button>
+        <Button
+          variant="contained"
+          onClick={handleSave}
+          disabled={saving || loading}
+          sx={{
+            textTransform: "none",
+            fontWeight: 700,
+            borderRadius: 2,
+            px: 3,
+            bgcolor: BRAND.indigo,
+            boxShadow: `0 8px 20px ${alpha(BRAND.indigo, 0.25)}`,
+            "&:hover": {
+              bgcolor: BRAND.indigoDeep,
+              boxShadow: `0 10px 24px ${alpha(BRAND.indigo, 0.32)}`,
+            },
+            "&.Mui-disabled": {
+              bgcolor: alpha(BRAND.indigo, 0.35),
+              color: "#fff",
+            },
+          }}
+        >
+          {saving ? "Saving…" : "Save changes"}
         </Button>
       </DialogActions>
     </Dialog>

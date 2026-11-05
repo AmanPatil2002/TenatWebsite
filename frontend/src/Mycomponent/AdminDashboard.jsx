@@ -23,20 +23,117 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import RefreshIcon from "@mui/icons-material/Refresh";
-import CurrencyRupeeIcon from "@mui/icons-material/CurrencyRupee";
-import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
-import PeopleIcon from "@mui/icons-material/People";
-import LanguageIcon from "@mui/icons-material/Language";
-import DashboardCustomizeIcon from "@mui/icons-material/DashboardCustomize";
-import StarIcon from "@mui/icons-material/Star";
-import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
-import TaskAltIcon from "@mui/icons-material/TaskAlt";
-import TrendingUpIcon from "@mui/icons-material/TrendingUp";
-import TrendingDownIcon from "@mui/icons-material/TrendingDown";
 import { PieChart } from "@mui/x-charts/PieChart";
 import { LineChart } from "@mui/x-charts/LineChart";
 import { BarChart } from "@mui/x-charts/BarChart";
+
+/* ======================================================================
+   Inline SVG Icons (no @mui/icons-material dependency)
+   ====================================================================== */
+
+const Icon = ({ children, size = 22, ...props }) => (
+  <Box
+    component="svg"
+    viewBox="0 0 24 24"
+    width={size}
+    height={size}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    {...props}
+  >
+    {children}
+  </Box>
+);
+
+const RefreshIcon = (p) => (
+  <Icon {...p}>
+    <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+    <path d="M21 3v6h-6" />
+  </Icon>
+);
+
+const CurrencyRupeeIcon = (p) => (
+  <Icon {...p}>
+    <path d="M6 3h12M6 8h12M9 3c3 0 5 1.5 5 5s-2 5-5 5H6l7 8" />
+  </Icon>
+);
+
+const ShoppingCartIcon = (p) => (
+  <Icon {...p}>
+    <circle cx="9" cy="20" r="1.5" />
+    <circle cx="18" cy="20" r="1.5" />
+    <path d="M2 3h3l2.4 11.4a2 2 0 0 0 2 1.6h8.4a2 2 0 0 0 2-1.6L21 8H6" />
+  </Icon>
+);
+
+const PeopleIcon = (p) => (
+  <Icon {...p}>
+    <circle cx="9" cy="8" r="3.5" />
+    <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
+    <path d="M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-5-6.3" />
+  </Icon>
+);
+
+const LanguageIcon = (p) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
+  </Icon>
+);
+
+const DashboardCustomizeIcon = (p) => (
+  <Icon {...p}>
+    <rect x="3" y="3" width="7" height="9" rx="1.5" />
+    <rect x="14" y="3" width="7" height="5" rx="1.5" />
+    <rect x="14" y="12" width="7" height="9" rx="1.5" />
+    <rect x="3" y="16" width="7" height="5" rx="1.5" />
+  </Icon>
+);
+
+const StarIcon = (p) => (
+  <Icon {...p}>
+    <path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 17l-5.2 2.7 1-5.9L3.5 9.7l5.9-.8L12 3.5z" />
+  </Icon>
+);
+
+const ReceiptLongIcon = (p) => (
+  <Icon {...p}>
+    <path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2V3z" />
+    <path d="M9 8h6M9 12h6M9 16h4" />
+  </Icon>
+);
+
+const TaskAltIcon = (p) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M8 12.5l2.5 2.5L16 9.5" />
+  </Icon>
+);
+
+const TrendingUpIcon = (p) => (
+  <Icon {...p}>
+    <path d="M3 17l6-6 4 4 8-8" />
+    <path d="M14 7h7v7" />
+  </Icon>
+);
+
+const TrendingDownIcon = (p) => (
+  <Icon {...p}>
+    <path d="M3 7l6 6 4-4 8 8" />
+    <path d="M21 17h-7v-7" />
+  </Icon>
+);
+
+const SparkleIcon = (p) => (
+  <Icon {...p}>
+    <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8L12 3z" />
+    <path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z" />
+  </Icon>
+);
 
 /* ======================================================================
    Config & helpers
@@ -102,7 +199,10 @@ const lastMonths = (n = 6) => {
   });
 };
 
-// Fresh palette: ocean / teal / sunset tones
+/* ======================================================================
+   Vibrant color palette
+   ====================================================================== */
+
 const C = {
   sky: "#0ea5e9",
   teal: "#14b8a6",
@@ -112,7 +212,10 @@ const C = {
   orange: "#f97316",
   indigo: "#6366f1",
   lime: "#84cc16",
+  fuchsia: "#d946ef",
+  cyan: "#06b6d4",
 };
+
 const PALETTE = [
   C.sky,
   C.teal,
@@ -122,6 +225,8 @@ const PALETTE = [
   C.orange,
   C.indigo,
   C.lime,
+  C.fuchsia,
+  C.cyan,
 ];
 
 const STATUS_COLOR = {
@@ -132,9 +237,16 @@ const STATUS_COLOR = {
   refunded: "warning",
 };
 
+/* ======================================================================
+   Card style base
+   ====================================================================== */
+
 const cardSx = {
   width: "100%",
   minWidth: 0,
+  height: "100%",
+  display: "flex",
+  flexDirection: "column",
   borderRadius: 3,
   border: "1px solid",
   borderColor: "divider",
@@ -144,7 +256,8 @@ const cardSx = {
   transition: "box-shadow 180ms ease, transform 180ms ease",
   "&:hover": {
     boxShadow:
-      "0 1px 2px rgba(16,24,40,0.04), 0 16px 32px -12px rgba(16,24,40,0.16)",
+      "0 1px 2px rgba(16,24,40,0.04), 0 16px 36px -12px rgba(16,24,40,0.18)",
+    transform: "translateY(-2px)",
   },
 };
 
@@ -161,10 +274,20 @@ function TrendBadge({ value }) {
     );
   }
   const up = value >= 0;
-  const Icon = up ? TrendingUpIcon : TrendingDownIcon;
+  const TrendIcon = up ? TrendingUpIcon : TrendingDownIcon;
   return (
     <Stack direction="row" alignItems="center" spacing={0.5}>
-      <Icon sx={{ fontSize: 16, color: up ? "success.main" : "error.main" }} />
+      <Box
+        sx={{
+          display: "inline-flex",
+          p: 0.25,
+          borderRadius: 1,
+          bgcolor: up ? alpha(C.teal, 0.12) : alpha(C.rose, 0.12),
+          color: up ? C.teal : C.rose,
+        }}
+      >
+        <TrendIcon size={14} />
+      </Box>
       <Typography
         variant="caption"
         fontWeight={700}
@@ -172,7 +295,7 @@ function TrendBadge({ value }) {
       >
         {Math.abs(value).toFixed(1)}%
       </Typography>
-      <Typography variant="caption" color="text.secondary">
+      <Typography variant="caption" color="text.secondary" noWrap>
         vs last month
       </Typography>
     </Stack>
@@ -182,6 +305,7 @@ function TrendBadge({ value }) {
 function StatCard({ title, value, icon, color, loading, trend, caption }) {
   return (
     <Card sx={{ ...cardSx, position: "relative", overflow: "hidden" }}>
+      {/* Top accent */}
       <Box
         sx={{
           position: "absolute",
@@ -189,68 +313,108 @@ function StatCard({ title, value, icon, color, loading, trend, caption }) {
           left: 0,
           right: 0,
           height: 4,
-          background: `linear-gradient(90deg, ${color}, ${alpha(color, 0.35)})`,
+          background: `linear-gradient(90deg, ${color}, ${alpha(color, 0.3)})`,
         }}
       />
-      <CardContent sx={{ p: 2.5, pt: 3, "&:last-child": { pb: 2.5 } }}>
+      {/* Soft gradient wash */}
+      <Box
+        sx={{
+          position: "absolute",
+          top: -40,
+          right: -40,
+          width: 140,
+          height: 140,
+          borderRadius: "50%",
+          background: `radial-gradient(circle, ${alpha(color, 0.18)}, transparent 70%)`,
+          pointerEvents: "none",
+        }}
+      />
+      <CardContent
+        sx={{
+          p: 2.5,
+          pt: 3,
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          "&:last-child": { pb: 2.5 },
+        }}
+      >
         <Stack
           direction="row"
           justifyContent="space-between"
           alignItems="flex-start"
-          spacing={2}
+          spacing={1.5}
         >
           <Box sx={{ minWidth: 0, flex: 1 }}>
             <Typography
-              variant="body2"
+              variant="caption"
               color="text.secondary"
-              noWrap
-              sx={{ fontWeight: 600, letterSpacing: 0.2 }}
+              sx={{
+                fontWeight: 700,
+                letterSpacing: 0.6,
+                textTransform: "uppercase",
+                fontSize: 11,
+                display: "block",
+                mb: 0.75,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
             >
               {title}
             </Typography>
             {loading ? (
-              <Skeleton width={110} height={44} sx={{ mt: 0.5 }} />
+              <Skeleton width={110} height={42} />
             ) : (
               <Typography
                 variant="h4"
                 fontWeight={800}
                 sx={{
-                  mt: 0.5,
-                  lineHeight: 1.15,
-                  letterSpacing: -0.5,
+                  lineHeight: 1.1,
+                  letterSpacing: -0.6,
                   overflowWrap: "anywhere",
                 }}
               >
                 {value}
               </Typography>
             )}
-            <Box sx={{ mt: 1, minHeight: 20 }}>
-              {loading ? (
-                <Skeleton width={120} />
-              ) : trend !== undefined ? (
-                <TrendBadge value={trend} />
-              ) : (
-                <Typography variant="caption" color="text.secondary">
-                  {caption}
-                </Typography>
-              )}
-            </Box>
           </Box>
 
           <Avatar
             sx={{
-              width: 54,
-              height: 54,
+              width: 48,
+              height: 48,
               flexShrink: 0,
               color: "#fff",
               background: `linear-gradient(135deg, ${alpha(color, 0.85)} 0%, ${color} 100%)`,
-              boxShadow: `0 8px 16px -4px ${alpha(color, 0.5)}`,
-              "& svg": { fontSize: 26 },
+              boxShadow: `0 8px 18px -6px ${alpha(color, 0.55)}`,
             }}
           >
             {icon}
           </Avatar>
         </Stack>
+
+        <Box sx={{ mt: 1.5, minHeight: 20 }}>
+          {loading ? (
+            <Skeleton width={120} />
+          ) : trend !== undefined ? (
+            <TrendBadge value={trend} />
+          ) : (
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{
+                display: "-webkit-box",
+                WebkitLineClamp: 1,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
+            >
+              {caption}
+            </Typography>
+          )}
+        </Box>
       </CardContent>
     </Card>
   );
@@ -269,30 +433,25 @@ function Panel({
   children,
 }) {
   return (
-    <Card
-      sx={{
-        ...cardSx,
-        display: "flex",
-        flex: 1,
-        flexDirection: "column",
-      }}
-    >
+    <Card sx={cardSx}>
       <CardContent
         sx={{
           p: 3,
           "&:last-child": { pb: 3 },
           flex: 1,
           minWidth: 0,
+          display: "flex",
+          flexDirection: "column",
         }}
       >
         <Stack
           direction="row"
           justifyContent="space-between"
           alignItems="flex-start"
-          spacing={1}
-          sx={{ mb: 1.5 }}
+          spacing={1.5}
+          sx={{ mb: 2 }}
         >
-          <Box sx={{ minWidth: 0 }}>
+          <Box sx={{ minWidth: 0, flex: 1 }}>
             <Stack direction="row" alignItems="center" spacing={1}>
               {accent && (
                 <Box
@@ -302,10 +461,11 @@ function Panel({
                     borderRadius: "50%",
                     bgcolor: accent,
                     flexShrink: 0,
+                    boxShadow: `0 0 0 3px ${alpha(accent, 0.15)}`,
                   }}
                 />
               )}
-              <Typography variant="h6" fontWeight={700} noWrap>
+              <Typography variant="h6" fontWeight={700} noWrap sx={{ minWidth: 0 }}>
                 {title}
               </Typography>
             </Stack>
@@ -313,17 +473,23 @@ function Panel({
               <Typography
                 variant="body2"
                 color="text.secondary"
-                sx={{ mt: 0.25 }}
+                sx={{
+                  mt: 0.35,
+                  display: "-webkit-box",
+                  WebkitLineClamp: 1,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                }}
               >
                 {subtitle}
               </Typography>
             )}
           </Box>
-          {action}
+          {action && <Box sx={{ flexShrink: 0 }}>{action}</Box>}
         </Stack>
 
         {loading ? (
-          <Skeleton variant="rounded" height={height} />
+          <Skeleton variant="rounded" height={height} sx={{ borderRadius: 2 }} />
         ) : error || empty ? (
           <Box
             sx={{
@@ -334,7 +500,21 @@ function Panel({
             }}
           >
             <Stack alignItems="center" spacing={0.5}>
-              <Typography fontWeight={500}>
+              <Box
+                sx={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: "50%",
+                  display: "grid",
+                  placeItems: "center",
+                  bgcolor: alpha(accent || C.sky, 0.12),
+                  color: accent || C.sky,
+                  mb: 0.5,
+                }}
+              >
+                <SparkleIcon size={20} />
+              </Box>
+              <Typography fontWeight={600} variant="body2">
                 {error ? "Could not load data" : emptyText}
               </Typography>
               {!error && (
@@ -345,7 +525,7 @@ function Panel({
             </Stack>
           </Box>
         ) : (
-          children
+          <Box sx={{ flex: 1, minWidth: 0 }}>{children}</Box>
         )}
       </CardContent>
     </Card>
@@ -366,7 +546,7 @@ function DonutChart({ data, centerLabel = "Total" }) {
               innerRadius: 66,
               outerRadius: 100,
               paddingAngle: 2,
-              cornerRadius: 4,
+              cornerRadius: 6,
               highlightScope: { fade: "global", highlight: "item" },
             },
           ]}
@@ -393,14 +573,9 @@ function DonutChart({ data, centerLabel = "Total" }) {
         </Box>
       </Box>
 
-      <Stack spacing={0.75} sx={{ mt: 1.5 }}>
+      <Stack spacing={0.85} sx={{ mt: 1.5 }}>
         {data.map((d, i) => (
-          <Stack
-            key={d.id}
-            direction="row"
-            alignItems="center"
-            spacing={1}
-          >
+          <Stack key={d.id} direction="row" alignItems="center" spacing={1}>
             <Box
               sx={{
                 width: 10,
@@ -410,7 +585,11 @@ function DonutChart({ data, centerLabel = "Total" }) {
                 flexShrink: 0,
               }}
             />
-            <Typography variant="body2" noWrap sx={{ flex: 1, minWidth: 0 }}>
+            <Typography
+              variant="body2"
+              noWrap
+              sx={{ flex: 1, minWidth: 0 }}
+            >
               {d.label}
             </Typography>
             <Typography variant="body2" fontWeight={700}>
@@ -440,7 +619,7 @@ function RatingBreakdown({ reviews, average }) {
   return (
     <Box>
       <Stack direction="row" alignItems="center" spacing={2.5} sx={{ mb: 2 }}>
-        <Box sx={{ textAlign: "center" }}>
+        <Box sx={{ textAlign: "center", flexShrink: 0 }}>
           <Typography variant="h2" fontWeight={800} lineHeight={1}>
             {average}
           </Typography>
@@ -451,18 +630,14 @@ function RatingBreakdown({ reviews, average }) {
             size="small"
             sx={{ mt: 0.5, color: C.amber }}
           />
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            display="block"
-          >
+          <Typography variant="caption" color="text.secondary" display="block">
             {total} reviews
           </Typography>
         </Box>
         <Stack spacing={0.9} sx={{ flex: 1, minWidth: 0 }}>
           {counts.map(({ star, count }) => (
             <Stack key={star} direction="row" alignItems="center" spacing={1}>
-              <Typography variant="caption" sx={{ width: 22 }}>
+              <Typography variant="caption" sx={{ width: 22, flexShrink: 0 }}>
                 {star} ★
               </Typography>
               <LinearProgress
@@ -482,7 +657,7 @@ function RatingBreakdown({ reviews, average }) {
               <Typography
                 variant="caption"
                 color="text.secondary"
-                sx={{ width: 24, textAlign: "right" }}
+                sx={{ width: 24, textAlign: "right", flexShrink: 0 }}
               >
                 {count}
               </Typography>
@@ -505,6 +680,7 @@ function PersonRow({ name, secondary, right }) {
           fontWeight: 700,
           bgcolor: alpha(C.sky, 0.15),
           color: C.sky,
+          flexShrink: 0,
         }}
       >
         {(name || "?").trim().charAt(0).toUpperCase()}
@@ -528,7 +704,7 @@ function PersonRow({ name, secondary, right }) {
           </Typography>
         )}
       </Box>
-      {right}
+      {right && <Box sx={{ flexShrink: 0 }}>{right}</Box>}
     </Stack>
   );
 }
@@ -728,58 +904,56 @@ export default function AdminDashboard() {
     {
       title: "Total Revenue",
       value: money(stats?.revenue),
-      icon: <CurrencyRupeeIcon />,
+      icon: <CurrencyRupeeIcon size={22} />,
       color: C.teal,
       trend: revenueTrend,
     },
     {
       title: "Templates Purchased",
       value: stats?.purchases ?? 0,
-      icon: <ShoppingCartIcon />,
+      icon: <ShoppingCartIcon size={22} />,
       color: C.sky,
       trend: purchaseTrend,
     },
     {
       title: "Avg Order Value",
       value: money(aov),
-      icon: <ReceiptLongIcon />,
+      icon: <ReceiptLongIcon size={22} />,
       color: C.indigo,
       caption: "Revenue per purchase",
     },
     {
-      title: "Payment Success Rate",
-      value: paymentTotals.total
-        ? `${paymentTotals.rate.toFixed(1)}%`
-        : "–",
-      icon: <TaskAltIcon />,
+      title: "Payment Success",
+      value: paymentTotals.total ? `${paymentTotals.rate.toFixed(1)}%` : "–",
+      icon: <TaskAltIcon size={22} />,
       color: C.lime,
       caption: `${paymentTotals.total} total payments`,
     },
     {
       title: "Active Clients",
       value: clients.filter((u) => u.status === "active").length,
-      icon: <PeopleIcon />,
+      icon: <PeopleIcon size={22} />,
       color: C.violet,
       caption: `${clients.length} clients in total`,
     },
     {
       title: "Live Sites",
       value: stats?.sites ?? 0,
-      icon: <LanguageIcon />,
+      icon: <LanguageIcon size={22} />,
       color: C.orange,
       caption: "Sites currently published",
     },
     {
       title: "Templates",
       value: stats?.templates ?? 0,
-      icon: <DashboardCustomizeIcon />,
+      icon: <DashboardCustomizeIcon size={22} />,
       color: C.rose,
       caption: `${stats?.themes ?? 0} themes · ${stats?.pages ?? 0} pages`,
     },
     {
       title: "Average Rating",
       value: avgRating,
-      icon: <StarIcon />,
+      icon: <StarIcon size={22} />,
       color: C.amber,
       caption: `${reviews.length} reviews`,
     },
@@ -789,33 +963,51 @@ export default function AdminDashboard() {
     <Box
       sx={{
         minHeight: "100vh",
-        background: `radial-gradient(1200px 500px at 8% -10%, ${alpha(C.sky, 0.1)}, transparent 60%), radial-gradient(1000px 400px at 100% 0%, ${alpha(C.teal, 0.09)}, transparent 55%)`,
+        background: `
+          radial-gradient(1200px 500px at 8% -10%, ${alpha(C.sky, 0.12)}, transparent 60%),
+          radial-gradient(1000px 400px at 100% 0%, ${alpha(C.violet, 0.1)}, transparent 55%),
+          radial-gradient(900px 500px at 50% 100%, ${alpha(C.teal, 0.08)}, transparent 60%),
+          #f8fafc
+        `,
         py: { xs: 3, md: 4 },
         px: { xs: 2, md: 4 },
       }}
     >
       <Box sx={{ maxWidth: 1500, mx: "auto" }}>
-        {/* Hero */}
+        {/* ============ HERO ============ */}
         <Box
           sx={{
-            mb: 3,
+            mb: 3.5,
             p: { xs: 3, md: 4 },
             borderRadius: 4,
             color: "#fff",
             position: "relative",
             overflow: "hidden",
             background:
-              "linear-gradient(135deg, #1f5ef0 0%, #1e86c3 55%, #2f7fe0 100%)",
-            boxShadow: "0 20px 40px -20px rgba(15,23,42,0.6)",
+              "linear-gradient(135deg, #4f46e5 0%, #0ea5e9 45%, #14b8a6 100%)",
+            boxShadow:
+              "0 24px 48px -24px rgba(79,70,229,0.55), 0 8px 16px -8px rgba(14,165,233,0.4)",
+            "&::before": {
+              content: '""',
+              position: "absolute",
+              right: -100,
+              top: -100,
+              width: 340,
+              height: 340,
+              borderRadius: "50%",
+              background:
+                "radial-gradient(circle, rgba(255,255,255,0.18), transparent 70%)",
+            },
             "&::after": {
               content: '""',
               position: "absolute",
-              right: -80,
-              top: -80,
-              width: 280,
-              height: 280,
+              left: -60,
+              bottom: -120,
+              width: 260,
+              height: 260,
               borderRadius: "50%",
-              background: "rgba(255,255,255,0.06)",
+              background:
+                "radial-gradient(circle, rgba(255,255,255,0.12), transparent 70%)",
             },
           }}
         >
@@ -826,31 +1018,55 @@ export default function AdminDashboard() {
             spacing={3}
             sx={{ position: "relative", zIndex: 1 }}
           >
-            <Box>
-              <Typography
-                variant="overline"
-                sx={{ opacity: 0.75, fontWeight: 600, letterSpacing: 1.5 }}
-              >
-                Admin Dashboard ·{" "}
-                {new Date().toLocaleDateString("en-IN", {
-                  weekday: "long",
-                  day: "numeric",
-                  month: "long",
-                })}
-              </Typography>
+            <Box sx={{ minWidth: 0 }}>
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+                <Box
+                  sx={{
+                    display: "inline-flex",
+                    px: 1.25,
+                    py: 0.4,
+                    borderRadius: 10,
+                    bgcolor: "rgba(255,255,255,0.18)",
+                    backdropFilter: "blur(6px)",
+                    border: "1px solid rgba(255,255,255,0.25)",
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontWeight: 700,
+                      letterSpacing: 1,
+                      textTransform: "uppercase",
+                      fontSize: 10.5,
+                    }}
+                  >
+                    Admin Dashboard
+                  </Typography>
+                </Box>
+              </Stack>
               <Typography
                 variant="h4"
                 fontWeight={800}
                 sx={{
-                  fontSize: { xs: "1.5rem", sm: "2rem" },
-                  letterSpacing: -0.5,
+                  fontSize: { xs: "1.6rem", sm: "2.1rem" },
+                  letterSpacing: -0.6,
                   overflowWrap: "anywhere",
+                  lineHeight: 1.15,
                 }}
               >
-                {greeting()}, {username} 👋
+                {greeting()}, {username}
               </Typography>
-              <Typography variant="body2" sx={{ opacity: 0.8, mt: 0.5 }}>
-                Here's what's happening across your platform.
+              <Typography
+                variant="body2"
+                sx={{ opacity: 0.85, mt: 0.75, maxWidth: 520 }}
+              >
+                {new Date().toLocaleDateString("en-IN", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}{" "}
+                · Here's what's happening across your platform.
               </Typography>
             </Box>
 
@@ -858,7 +1074,7 @@ export default function AdminDashboard() {
               direction={{ xs: "column", sm: "row" }}
               spacing={1.5}
               alignItems="stretch"
-              sx={{ minWidth: 0 }}
+              sx={{ width: { xs: "100%", md: "auto" } }}
             >
               {[
                 {
@@ -876,16 +1092,16 @@ export default function AdminDashboard() {
                     px: 2,
                     py: 1.25,
                     borderRadius: 2.5,
-                    bgcolor: "rgba(255,255,255,0.12)",
-                    border: "1px solid rgba(255,255,255,0.18)",
-                    backdropFilter: "blur(6px)",
-                    minWidth: { xs: 0, sm: 130 },
+                    bgcolor: "rgba(255,255,255,0.14)",
+                    border: "1px solid rgba(255,255,255,0.22)",
+                    backdropFilter: "blur(8px)",
+                    minWidth: { xs: 0, sm: 140 },
                   }}
                 >
-                  <Typography variant="caption" sx={{ opacity: 0.75 }}>
+                  <Typography variant="caption" sx={{ opacity: 0.8 }}>
                     {item.label}
                   </Typography>
-                  <Typography variant="h6" fontWeight={800}>
+                  <Typography variant="h6" fontWeight={800} sx={{ mt: 0.25 }}>
                     {loading || error ? "–" : item.value}
                   </Typography>
                 </Box>
@@ -905,17 +1121,19 @@ export default function AdminDashboard() {
                     onClick={() => load()}
                     disabled={loading}
                     sx={{
-                      width: { xs: 44, sm: "auto" },
-                      height: { xs: 44, sm: "100%" },
-                      alignSelf: { xs: "flex-end", sm: "stretch" },
+                      width: { xs: "100%", sm: 52 },
+                      height: 52,
+                      alignSelf: { xs: "stretch", sm: "center" },
                       borderRadius: 2.5,
                       color: "#fff",
-                      border: "1px solid rgba(255,255,255,0.3)",
-                      "&:hover": { bgcolor: "rgba(255,255,255,0.12)" },
+                      bgcolor: "rgba(255,255,255,0.14)",
+                      border: "1px solid rgba(255,255,255,0.28)",
+                      backdropFilter: "blur(8px)",
+                      "&:hover": { bgcolor: "rgba(255,255,255,0.22)" },
                       "&.Mui-disabled": { color: "rgba(255,255,255,0.4)" },
                     }}
                   >
-                    <RefreshIcon />
+                    <RefreshIcon size={20} />
                   </IconButton>
                 </span>
               </Tooltip>
@@ -937,7 +1155,7 @@ export default function AdminDashboard() {
           </Alert>
         )}
 
-        {/* KPI cards */}
+        {/* ============ KPI CARDS ============ */}
         <Grid container spacing={{ xs: 2, md: 2.5 }}>
           {cards.map((card) => (
             <Grid
@@ -954,7 +1172,7 @@ export default function AdminDashboard() {
           ))}
         </Grid>
 
-        {/* Revenue trend + rating breakdown */}
+        {/* ============ REVENUE + RATING ============ */}
         <Grid container spacing={{ xs: 2, md: 2.5 }} sx={{ mt: 0.5 }}>
           <Grid size={{ xs: 12, lg: 7 }} sx={{ display: "flex" }}>
             <Panel
@@ -966,14 +1184,15 @@ export default function AdminDashboard() {
               empty={!hasMonthly}
               height={340}
               action={
-                <Stack direction="row" spacing={1} flexWrap="wrap">
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                   <Chip
                     size="small"
-                    label={`6-mo total ${money(sixMonthRevenue)}`}
+                    label={`6-mo ${money(sixMonthRevenue)}`}
                     sx={{
-                      fontWeight: 600,
+                      fontWeight: 700,
                       bgcolor: alpha(C.teal, 0.12),
                       color: C.teal,
+                      borderRadius: 1.5,
                     }}
                   />
                   {bestMonth && (
@@ -981,7 +1200,7 @@ export default function AdminDashboard() {
                       size="small"
                       variant="outlined"
                       label={`Best: ${bestMonth.label}`}
-                      sx={{ fontWeight: 600 }}
+                      sx={{ fontWeight: 600, borderRadius: 1.5 }}
                     />
                   )}
                 </Stack>
@@ -1005,7 +1224,12 @@ export default function AdminDashboard() {
                 slotProps={{ legend: { hidden: true } }}
                 sx={{
                   "& .MuiLineElement-root": { strokeWidth: 3 },
-                  "& .MuiAreaElement-root": { fill: alpha(C.teal, 0.14) },
+                  "& .MuiAreaElement-root": { fill: alpha(C.teal, 0.16) },
+                  "& .MuiMarkElement-root": {
+                    stroke: C.teal,
+                    fill: "#fff",
+                    strokeWidth: 2,
+                  },
                 }}
               />
             </Panel>
@@ -1025,9 +1249,14 @@ export default function AdminDashboard() {
               <RatingBreakdown reviews={reviews} average={avgRating} />
               <Divider sx={{ my: 1.5 }} />
               <Typography
-                variant="overline"
+                variant="caption"
                 color="text.secondary"
-                sx={{ fontWeight: 700, letterSpacing: 1 }}
+                sx={{
+                  fontWeight: 700,
+                  letterSpacing: 1,
+                  textTransform: "uppercase",
+                  fontSize: 10.5,
+                }}
               >
                 Latest reviews
               </Typography>
@@ -1066,7 +1295,7 @@ export default function AdminDashboard() {
           </Grid>
         </Grid>
 
-        {/* Monthly detail charts */}
+        {/* ============ MONTHLY CHARTS ============ */}
         <Grid
           container
           spacing={{ xs: 2, md: 2.5 }}
@@ -1092,7 +1321,7 @@ export default function AdminDashboard() {
                     label: "Purchases",
                   },
                 ]}
-                borderRadius={6}
+                borderRadius={8}
                 grid={{ horizontal: true }}
                 slotProps={{ legend: { hidden: true } }}
               />
@@ -1144,7 +1373,7 @@ export default function AdminDashboard() {
                 colors={[C.violet]}
                 xAxis={[{ scaleType: "band", data: signupSeries.labels }]}
                 series={[{ data: signupSeries.values, label: "Sign-ups" }]}
-                borderRadius={6}
+                borderRadius={8}
                 grid={{ horizontal: true }}
                 slotProps={{ legend: { hidden: true } }}
               />
@@ -1152,7 +1381,7 @@ export default function AdminDashboard() {
           </Grid>
         </Grid>
 
-        {/* Donuts */}
+        {/* ============ DONUTS ============ */}
         <Grid
           container
           spacing={{ xs: 2, md: 2.5 }}
@@ -1200,7 +1429,7 @@ export default function AdminDashboard() {
           </Grid>
         </Grid>
 
-        {/* Template performance */}
+        {/* ============ TEMPLATE PERFORMANCE ============ */}
         <Grid container spacing={{ xs: 2, md: 2.5 }} sx={{ mt: 0.5 }}>
           <Grid size={{ xs: 12, lg: 7 }} sx={{ display: "flex" }}>
             <Panel
@@ -1218,8 +1447,8 @@ export default function AdminDashboard() {
                       sx={{
                         "& th": {
                           fontWeight: 700,
-                          fontSize: 12,
-                          letterSpacing: 0.6,
+                          fontSize: 11,
+                          letterSpacing: 0.8,
                           textTransform: "uppercase",
                           color: "text.secondary",
                         },
@@ -1262,7 +1491,10 @@ export default function AdminDashboard() {
                                 flex: 1,
                                 height: 6,
                                 borderRadius: 3,
-                                bgcolor: alpha(PALETTE[i % PALETTE.length], 0.15),
+                                bgcolor: alpha(
+                                  PALETTE[i % PALETTE.length],
+                                  0.15,
+                                ),
                                 "& .MuiLinearProgress-bar": {
                                   borderRadius: 3,
                                   bgcolor: PALETTE[i % PALETTE.length],
@@ -1313,7 +1545,7 @@ export default function AdminDashboard() {
                     valueFormatter: (v) => money(v),
                   },
                 ]}
-                borderRadius={6}
+                borderRadius={8}
                 margin={{ left: 100 }}
                 slotProps={{ legend: { hidden: true } }}
               />
@@ -1321,7 +1553,7 @@ export default function AdminDashboard() {
           </Grid>
         </Grid>
 
-        {/* Recent payments + new clients */}
+        {/* ============ RECENT PAYMENTS + NEW CLIENTS ============ */}
         <Grid container spacing={{ xs: 2, md: 2.5 }} sx={{ mt: 0.5 }}>
           <Grid size={{ xs: 12, lg: 8 }} sx={{ display: "flex" }}>
             <Panel
@@ -1348,8 +1580,8 @@ export default function AdminDashboard() {
                       sx={{
                         "& th": {
                           fontWeight: 700,
-                          fontSize: 12,
-                          letterSpacing: 0.6,
+                          fontSize: 11,
+                          letterSpacing: 0.8,
                           textTransform: "uppercase",
                           color: "text.secondary",
                           py: 1.25,
@@ -1480,6 +1712,19 @@ export default function AdminDashboard() {
             </Panel>
           </Grid>
         </Grid>
+
+        {/* Footer */}
+        <Box sx={{ mt: 4, textAlign: "center" }}>
+          <Typography variant="caption" color="text.secondary">
+            Admin Dashboard · Data refreshes on demand ·{" "}
+            {updatedAt
+              ? `Last synced ${updatedAt.toLocaleTimeString("en-IN", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}`
+              : "Not synced yet"}
+          </Typography>
+        </Box>
       </Box>
     </Box>
   );

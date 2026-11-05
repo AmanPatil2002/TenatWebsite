@@ -11,6 +11,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Divider,
   InputAdornment,
   Paper,
   Stack,
@@ -26,6 +27,10 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import SearchIcon from "@mui/icons-material/Search";
+import CloseIcon from "@mui/icons-material/Close";
+import AdminPanelSettingsOutlinedIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
+import VpnKeyOutlinedIcon from "@mui/icons-material/VpnKeyOutlined";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 
 const API_URL = (
   import.meta.env.VITE_API_URL || "http://localhost:5000"
@@ -167,186 +172,242 @@ export default function SiteAdminAccess() {
   };
 
   return (
-    <Box>
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        justifyContent="space-between"
-        alignItems={{ xs: "stretch", sm: "center" }}
-        spacing={2}
-        sx={{ mb: 3 }}
-      >
-        <Box>
-          <Typography variant="h5" fontWeight={700}>
-            Site admin access
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Email a site-specific login. The recipient can edit and create pages
-            for that purchased site, but cannot change its theme.
-          </Typography>
-        </Box>
-        <TextField
-          size="small"
-          placeholder="Search sites, owners, emails..."
-          value={search}
-          onChange={(event) => {
-            setSearch(event.target.value);
-            setPage(0);
-          }}
-          sx={{ width: { xs: "100%", sm: 300 } }}
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" />
-                </InputAdornment>
-              ),
-            },
-          }}
-        />
-      </Stack>
+    <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, minHeight: "100vh", bgcolor: "#f4f6f8" }}>
+      <Box sx={{ maxWidth: 1500, mx: "auto" }}>
+        {/* Page header */}
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          justifyContent="space-between"
+          alignItems={{ xs: "stretch", sm: "center" }}
+          spacing={2}
+          sx={{ mb: 3 }}
+        >
+          <Stack direction="row" alignItems="center" spacing={1.5}>
+            <Box
+              sx={{
+                display: "grid",
+                placeItems: "center",
+                width: 40,
+                height: 40,
+                borderRadius: 2,
+                bgcolor: "primary.main",
+                color: "primary.contrastText",
+              }}
+            >
+              <AdminPanelSettingsOutlinedIcon fontSize="small" />
+            </Box>
+            <Box>
+              <Typography variant="h5" fontWeight={700} sx={{ lineHeight: 1.2 }}>
+                Site Admin Access
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Email a site-specific login. The recipient can edit and create
+                pages for that purchased site, but cannot change its theme.
+              </Typography>
+            </Box>
+          </Stack>
 
-      {error && !selectedSite && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>
-          {error}
-        </Alert>
-      )}
-      {notice && (
-        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setNotice("")}>
-          {notice}
-        </Alert>
-      )}
-
-      {loading ? (
-        <Box sx={{ display: "grid", placeItems: "center", py: 8 }}>
-          <CircularProgress />
-        </Box>
-      ) : (
-        <Paper variant="outlined" sx={{ overflow: "hidden" }}>
-          <TableContainer sx={{ maxHeight: 560 }}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={headCellSx}>Site</TableCell>
-                  <TableCell sx={headCellSx}>Purchased by</TableCell>
-                  <TableCell sx={headCellSx}>Expires</TableCell>
-                  <TableCell sx={headCellSx}>Status</TableCell>
-                  <TableCell sx={headCellSx}>Site-admin email</TableCell>
-                  <TableCell sx={headCellSx} align="right">
-                    Access
-                  </TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {visibleSites.map((site) => {
-                  const active = site.currentStatus === "active";
-                  return (
-                    <TableRow key={site.siteId} hover>
-                      <TableCell sx={{ minWidth: 180 }}>
-                        <Typography variant="body2" fontWeight={600}>
-                          {site.siteName}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Site #{site.siteId}
-                        </Typography>
-                      </TableCell>
-
-                      <TableCell sx={{ minWidth: 220 }}>
-                        <Stack direction="row" spacing={1.5} alignItems="center">
-                          <Avatar
-                            sx={{
-                              width: 34,
-                              height: 34,
-                              fontSize: 13,
-                              bgcolor: "primary.main",
-                            }}
-                          >
-                            {getInitials(site.ownerName)}
-                          </Avatar>
-                          <Box sx={{ minWidth: 0 }}>
-                            <Typography variant="body2" fontWeight={600} noWrap>
-                              {site.ownerName}
-                            </Typography>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              noWrap
-                              display="block"
-                            >
-                              {site.ownerEmail}
-                            </Typography>
-                          </Box>
-                        </Stack>
-                      </TableCell>
-
-                      <TableCell sx={{ whiteSpace: "nowrap" }}>
-                        {formatDate(site.expiresAt)}
-                      </TableCell>
-
-                      <TableCell>
-                        <Chip
-                          size="small"
-                          label={site.currentStatus || "unknown"}
-                          color={statusColor(site.currentStatus)}
-                          variant="outlined"
-                          sx={{ textTransform: "capitalize" }}
-                        />
-                      </TableCell>
-
-                      <TableCell>
-                        {site.siteAdminEmail ? (
-                          <Typography variant="body2">
-                            {site.siteAdminEmail}
-                          </Typography>
-                        ) : (
-                          <Chip size="small" label="Not granted" />
-                        )}
-                      </TableCell>
-
-                      <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
-                        <Button
-                          size="small"
-                          variant={site.siteAdminEmail ? "outlined" : "contained"}
-                          disabled={!active}
-                          onClick={() => openDialog(site)}
-                        >
-                          {site.siteAdminEmail ? "Resend / update" : "Grant access"}
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-
-                {!visibleSites.length && (
-                  <TableRow>
-                    <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        {sites.length
-                          ? "No sites match your search."
-                          : "No captured purchases found."}
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-
-          <TablePagination
-            component="div"
-            count={filteredSites.length}
-            page={page}
-            onPageChange={(_, newPage) => setPage(newPage)}
-            rowsPerPage={rowsPerPage}
-            onRowsPerPageChange={(event) => {
-              setRowsPerPage(parseInt(event.target.value, 10));
+          <TextField
+            size="small"
+            placeholder="Search sites, owners, emails..."
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value);
               setPage(0);
             }}
-            rowsPerPageOptions={[5, 10, 25]}
-            sx={{ borderTop: 1, borderColor: "divider" }}
+            sx={{ width: { xs: "100%", sm: 320 }, bgcolor: "background.paper" }}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              },
+            }}
           />
-        </Paper>
-      )}
+        </Stack>
 
+        {error && !selectedSite && (
+          <Alert
+            severity="error"
+            sx={{ mb: 2, borderRadius: 1.5 }}
+            onClose={() => setError("")}
+          >
+            {error}
+          </Alert>
+        )}
+        {notice && (
+          <Alert
+            severity="success"
+            sx={{ mb: 2, borderRadius: 1.5 }}
+            onClose={() => setNotice("")}
+          >
+            {notice}
+          </Alert>
+        )}
+
+        {loading ? (
+          <Box sx={{ display: "grid", placeItems: "center", py: 8 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <Paper
+            elevation={0}
+            sx={{
+              borderRadius: 2,
+              border: "1px solid",
+              borderColor: "divider",
+              overflow: "hidden",
+            }}
+          >
+            <TableContainer sx={{ maxHeight: 620 }}>
+              <Table stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={headCellSx}>Site</TableCell>
+                    <TableCell sx={headCellSx}>Purchased by</TableCell>
+                    <TableCell sx={headCellSx}>Expires</TableCell>
+                    <TableCell sx={headCellSx}>Status</TableCell>
+                    <TableCell sx={headCellSx}>Site-admin email</TableCell>
+                    <TableCell sx={{ ...headCellSx, width: 160 }} align="right">
+                      Access
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {visibleSites.map((site) => {
+                    const active = site.currentStatus === "active";
+                    return (
+                      <TableRow
+                        key={site.siteId}
+                        hover
+                        sx={{ "& td": { verticalAlign: "middle", py: 1.75 } }}
+                      >
+                        <TableCell sx={{ minWidth: 180 }}>
+                          <Typography variant="body2" fontWeight={600}>
+                            {site.siteName}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Site #{site.siteId}
+                          </Typography>
+                        </TableCell>
+
+                        <TableCell sx={{ minWidth: 220 }}>
+                          <Stack direction="row" spacing={1.5} alignItems="center">
+                            <Avatar
+                              sx={{
+                                width: 34,
+                                height: 34,
+                                fontSize: 13,
+                                bgcolor: "primary.main",
+                              }}
+                            >
+                              {getInitials(site.ownerName)}
+                            </Avatar>
+                            <Box sx={{ minWidth: 0 }}>
+                              <Typography variant="body2" fontWeight={600} noWrap>
+                                {site.ownerName}
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                noWrap
+                                display="block"
+                              >
+                                {site.ownerEmail}
+                              </Typography>
+                            </Box>
+                          </Stack>
+                        </TableCell>
+
+                        <TableCell sx={{ whiteSpace: "nowrap" }}>
+                          {formatDate(site.expiresAt)}
+                        </TableCell>
+
+                        <TableCell>
+                          <Chip
+                            size="small"
+                            label={site.currentStatus || "unknown"}
+                            color={statusColor(site.currentStatus)}
+                            variant="outlined"
+                            sx={{ textTransform: "capitalize", fontWeight: 600 }}
+                          />
+                        </TableCell>
+
+                        <TableCell sx={{ maxWidth: 240 }}>
+                          {site.siteAdminEmail ? (
+                            <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
+                              {site.siteAdminEmail}
+                            </Typography>
+                          ) : (
+                            <Chip
+                              size="small"
+                              label="Not granted"
+                              variant="outlined"
+                              sx={{ fontWeight: 600 }}
+                            />
+                          )}
+                        </TableCell>
+
+                        <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                          <Button
+                            size="small"
+                            variant={site.siteAdminEmail ? "outlined" : "contained"}
+                            disableElevation
+                            disabled={!active}
+                            startIcon={<VpnKeyOutlinedIcon fontSize="small" />}
+                            onClick={() => openDialog(site)}
+                            sx={{
+                              textTransform: "none",
+                              fontWeight: 600,
+                              borderRadius: 1.5,
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {site.siteAdminEmail ? "Resend / update" : "Grant access"}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+
+                  {!visibleSites.length && (
+                    <TableRow>
+                      <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
+                          {sites.length ? "No matching sites" : "No sites found"}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {sites.length
+                            ? "Try a different search term."
+                            : "Captured purchases will appear here."}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+            <TablePagination
+              component="div"
+              count={filteredSites.length}
+              page={page}
+              onPageChange={(_, newPage) => setPage(newPage)}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={(event) => {
+                setRowsPerPage(parseInt(event.target.value, 10));
+                setPage(0);
+              }}
+              rowsPerPageOptions={[5, 10, 25]}
+              sx={{ borderTop: 1, borderColor: "divider" }}
+            />
+          </Paper>
+        )}
+      </Box>
+
+      {/* Grant access dialog */}
       <Dialog
         open={Boolean(selectedSite)}
         onClose={() => !sending && setSelectedSite(null)}
@@ -354,39 +415,104 @@ export default function SiteAdminAccess() {
         maxWidth="xs"
       >
         <Box component="form" onSubmit={sendCredentials}>
-          <DialogTitle>Grant page-management access</DialogTitle>
-          <DialogContent>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              A generated password will be emailed for{" "}
-              <strong>{selectedSite?.siteName}</strong>. Sending again replaces
-              the previous password.
-            </Typography>
+          <DialogTitle sx={{ fontWeight: 700, pb: 1, pr: 6 }}>
+            Grant page-management access
+            <IconButtonLikeClose
+              disabled={sending}
+              onClose={() => setSelectedSite(null)}
+            />
+          </DialogTitle>
+          <Divider />
+          <DialogContent sx={{ pt: 2.5 }}>
+            <Alert
+              severity="info"
+              icon={<InfoOutlinedIcon fontSize="small" />}
+              sx={{ mb: 2.5, borderRadius: 1.5, alignItems: "flex-start" }}
+            >
+              <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                {selectedSite?.siteName}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                A generated password will be emailed to the address below.
+                Sending again replaces the previous password.
+              </Typography>
+            </Alert>
+
             {error && (
-              <Alert severity="error" sx={{ mb: 2 }}>
+              <Alert severity="error" sx={{ mb: 2, borderRadius: 1.5 }}>
                 {error}
               </Alert>
             )}
+
             <TextField
               autoFocus
               label="Client admin email"
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              inputProps={{ maxLength: 190 }}
+              slotProps={{ htmlInput: { maxLength: 190 } }}
               required
               fullWidth
+              size="small"
             />
           </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 2 }}>
-            <Button onClick={() => setSelectedSite(null)} disabled={sending}>
+          <DialogActions sx={{ px: 3, pb: 2.5, pt: 0 }}>
+            <Button
+              onClick={() => setSelectedSite(null)}
+              disabled={sending}
+              sx={{ textTransform: "none", fontWeight: 600 }}
+            >
               Cancel
             </Button>
-            <Button type="submit" variant="contained" disabled={sending}>
-              {sending ? "Sending..." : "Email login"}
+            <Button
+              type="submit"
+              variant="contained"
+              disableElevation
+              disabled={sending}
+              startIcon={
+                sending ? (
+                  <CircularProgress size={16} color="inherit" />
+                ) : (
+                  <VpnKeyOutlinedIcon fontSize="small" />
+                )
+              }
+              sx={{ textTransform: "none", fontWeight: 600, borderRadius: 1.5 }}
+            >
+              {sending ? "Sending…" : "Email login"}
             </Button>
           </DialogActions>
         </Box>
       </Dialog>
+    </Box>
+  );
+}
+
+/* Small close button for the dialog title (kept out of the icon-button
+   trap by using a plain styled Box, not an MUI Tooltip/IconButton combo). */
+function IconButtonLikeClose({ onClose, disabled }) {
+  return (
+    <Box
+      component="button"
+      type="button"
+      aria-label="Close dialog"
+      onClick={onClose}
+      disabled={disabled}
+      sx={{
+        position: "absolute",
+        right: 12,
+        top: 12,
+        border: 0,
+        background: "transparent",
+        cursor: disabled ? "not-allowed" : "pointer",
+        color: "text.secondary",
+        display: "grid",
+        placeItems: "center",
+        p: 0.5,
+        borderRadius: 1,
+        "&:hover": { bgcolor: "action.hover" },
+      }}
+    >
+      <CloseIcon fontSize="small" />
     </Box>
   );
 }

@@ -15,6 +15,7 @@ const themeRoute = require("./route/themeRoute");
 const faqRoute = require("./route/faqRoute");
 const acontactRoute = require("./route/acontactRoute");
 const statsRoute = require("./route/statsRoutes");
+const bugRoute = require("./route/bugRoute");
 
 const app = express();
 
@@ -36,6 +37,7 @@ app.use("/theme", themeRoute);
 app.use("/faq", faqRoute);
 app.use("/contact", acontactRoute);
 app.use("/stats", statsRoute);
+app.use("/bugreports", bugRoute);
 
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/uploads", ckeditorUploadRoute);

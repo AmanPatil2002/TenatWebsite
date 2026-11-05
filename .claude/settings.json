@@ -1,0 +1,14 @@
+﻿{
+    "maxEffortLevel": "medium",
+    "permissions": {"defaultMode": "acceptEdits"},
+    "env": {
+         "ANTHROPIC_BASE_URL": "http://localhost:20128", 
+         "ANTHROPIC_AUTH_TOKEN": "sk-4edbad2d0a4eeebf-01ff26-2b4e0e13", 
+         "ANTHROPIC_MODEL": "my-drakkon", 
+         "ANTHROPIC_DEFAULT_OPUS_MODEL": "my-drakkon", 
+         "ANTHROPIC_DEFAULT_SONNET_MODEL": "my-drakkon",
+         "ANTHROPIC_DEFAULT_HAIKU_MODEL": "my-drakkon",
+         "CLAUDE_CODE_MAX_CONTEXT_TOKENS": "131072",
+         "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
+         }
+}

@@ -22,6 +22,7 @@ import {
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import AddCommentOutlinedIcon from "@mui/icons-material/AddCommentOutlined";
 import axios from "axios";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -31,7 +32,7 @@ const MIN_ANSWER = 20;
 
 const getInitialForm = () => ({ question: "", answer: "" });
 
-// ---- Shared form (add + edit) -------------------------------------------
+/* ---------- Shared form (add + edit) ---------- */
 function FaqForm({
   initialValues,
   submitLabel,
@@ -74,7 +75,6 @@ function FaqForm({
       answer: formData.answer.trim(),
     };
 
-    // Clear the form after a successful create (edit form is remounted via key)
     Promise.resolve(onSubmit(payload)).then((ok) => {
       if (ok && !initialValues?.question) setFormData(getInitialForm());
     });
@@ -82,67 +82,80 @@ function FaqForm({
 
   return (
     <Box component="form" onSubmit={handleSubmit} noValidate>
-      <Grid container spacing={2}>
-        <Grid size={12}>
-          <TextField
-            fullWidth
-            size="small"
-            name="question"
-            label="Question"
-            value={formData.question}
-            onChange={handleChange}
-            error={!!errors.question}
-            helperText={errors.question || "e.g. How do I change my domain?"}
-          />
-        </Grid>
+      <Stack spacing={2.5}>
+        <TextField
+          fullWidth
+          size="small"
+          name="question"
+          label="Question"
+          placeholder="e.g. How do I change my domain?"
+          value={formData.question}
+          onChange={handleChange}
+          error={!!errors.question}
+          helperText={errors.question || `Minimum ${MIN_QUESTION} characters`}
+        />
 
-        <Grid size={12}>
-          <TextField
-            fullWidth
-            multiline
-            minRows={5}
-            maxRows={14}
-            size="small"
-            name="answer"
-            label="Answer"
-            value={formData.answer}
-            onChange={handleChange}
-            error={!!errors.answer}
-            helperText={errors.answer}
-          />
-        </Grid>
+        <TextField
+          fullWidth
+          multiline
+          minRows={5}
+          maxRows={14}
+          size="small"
+          name="answer"
+          label="Answer"
+          placeholder="Write a clear, helpful answer…"
+          value={formData.answer}
+          onChange={handleChange}
+          error={!!errors.answer}
+          helperText={errors.answer || `Minimum ${MIN_ANSWER} characters`}
+        />
 
-        <Grid size={12}>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+          <Button
+            type="submit"
+            variant="contained"
+            disableElevation
+            disabled={submitting}
+            startIcon={
+              submitting ? (
+                <CircularProgress size={16} color="inherit" />
+              ) : (
+                <AddCommentOutlinedIcon fontSize="small" />
+              )
+            }
+            sx={{
+              py: 1.1,
+              px: 3,
+              fontWeight: 600,
+              textTransform: "none",
+              borderRadius: 1.5,
+            }}
+          >
+            {submitting ? "Saving…" : submitLabel}
+          </Button>
+          {onCancel && (
             <Button
-              type="submit"
-              variant="contained"
-              fullWidth
+              variant="outlined"
               disabled={submitting}
-              sx={{ py: 1.25, fontSize: "0.95rem", fontWeight: "bold" }}
+              onClick={onCancel}
+              sx={{
+                py: 1.1,
+                px: 3,
+                fontWeight: 600,
+                textTransform: "none",
+                borderRadius: 1.5,
+              }}
             >
-              {submitting ? "Saving…" : submitLabel}
+              Cancel
             </Button>
-            {onCancel && (
-              <Button
-                variant="outlined"
-                fullWidth
-                disabled={submitting}
-                onClick={onCancel}
-                sx={{ py: 1.25, fontSize: "0.95rem" }}
-              >
-                Cancel
-              </Button>
-            )}
-          </Stack>
-        </Grid>
-      </Grid>
+          )}
+        </Stack>
+      </Stack>
     </Box>
   );
 }
 
-// ---- Main page ----------------------------------------------------------
-
+/* ---------- Main page ---------- */
 export default function AddFaq() {
   const [faqs, setFaqs] = useState([]);
   const [loadingList, setLoadingList] = useState(true);
@@ -184,7 +197,6 @@ export default function AddFaq() {
     fetchFaqs();
   }, [fetchFaqs]);
 
-  // Each handler returns true on success so the form can reset itself
   const handleCreate = async (values) => {
     if (!getToken()) {
       showSnack("Please log in first.", "error");
@@ -253,32 +265,53 @@ export default function AddFaq() {
   return (
     <Box
       sx={{
-        p: { xs: 1.5, sm: 2, md: 3 },
+        p: { xs: 2, sm: 3, md: 4 },
         minHeight: "100vh",
-        backgroundColor: "#f5f5f5",
+        backgroundColor: "#f4f6f8",
       }}
     >
+      {/* -------- Page header -------- */}
+      <Box sx={{ maxWidth: 1280, mx: "auto", mb: { xs: 2, md: 3 } }}>
+        <Typography
+          variant="h5"
+          sx={{ fontWeight: 700, fontSize: { xs: "1.25rem", sm: "1.5rem" } }}
+        >
+          FAQ Management
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+          Create, edit, and manage the frequently asked questions shown on your
+          website.
+        </Typography>
+      </Box>
+
       <Grid
         container
         spacing={{ xs: 2, md: 3 }}
-        sx={{ maxWidth: 1200, mx: "auto" }}
+        alignItems="flex-start"
+        sx={{ maxWidth: 1280, mx: "auto" }}
       >
         {/* -------- Form card -------- */}
         <Grid size={{ xs: 12, md: 5 }}>
-          <Paper elevation={1} sx={{ p: { xs: 2, sm: 3 } }}>
-            <Typography
-              variant="h5"
-              sx={{
-                fontWeight: "bold",
-                mb: 0.5,
-                fontSize: { xs: "1.2rem", sm: "1.5rem" },
-              }}
-            >
-              {editingFaq ? "Edit FAQ" : "Add FAQ"}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              FAQs appear in the questions section of your website.
-            </Typography>
+          <Paper
+            elevation={0}
+            sx={{
+              p: { xs: 2, sm: 3 },
+              borderRadius: 2,
+              border: "1px solid",
+              borderColor: "divider",
+            }}
+          >
+            <Stack spacing={0.5} sx={{ mb: 2.5 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                {editingFaq ? "Edit FAQ" : "Add New FAQ"}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {editingFaq
+                  ? "Update the question and answer, then save your changes."
+                  : "Fill in the question and answer below to publish a new FAQ."}
+              </Typography>
+            </Stack>
+            <Divider sx={{ mb: 3 }} />
 
             <FaqForm
               key={editingFaq ? editingFaq.faqId : "new"}
@@ -290,7 +323,7 @@ export default function AddFaq() {
                     }
                   : getInitialForm()
               }
-              submitLabel={editingFaq ? "Save changes" : "Add FAQ"}
+              submitLabel={editingFaq ? "Save Changes" : "Add FAQ"}
               onSubmit={editingFaq ? handleUpdate : handleCreate}
               onCancel={editingFaq ? () => setEditingId(null) : undefined}
               submitting={submitting}
@@ -300,49 +333,73 @@ export default function AddFaq() {
 
         {/* -------- Table card -------- */}
         <Grid size={{ xs: 12, md: 7 }}>
-          <Paper elevation={1} sx={{ p: { xs: 2, sm: 3 } }}>
-            <Typography variant="h6" sx={{ fontWeight: "bold", mb: 1 }}>
-              Existing FAQs
-            </Typography>
+          <Paper
+            elevation={0}
+            sx={{
+              p: { xs: 2, sm: 3 },
+              borderRadius: 2,
+              border: "1px solid",
+              borderColor: "divider",
+            }}
+          >
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="center"
+              sx={{ mb: 1 }}
+            >
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                Existing FAQs
+              </Typography>
+            </Stack>
             <Divider sx={{ mb: 2 }} />
 
             {loadingList ? (
-              <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
-                <CircularProgress size={24} />
+              <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+                <CircularProgress size={28} />
               </Box>
             ) : faqs.length === 0 ? (
-              <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
-                No FAQs yet. Add your first one using the form.
-              </Typography>
+              <Box
+                sx={{
+                  py: 6,
+                  textAlign: "center",
+                  border: "1px dashed",
+                  borderColor: "divider",
+                  borderRadius: 2,
+                }}
+              >
+                <Typography
+                  variant="subtitle1"
+                  sx={{ fontWeight: 600, mb: 0.5 }}
+                >
+                  No FAQs yet
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Add your first FAQ using the form.
+                </Typography>
+              </Box>
             ) : (
               <TableContainer
                 sx={{
                   width: "100%",
                   overflowX: "auto",
-                  overflowY: "hidden",
-                  WebkitOverflowScrolling: "touch",
-                  borderRadius: 1,
+                  borderRadius: 1.5,
+                  border: "1px solid",
+                  borderColor: "divider",
                 }}
               >
-                <Table
-                  size="small"
-                  sx={{
-                    minWidth: 630,
-                    tableLayout: "auto",
-                  }}
-                >
+                <Table size="small" sx={{ minWidth: 560 }}>
                   <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ minWidth: 450, fontWeight: "bold" }}>
-                        Question & Answer
+                    <TableRow sx={{ backgroundColor: "#fafafa" }}>
+                      <TableCell sx={{ fontWeight: 700, whiteSpace: "nowrap" }}>
+                        Question &amp; Answer
                       </TableCell>
-
                       <TableCell
                         align="right"
                         sx={{
-                          minWidth: 120,
+                          fontWeight: 700,
                           whiteSpace: "nowrap",
-                          fontWeight: "bold",
+                          width: 120,
                         }}
                       >
                         Actions
@@ -356,63 +413,69 @@ export default function AddFaq() {
                         key={f.faqId}
                         hover
                         selected={editingId === f.faqId}
+                        sx={{
+                          verticalAlign: "top",
+                          "& td": { verticalAlign: "top" },
+                        }}
                       >
-                        <TableCell
-                          sx={{
-                            minWidth: 450,
-                            maxWidth: 650,
-                            verticalAlign: "top",
-                            whiteSpace: "normal",
-                            overflowWrap: "anywhere",
-                          }}
-                        >
+                        <TableCell sx={{ py: 2 }}>
                           <Stack spacing={1}>
-                            <Typography variant="body1">
-                              <b>Question:</b> {f.question}
+                            <Typography
+                              variant="body2"
+                              sx={{ fontWeight: 600, color: "text.primary" }}
+                            >
+                              {f.question}
                             </Typography>
-
-                            <Typography variant="body1">
-                              <b>Answer:</b> {f.answer}
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                              sx={{ whiteSpace: "pre-line", lineHeight: 1.6 }}
+                            >
+                              {f.answer}
                             </Typography>
                           </Stack>
                         </TableCell>
 
-                        <TableCell
-                          align="right"
-                          sx={{
-                            minWidth: 120,
-                            whiteSpace: "nowrap",
-                            verticalAlign: "top",
-                          }}
-                        >
-                          <Tooltip title="Edit">
-                            <span>
-                              <IconButton
-                                size="small"
-                                onClick={() => setEditingId(f.faqId)}
-                                disabled={submitting || deletingId === f.faqId}
-                              >
-                                <EditIcon fontSize="small" />
-                              </IconButton>
-                            </span>
-                          </Tooltip>
+                        <TableCell align="right" sx={{ py: 2 }}>
+                          <Stack
+                            direction="row"
+                            spacing={0.5}
+                            justifyContent="flex-end"
+                            alignItems="center"
+                          >
+                            <Tooltip title="Edit">
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => setEditingId(f.faqId)}
+                                  disabled={
+                                    submitting || deletingId === f.faqId
+                                  }
+                                >
+                                  <EditIcon fontSize="small" />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
 
-                          <Tooltip title="Delete">
-                            <span>
-                              <IconButton
-                                size="small"
-                                color="error"
-                                onClick={() => handleDelete(f)}
-                                disabled={submitting || deletingId === f.faqId}
-                              >
-                                {deletingId === f.faqId ? (
-                                  <CircularProgress size={16} />
-                                ) : (
-                                  <DeleteIcon fontSize="small" />
-                                )}
-                              </IconButton>
-                            </span>
-                          </Tooltip>
+                            <Tooltip title="Delete">
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  onClick={() => handleDelete(f)}
+                                  disabled={
+                                    submitting || deletingId === f.faqId
+                                  }
+                                >
+                                  {deletingId === f.faqId ? (
+                                    <CircularProgress size={16} />
+                                  ) : (
+                                    <DeleteIcon fontSize="small" />
+                                  )}
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          </Stack>
                         </TableCell>
                       </TableRow>
                     ))}

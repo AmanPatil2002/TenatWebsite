@@ -16,25 +16,33 @@ import { alpha } from "@mui/material/styles";
 import PhoneIcon from "@mui/icons-material/PhoneOutlined";
 import EmailIcon from "@mui/icons-material/EmailOutlined";
 import LocationOnIcon from "@mui/icons-material/LocationOnOutlined";
+import SupportAgentOutlinedIcon from "@mui/icons-material/SupportAgentOutlined";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const CONTACT_URL = `${API_URL}/contact/acontact`;
+
+const BRAND = {
+  indigo: "#4f46e5",
+  indigoDeep: "#3730a3",
+  ink: "#0f172a",
+  muted: "#64748b",
+};
 
 // One labelled row: soft tinted icon tile + label + value (optionally a link)
 const InfoRow = ({ icon, label, value, href, external }) => (
   <Stack direction="row" spacing={2} alignItems="flex-start">
     <Box
-      sx={(theme) => ({
+      sx={{
         width: 44,
         height: 44,
         flexShrink: 0,
         display: "grid",
         placeItems: "center",
         borderRadius: 2,
-        color: "primary.main",
-        bgcolor: alpha(theme.palette.primary.main, 0.08),
-        "& .MuiSvgIcon-root": { fontSize: "1.35rem" },
-      })}
+        color: BRAND.indigo,
+        bgcolor: alpha(BRAND.indigo, 0.08),
+        "& .MuiSvgIcon-root": { fontSize: "1.3rem" },
+      }}
     >
       {icon}
     </Box>
@@ -44,7 +52,7 @@ const InfoRow = ({ icon, label, value, href, external }) => (
       <Typography
         variant="overline"
         color="text.secondary"
-        sx={{ display: "block", lineHeight: 1.6, letterSpacing: 1, fontWeight: 600 }}
+        sx={{ display: "block", lineHeight: 1.6, letterSpacing: 1, fontWeight: 600, fontSize: "0.7rem" }}
       >
         {label}
       </Typography>
@@ -56,12 +64,18 @@ const InfoRow = ({ icon, label, value, href, external }) => (
           underline="hover"
           color="text.primary"
           variant="body1"
-          sx={{ fontWeight: 500, wordBreak: "break-word", "&:hover": { color: "primary.main" } }}
+          sx={{
+            fontWeight: 500,
+            wordBreak: "break-word",
+            fontSize: "0.95rem",
+            transition: "color 0.2s ease",
+            "&:hover": { color: BRAND.indigo },
+          }}
         >
           {value}
         </Link>
       ) : (
-        <Typography variant="body1" sx={{ fontWeight: 500, wordBreak: "break-word" }}>
+        <Typography variant="body1" sx={{ fontWeight: 500, wordBreak: "break-word", fontSize: "0.95rem" }}>
           {value}
         </Typography>
       )}
@@ -116,31 +130,34 @@ const ContactCard = ({ contact, index, showIndex }) => {
   return (
     <Card
       component="article"
-      variant="outlined"
+      elevation={0}
       sx={{
         height: "100%",
         borderRadius: 3,
         bgcolor: "background.paper",
-        transition: "border-color 0.2s ease, box-shadow 0.2s ease",
+        border: "1px solid",
+        borderColor: "divider",
+        transition: "border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease",
         "&:hover": {
-          borderColor: "primary.main",
-          boxShadow: "0 8px 24px rgba(16, 24, 40, 0.08)",
+          borderColor: alpha(BRAND.indigo, 0.4),
+          boxShadow: `0 16px 40px ${alpha(BRAND.indigo, 0.08)}`,
+          transform: "translateY(-2px)",
         },
       }}
     >
       <CardContent sx={{ p: { xs: 2.5, sm: 3.5 } }}>
         {showIndex && (
           <Typography
-            variant="subtitle2"
+            variant="overline"
             component="h2"
-            color="text.secondary"
-            sx={{ mb: 2, fontWeight: 600, letterSpacing: 0.3 }}
+            color="primary"
+            sx={{ display: "block", mb: 2, fontWeight: 700, letterSpacing: 1.2, fontSize: "0.7rem" }}
           >
             Contact {String(index + 1).padStart(2, "0")}
           </Typography>
         )}
 
-        <Stack spacing={2.5} divider={<Divider flexItem />}>
+        <Stack spacing={2.5} divider={<Divider flexItem sx={{ borderColor: "divider" }} />}>
           {rows}
         </Stack>
       </CardContent>
@@ -149,15 +166,15 @@ const ContactCard = ({ contact, index, showIndex }) => {
 };
 
 const CardSkeleton = () => (
-  <Card variant="outlined" sx={{ borderRadius: 3 }}>
+  <Card elevation={0} sx={{ borderRadius: 3, border: "1px solid", borderColor: "divider" }}>
     <CardContent sx={{ p: { xs: 2.5, sm: 3.5 } }}>
       <Stack spacing={3}>
         {[0, 1, 2].map((i) => (
           <Stack key={i} direction="row" spacing={2}>
-            <Skeleton variant="rounded" width={44} height={44} />
+            <Skeleton variant="rounded" width={44} height={44} sx={{ borderRadius: 2 }} />
             <Box sx={{ flex: 1 }}>
-              <Skeleton width="30%" />
-              <Skeleton width="75%" />
+              <Skeleton width="30%" height={12} />
+              <Skeleton width="75%" height={18} />
             </Box>
           </Stack>
         ))}
@@ -200,14 +217,34 @@ export default function Contact() {
   const single = contacts.length === 1;
 
   return (
-    <Box sx={{ bgcolor: "grey.50", minHeight: "100vh" }}>
+    <Box
+      sx={{
+        minHeight: "100vh",
+        background: "linear-gradient(160deg, #f8fafc 0%, #eef2ff 45%, #f0fdfa 100%)",
+      }}
+    >
       <Container maxWidth="md" sx={{ py: { xs: 6, sm: 8, md: 12 }, px: { xs: 2, sm: 3 } }}>
         {/* ---- Header ---- */}
-        <Box sx={{ textAlign: "center", mb: { xs: 5, md: 8 } }}>
+        <Box sx={{ textAlign: "center", mb: { xs: 5, md: 7 } }}>
+          <Box
+            sx={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 56,
+              height: 56,
+              borderRadius: 2.5,
+              bgcolor: alpha(BRAND.indigo, 0.1),
+              color: BRAND.indigo,
+              mb: 2.5,
+            }}
+          >
+            <SupportAgentOutlinedIcon fontSize="medium" />
+          </Box>
+
           <Typography
             variant="overline"
-            color="primary"
-            sx={{ fontWeight: 700, letterSpacing: 2 }}
+            sx={{ display: "block", fontWeight: 700, letterSpacing: "0.12em", color: BRAND.indigo }}
           >
             Contact Us
           </Typography>
@@ -215,24 +252,27 @@ export default function Contact() {
             variant="h3"
             component="h1"
             sx={{
-              fontWeight: 700,
+              fontWeight: 800,
               mt: 0.5,
               mb: 2,
               letterSpacing: "-0.02em",
-              fontSize: { xs: "2rem", sm: "2.5rem", md: "3rem" },
+              color: BRAND.ink,
+              fontSize: { xs: "1.9rem", sm: "2.4rem", md: "2.9rem" },
             }}
           >
             Get in touch
           </Typography>
-          <Box
-            sx={{ width: 48, height: 3, borderRadius: 2, bgcolor: "primary.main", mx: "auto", mb: 2.5 }}
-          />
           <Typography
             variant="body1"
             color="text.secondary"
-            sx={{ maxWidth: 560, mx: "auto", fontSize: { xs: "0.95rem", sm: "1.05rem" }, lineHeight: 1.7 }}
+            sx={{
+              maxWidth: 520,
+              mx: "auto",
+              fontSize: { xs: "0.95rem", sm: "1.05rem" },
+              lineHeight: 1.7,
+            }}
           >
-            We’d be glad to hear from you. Reach our team using the details below.
+            We'd be glad to hear from you. Reach our team using the details below.
           </Typography>
         </Box>
 
@@ -240,9 +280,9 @@ export default function Contact() {
         {error && (
           <Alert
             severity="error"
-            sx={{ maxWidth: 560, mx: "auto" }}
+            sx={{ maxWidth: 560, mx: "auto", borderRadius: 2 }}
             action={
-              <Button color="inherit" size="small" onClick={retry}>
+              <Button color="inherit" size="small" onClick={retry} sx={{ fontWeight: 600 }}>
                 Try again
               </Button>
             }
@@ -266,8 +306,20 @@ export default function Contact() {
         )}
 
         {!loading && !error && contacts.length === 0 && (
-          <Box sx={{ textAlign: "center", py: { xs: 4, md: 6 } }}>
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
+          <Box
+            sx={{
+              textAlign: "center",
+              py: { xs: 5, md: 7 },
+              px: 3,
+              maxWidth: 480,
+              mx: "auto",
+              bgcolor: "background.paper",
+              borderRadius: 3,
+              border: "1px dashed",
+              borderColor: "divider",
+            }}
+          >
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 1, fontWeight: 600 }}>
               Contact information is not available at the moment.
             </Typography>
             <Typography variant="body2" color="text.secondary">

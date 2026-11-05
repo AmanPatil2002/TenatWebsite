@@ -23,18 +23,19 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Chip,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import SaveIcon from "@mui/icons-material/Save";
+import ContactPhoneOutlinedIcon from "@mui/icons-material/ContactPhoneOutlined";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import axios from "axios";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-// Base endpoint. Item routes are `${CONTACT_URL}/:id`
 const CONTACT_URL = `${API_URL}/contact/acontact`;
 
-// Keep these in sync with backend validation and the acontact table
 const MAX_EMAIL = 190;
 const MAX_ADDRESS = 100;
 
@@ -43,7 +44,7 @@ const authHeaders = () => ({ headers: { Authorization: `Bearer ${getToken()}` } 
 
 const getInitialForm = () => ({ phone: "", email: "", address: "" });
 
-// ---- Shared form component -------------------------------------------
+/* ---------- Shared form ---------- */
 const ContactForm = ({ initialValues, submitLabel, onSubmit, onCancel, submitting, isEdit }) => {
   const [formData, setFormData] = useState(initialValues || getInitialForm());
   const [errors, setErrors] = useState({});
@@ -70,7 +71,6 @@ const ContactForm = ({ initialValues, submitLabel, onSubmit, onCancel, submittin
 
   const handleChange = (e) => {
     const { name } = e.target;
-    // Phone accepts digits only
     const value = name === "phone" ? e.target.value.replace(/\D/g, "") : e.target.value;
     setFormData((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => ({ ...prev, [name]: undefined }));
@@ -87,123 +87,142 @@ const ContactForm = ({ initialValues, submitLabel, onSubmit, onCancel, submittin
     };
 
     const ok = await onSubmit(payload);
-    // Clear the form only after a successful "create"
     if (ok && !isEdit) setFormData(getInitialForm());
   };
 
   return (
     <Box component="form" onSubmit={handleSubmit} noValidate>
-      <Grid container spacing={2}>
-        <Grid size={12}>
-          <TextField
-            fullWidth
-            size="small"
-            name="phone"
-            label="Phone"
-            value={formData.phone}
-            onChange={handleChange}
-            error={!!errors.phone}
-            helperText={errors.phone || "e.g. 1234567890"}
-            placeholder="10 digits only"
-            slotProps={{ htmlInput: { maxLength: 10, inputMode: "numeric" } }}
-          />
-        </Grid>
+      <Stack spacing={2.5}>
+        <TextField
+          fullWidth
+          size="small"
+          name="phone"
+          label="Phone"
+          value={formData.phone}
+          onChange={handleChange}
+          error={!!errors.phone}
+          helperText={errors.phone || "10 digits, numbers only"}
+          placeholder="1234567890"
+          slotProps={{ htmlInput: { maxLength: 10, inputMode: "numeric" } }}
+        />
 
-        <Grid size={12}>
-          <TextField
-            fullWidth
-            size="small"
-            name="email"
-            label="Email"
-            type="email"
-            value={formData.email}
-            onChange={handleChange}
-            error={!!errors.email}
-            helperText={errors.email}
-            slotProps={{ htmlInput: { maxLength: MAX_EMAIL } }}
-          />
-        </Grid>
+        <TextField
+          fullWidth
+          size="small"
+          name="email"
+          label="Email"
+          type="email"
+          value={formData.email}
+          onChange={handleChange}
+          error={!!errors.email}
+          helperText={errors.email || `Up to ${MAX_EMAIL} characters`}
+          placeholder="admin@example.com"
+          slotProps={{ htmlInput: { maxLength: MAX_EMAIL } }}
+        />
 
-        <Grid size={12}>
-          <TextField
-            fullWidth
-            size="small"
-            name="address"
-            label="Address"
-            multiline
-            minRows={3}
-            maxRows={6}
-            value={formData.address}
-            onChange={handleChange}
-            error={!!errors.address}
-            helperText={errors.address || `${formData.address.length}/${MAX_ADDRESS}`}
-            slotProps={{ htmlInput: { maxLength: MAX_ADDRESS } }}
-          />
-        </Grid>
+        <TextField
+          fullWidth
+          size="small"
+          name="address"
+          label="Address"
+          multiline
+          minRows={3}
+          maxRows={6}
+          value={formData.address}
+          onChange={handleChange}
+          error={!!errors.address}
+          helperText={errors.address || `${formData.address.length}/${MAX_ADDRESS}`}
+          placeholder="Office address"
+          slotProps={{ htmlInput: { maxLength: MAX_ADDRESS } }}
+        />
 
-        <Grid size={12}>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+          <Button
+            type="submit"
+            variant="contained"
+            disableElevation
+            disabled={submitting}
+            startIcon={
+              submitting ? (
+                <CircularProgress size={16} color="inherit" />
+              ) : isEdit ? (
+                <SaveIcon fontSize="small" />
+              ) : (
+                <AddIcon fontSize="small" />
+              )
+            }
+            sx={{
+              py: 1.1,
+              px: 3,
+              fontWeight: 600,
+              textTransform: "none",
+              borderRadius: 1.5,
+            }}
+          >
+            {submitting ? "Saving…" : submitLabel}
+          </Button>
+          {onCancel && (
             <Button
-              type="submit"
-              variant="contained"
-              fullWidth
+              variant="outlined"
               disabled={submitting}
-              startIcon={submitting ? null : isEdit ? <SaveIcon /> : <AddIcon />}
-              sx={{ py: 1.25, fontSize: "0.95rem", fontWeight: "bold" }}
+              onClick={onCancel}
+              sx={{
+                py: 1.1,
+                px: 3,
+                fontWeight: 600,
+                textTransform: "none",
+                borderRadius: 1.5,
+              }}
             >
-              {submitting ? "Saving…" : submitLabel}
+              Cancel
             </Button>
-            {onCancel && (
-              <Button
-                variant="outlined"
-                fullWidth
-                disabled={submitting}
-                onClick={onCancel}
-                sx={{ py: 1.25, fontSize: "0.95rem" }}
-              >
-                Cancel
-              </Button>
-            )}
-          </Stack>
-        </Grid>
-      </Grid>
+          )}
+        </Stack>
+      </Stack>
     </Box>
   );
 };
 
-// ---- Confirmation dialog ---------------------------------------------
-const ConfirmDialog = ({ open, title, message, details, onConfirm, onCancel, confirming }) => {
-  return (
-    <Dialog open={open} onClose={confirming ? undefined : onCancel} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ pb: 1 }}>{title}</DialogTitle>
-      <DialogContent>
-        <Typography variant="body1">{message}</Typography>
-        {details && (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5, wordBreak: "break-word" }}>
-            {details}
-          </Typography>
-        )}
-      </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onCancel} disabled={confirming} color="inherit">
-          Cancel
-        </Button>
-        <Button
-          onClick={onConfirm}
-          color="error"
-          variant="contained"
-          disabled={confirming}
-          sx={{ minWidth: 100 }}
+/* ---------- Confirmation dialog ---------- */
+const ConfirmDialog = ({ open, title, message, details, onConfirm, onCancel, confirming }) => (
+  <Dialog open={open} onClose={confirming ? undefined : onCancel} maxWidth="sm" fullWidth>
+    <DialogTitle sx={{ pb: 1, fontWeight: 700 }}>{title}</DialogTitle>
+    <DialogContent>
+      <Typography variant="body1">{message}</Typography>
+      {details && (
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ mt: 1.5, wordBreak: "break-word" }}
         >
-          {confirming ? "Deleting..." : "Delete"}
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-};
+          {details}
+        </Typography>
+      )}
+    </DialogContent>
+    <DialogActions sx={{ px: 3, pb: 2 }}>
+      <Button
+        onClick={onCancel}
+        disabled={confirming}
+        color="inherit"
+        sx={{ textTransform: "none", fontWeight: 600 }}
+      >
+        Cancel
+      </Button>
+      <Button
+        onClick={onConfirm}
+        color="error"
+        variant="contained"
+        disableElevation
+        disabled={confirming}
+        sx={{ minWidth: 110, textTransform: "none", fontWeight: 600 }}
+      >
+        {confirming ? "Deleting…" : "Delete"}
+      </Button>
+    </DialogActions>
+  </Dialog>
+);
 
-// ---- Main page ----------------------------------------------------------
-
+/* ---------- Main page ---------- */
 export default function AddContact() {
   const [contacts, setContacts] = useState([]);
   const [loadingList, setLoadingList] = useState(true);
@@ -216,7 +235,6 @@ export default function AddContact() {
   const showSnack = (message, severity = "success") =>
     setSnack({ open: true, message, severity });
 
-  // showSpinner is true only for the first load; later refreshes happen silently
   const fetchContacts = useCallback(async (showSpinner = true) => {
     if (!getToken()) {
       showSnack("Please log in first.", "error");
@@ -238,10 +256,13 @@ export default function AddContact() {
     fetchContacts();
   }, [fetchContacts]);
 
-  // Each handler returns true on success so the form can reset itself
   const handleCreate = async (values) => {
     if (!getToken()) {
       showSnack("Please log in first.", "error");
+      return false;
+    }
+    if (contacts.length >= 1) {
+      showSnack("A contact already exists. Only one contact can be added.", "warning");
       return false;
     }
     try {
@@ -280,13 +301,10 @@ export default function AddContact() {
 
   const handleEdit = (contactId) => {
     setEditingId(contactId);
-    // The form is above the table on small screens, so bring it into view
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleDeleteClick = (contact) => {
-    setDeleteDialog({ open: true, contact });
-  };
+  const handleDeleteClick = (contact) => setDeleteDialog({ open: true, contact });
 
   const handleDeleteConfirm = async () => {
     const contact = deleteDialog.contact;
@@ -296,7 +314,6 @@ export default function AddContact() {
       setDeleteDialog({ open: false, contact: null });
       return;
     }
-
     try {
       setDeletingId(contact.contactId);
       await axios.delete(`${CONTACT_URL}/${contact.contactId}`, authHeaders());
@@ -311,9 +328,7 @@ export default function AddContact() {
     }
   };
 
-  const handleDeleteCancel = () => {
-    setDeleteDialog({ open: false, contact: null });
-  };
+  const handleDeleteCancel = () => setDeleteDialog({ open: false, contact: null });
 
   const handleSnackClose = (_, reason) => {
     if (reason === "clickaway") return;
@@ -323,96 +338,159 @@ export default function AddContact() {
   const editingContact =
     editingId != null ? contacts.find((c) => c.contactId === editingId) : null;
 
-  const headCellSx = { fontWeight: "bold", bgcolor: "grey.100" };
-
+  const hasContact = contacts.length >= 1;
+  const showForm = !hasContact || !!editingContact;
   const deleteDetails = deleteDialog.contact
     ? `${deleteDialog.contact.contact} · ${deleteDialog.contact.email}`
     : "";
 
-  return (
-    <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, minHeight: "100vh", bgcolor: "grey.100" }}>
-      <Grid container spacing={{ xs: 2, md: 3 }} sx={{ maxWidth: 1200, mx: "auto" }}>
-        {/* -------- Form card -------- */}
-        <Grid size={{ xs: 12, md: 5 }}>
-          <Paper elevation={1} sx={{ p: { xs: 2, sm: 3 } }}>
-            <Typography
-              variant="h5"
-              sx={{ fontWeight: "bold", mb: 0.5, fontSize: { xs: "1.2rem", sm: "1.5rem" } }}
-            >
-              {editingContact ? "Edit Contact" : "Add Contact"}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Admin contact information appears on the Contact page.
-            </Typography>
+  const headCellSx = { fontWeight: 700, bgcolor: "grey.50", whiteSpace: "nowrap" };
 
-            <ContactForm
-              key={editingContact ? editingContact.contactId : "new"}
-              isEdit={!!editingContact}
-              initialValues={
-                editingContact
-                  ? {
-                      phone: editingContact.contact || "",
-                      email: editingContact.email || "",
-                      address: editingContact.address || "",
-                    }
-                  : getInitialForm()
-              }
-              submitLabel={editingContact ? "Save changes" : "Add Contact"}
-              onSubmit={editingContact ? handleUpdate : handleCreate}
-              onCancel={editingContact ? () => setEditingId(null) : undefined}
-              submitting={submitting}
-            />
+  return (
+    <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, minHeight: "100vh", bgcolor: "#f4f6f8" }}>
+      {/* Page header */}
+      <Box sx={{ maxWidth: 1280, mx: "auto", mb: { xs: 2, md: 3 } }}>
+        <Stack direction="row" alignItems="center" spacing={1.5}>
+          <Box
+            sx={{
+              display: "grid",
+              placeItems: "center",
+              width: 40,
+              height: 40,
+              borderRadius: 2,
+              bgcolor: "primary.main",
+              color: "primary.contrastText",
+            }}
+          >
+            <ContactPhoneOutlinedIcon fontSize="small" />
+          </Box>
+          <Box>
+            <Typography variant="h5" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+              Contact Management
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Manage the single admin contact displayed on your website.
+            </Typography>
+          </Box>
+        </Stack>
+      </Box>
+
+      <Grid
+        container
+        spacing={{ xs: 2, md: 3 }}
+        alignItems="flex-start"
+        sx={{ maxWidth: 1280, mx: "auto" }}
+      >
+        {/* Form card */}
+        <Grid size={{ xs: 12, md: 5 }}>
+          <Paper
+            elevation={0}
+            sx={{ p: { xs: 2, sm: 3 }, borderRadius: 2, border: "1px solid", borderColor: "divider" }}
+          >
+            <Stack spacing={0.5} sx={{ mb: 2.5 }}>
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  {editingContact ? "Edit Contact" : "Add Contact"}
+                </Typography>
+                {!editingContact && hasContact && (
+                  <Chip size="small" label="Limit reached" color="warning" variant="outlined" />
+                )}
+              </Stack>
+              <Typography variant="body2" color="text.secondary">
+                {editingContact
+                  ? "Update the contact details and save your changes."
+                  : "Only one admin contact can exist at a time."}
+              </Typography>
+            </Stack>
+            <Divider sx={{ mb: 3 }} />
+
+            {showForm ? (
+              <ContactForm
+                key={editingContact ? editingContact.contactId : "new"}
+                isEdit={!!editingContact}
+                initialValues={
+                  editingContact
+                    ? {
+                        phone: editingContact.contact || "",
+                        email: editingContact.email || "",
+                        address: editingContact.address || "",
+                      }
+                    : getInitialForm()
+                }
+                submitLabel={editingContact ? "Save Changes" : "Add Contact"}
+                onSubmit={editingContact ? handleUpdate : handleCreate}
+                onCancel={editingContact ? () => setEditingId(null) : undefined}
+                submitting={submitting}
+              />
+            ) : (
+              <Alert
+                severity="info"
+                icon={<InfoOutlinedIcon fontSize="small" />}
+                sx={{ borderRadius: 1.5, alignItems: "flex-start" }}
+              >
+                <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                  Contact already added
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Only one contact is allowed. Edit the existing contact in the table,
+                  or delete it to add a new one.
+                </Typography>
+              </Alert>
+            )}
           </Paper>
         </Grid>
 
-        {/* -------- Table card -------- */}
+        {/* Table card */}
         <Grid size={{ xs: 12, md: 7 }}>
-          <Paper elevation={1} sx={{ p: { xs: 2, sm: 3 } }}>
-            <Typography
-              variant="h6"
-              component="div"
-              sx={{ fontWeight: "bold", mb: 1, display: "flex", alignItems: "center", gap: 1 }}
-            >
-              Admin Contacts
-              <Box
-                component="span"
-                sx={{
-                  bgcolor: "primary.main",
-                  color: "white",
-                  px: 1.5,
-                  py: 0.5,
-                  borderRadius: "12px",
-                  fontSize: "0.75rem",
-                  fontWeight: "bold",
-                }}
-              >
-                {contacts.length}
-              </Box>
-            </Typography>
+          <Paper
+            elevation={0}
+            sx={{ p: { xs: 2, sm: 3 }, borderRadius: 2, border: "1px solid", borderColor: "divider" }}
+          >
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                Admin Contact
+              </Typography>
+            </Stack>
             <Divider sx={{ mb: 2 }} />
 
             {loadingList ? (
-              <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
-                <CircularProgress size={24} />
+              <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+                <CircularProgress size={28} />
               </Box>
             ) : contacts.length === 0 ? (
-              <Box sx={{ textAlign: "center", py: 4 }}>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  No contacts yet. Add your first contact using the form.
+              <Box
+                sx={{
+                  py: 6,
+                  textAlign: "center",
+                  border: "1px dashed",
+                  borderColor: "divider",
+                  borderRadius: 2,
+                }}
+              >
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
+                  No contact added yet
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  All admin contacts will appear here for management.
+                <Typography variant="body2" color="text.secondary">
+                  Use the form to add the admin contact.
                 </Typography>
               </Box>
             ) : (
-              <TableContainer sx={{ maxHeight: 400, overflow: "auto" }}>
-                <Table size="small" stickyHeader>
+              <TableContainer
+                sx={{
+                  width: "100%",
+                  overflowX: "auto",
+                  borderRadius: 1.5,
+                  border: "1px solid",
+                  borderColor: "divider",
+                }}
+              >
+                <Table size="small" sx={{ minWidth: 560 }}>
                   <TableHead>
                     <TableRow>
                       <TableCell sx={headCellSx}>Phone</TableCell>
                       <TableCell sx={headCellSx}>Email</TableCell>
                       <TableCell sx={headCellSx}>Address</TableCell>
-                      <TableCell align="right" sx={headCellSx}>
+                      <TableCell align="right" sx={{ ...headCellSx, width: 110 }}>
                         Actions
                       </TableCell>
                     </TableRow>
@@ -421,25 +499,20 @@ export default function AddContact() {
                     {contacts.map((c) => {
                       const isEditing = editingId === c.contactId;
                       const busy = submitting || deletingId === c.contactId;
-                      // Editing happens in the form on the left; the row is only highlighted.
-                      const cellSx = {
-                        verticalAlign: "top",
-                        fontWeight: isEditing ? "bold" : "normal",
-                        color: isEditing ? "primary.main" : "inherit",
-                      };
-
                       return (
                         <TableRow
                           key={c.contactId}
                           hover
                           selected={isEditing}
-                          sx={{ "&.Mui-selected": { bgcolor: "action.selected" } }}
+                          sx={{ "& td": { verticalAlign: "top" } }}
                         >
-                          <TableCell sx={{ ...cellSx, maxWidth: 140 }}>{c.contact}</TableCell>
-                          <TableCell sx={{ ...cellSx, maxWidth: 200, wordBreak: "break-word" }}>
+                          <TableCell sx={{ fontWeight: isEditing ? 600 : 400 }}>
+                            {c.contact}
+                          </TableCell>
+                          <TableCell sx={{ maxWidth: 220, wordBreak: "break-word" }}>
                             {c.email}
                           </TableCell>
-                          <TableCell sx={{ ...cellSx, maxWidth: 250 }}>
+                          <TableCell sx={{ maxWidth: 260 }}>
                             <Typography
                               variant="body2"
                               sx={{
@@ -447,44 +520,45 @@ export default function AddContact() {
                                 WebkitLineClamp: 3,
                                 WebkitBoxOrient: "vertical",
                                 overflow: "hidden",
-                                fontWeight: "inherit",
-                                color: "inherit",
+                                lineHeight: 1.6,
                               }}
                             >
                               {c.address}
                             </Typography>
                           </TableCell>
-                          <TableCell align="right" sx={{ whiteSpace: "nowrap", verticalAlign: "top" }}>
-                            <Tooltip title="Edit">
-                              <span>
-                                <IconButton
-                                  size="small"
-                                  aria-label="Edit contact"
-                                  onClick={() => handleEdit(c.contactId)}
-                                  disabled={busy}
-                                  sx={{ color: isEditing ? "primary.main" : "inherit" }}
-                                >
-                                  <EditIcon fontSize="small" />
-                                </IconButton>
-                              </span>
-                            </Tooltip>
-                            <Tooltip title="Delete">
-                              <span>
-                                <IconButton
-                                  size="small"
-                                  color="error"
-                                  aria-label="Delete contact"
-                                  onClick={() => handleDeleteClick(c)}
-                                  disabled={busy}
-                                >
-                                  {deletingId === c.contactId ? (
-                                    <CircularProgress size={16} />
-                                  ) : (
-                                    <DeleteIcon fontSize="small" />
-                                  )}
-                                </IconButton>
-                              </span>
-                            </Tooltip>
+                          <TableCell align="right">
+                            <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                              <Tooltip title="Edit">
+                                <span>
+                                  <IconButton
+                                    size="small"
+                                    aria-label="Edit contact"
+                                    onClick={() => handleEdit(c.contactId)}
+                                    disabled={busy}
+                                    sx={{ color: isEditing ? "primary.main" : "inherit" }}
+                                  >
+                                    <EditIcon fontSize="small" />
+                                  </IconButton>
+                                </span>
+                              </Tooltip>
+                              <Tooltip title="Delete">
+                                <span>
+                                  <IconButton
+                                    size="small"
+                                    color="error"
+                                    aria-label="Delete contact"
+                                    onClick={() => handleDeleteClick(c)}
+                                    disabled={busy}
+                                  >
+                                    {deletingId === c.contactId ? (
+                                      <CircularProgress size={16} />
+                                    ) : (
+                                      <DeleteIcon fontSize="small" />
+                                    )}
+                                  </IconButton>
+                                </span>
+                              </Tooltip>
+                            </Stack>
                           </TableCell>
                         </TableRow>
                       );
@@ -515,7 +589,7 @@ export default function AddContact() {
 
       <ConfirmDialog
         open={deleteDialog.open}
-        title="Confirm Delete"
+        title="Delete contact?"
         message="Are you sure you want to delete this contact? This action cannot be undone."
         details={deleteDetails}
         onConfirm={handleDeleteConfirm}

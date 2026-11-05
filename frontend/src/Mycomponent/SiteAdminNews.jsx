@@ -14,11 +14,69 @@ import {
   Stack,
   TextField,
   Typography,
+  alpha,
+  useTheme,
 } from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
-import DeleteIcon from "@mui/icons-material/Delete";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
+
+/* ------------------------------------------------------------------ */
+/*  Inline SVG icons — no MUI icon imports, no tree-shaking issues     */
+/* ------------------------------------------------------------------ */
+const SvgIcon = ({ children, size = 20, color = "currentColor" }) => (
+  <Box
+    component="svg"
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    sx={{ width: size, height: size, display: "block", color, flexShrink: 0 }}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.8}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    {children}
+  </Box>
+);
+
+const AddIcon = (p) => (
+  <SvgIcon {...p}>
+    <path d="M12 5v14M5 12h14" />
+  </SvgIcon>
+);
+const DeleteIcon = (p) => (
+  <SvgIcon {...p}>
+    <path d="M3 6h18" />
+    <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+    <path d="M10 11v6M14 11v6" />
+  </SvgIcon>
+);
+const EditIcon = (p) => (
+  <SvgIcon {...p}>
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+  </SvgIcon>
+);
+const UploadIcon = (p) => (
+  <SvgIcon {...p}>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <path d="M17 8l-5-5-5 5" />
+    <path d="M12 3v12" />
+  </SvgIcon>
+);
+const NewsIcon = (p) => (
+  <SvgIcon {...p}>
+    <path d="M4 5h13a2 2 0 0 1 2 2v11a2 2 0 0 0 2-2V8" />
+    <path d="M4 5v12a2 2 0 0 0 2 2h13" />
+    <path d="M8 9h7M8 13h7M8 17h4" />
+  </SvgIcon>
+);
+const ImageIcon = (p) => (
+  <SvgIcon {...p}>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <circle cx="8.5" cy="9" r="1.5" />
+    <path d="m4 18 5-5 4 4 3-3 4 4" />
+  </SvgIcon>
+);
 
 const EMPTY_FORM = {
   title: "",
@@ -32,10 +90,13 @@ const formatDateInput = (value) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   const pad = (part) => String(part).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+    date.getDate(),
+  )}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
 export default function SiteAdminNews() {
+  const theme = useTheme();
   const { baseUrl, authConfig } = useOutletContext();
   const newsUrl = `${baseUrl}/news`;
   const uploadUrl = `${baseUrl}/media/upload`;
@@ -78,7 +139,9 @@ export default function SiteAdminNews() {
         }
       } catch (requestError) {
         if (!cancelled) {
-          setError(requestError.response?.data?.message || "Could not load news.");
+          setError(
+            requestError.response?.data?.message || "Could not load news.",
+          );
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -156,7 +219,6 @@ export default function SiteAdminNews() {
     event.preventDefault();
     setError("");
     setNotice("");
-
     setSaving(true);
 
     const payload = {
@@ -177,7 +239,8 @@ export default function SiteAdminNews() {
       setNotice(editingId ? "News article updated." : "News article added.");
     } catch (requestError) {
       setError(
-        requestError.response?.data?.message || "Could not save this news article.",
+        requestError.response?.data?.message ||
+          "Could not save this news article.",
       );
     } finally {
       setSaving(false);
@@ -197,7 +260,8 @@ export default function SiteAdminNews() {
       setNotice("News article deleted.");
     } catch (requestError) {
       setError(
-        requestError.response?.data?.message || "Could not delete this news article.",
+        requestError.response?.data?.message ||
+          "Could not delete this news article.",
       );
     } finally {
       setDeletingId(null);
@@ -206,13 +270,42 @@ export default function SiteAdminNews() {
 
   return (
     <Box sx={{ maxWidth: 1400, mx: "auto" }}>
+      {/* ---------------- Page header ---------------- */}
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        justifyContent="space-between"
+        alignItems={{ xs: "stretch", sm: "center" }}
+        spacing={2}
+        sx={{ mb: 3 }}
+      >
+        <Box>
+          <Typography variant="h4" fontWeight={800} letterSpacing="-0.02em">
+            News & updates
+          </Typography>
+          <Typography color="text.secondary" sx={{ mt: 0.5 }}>
+            Publish articles and announcements on your website.
+          </Typography>
+        </Box>
+        <Chip
+          icon={<NewsIcon size={14} />}
+          label={`${items.length} article${items.length === 1 ? "" : "s"}`}
+          variant="outlined"
+          sx={{
+            alignSelf: { xs: "flex-start", sm: "center" },
+            fontWeight: 600,
+            borderRadius: 2,
+            "& .MuiChip-icon": { color: "primary.main", ml: 0.5 },
+          }}
+        />
+      </Stack>
+
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>
+        <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError("")}>
           {error}
         </Alert>
       )}
       {notice && (
-        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setNotice("")}>
+        <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setNotice("")}>
           {notice}
         </Alert>
       )}
@@ -222,25 +315,51 @@ export default function SiteAdminNews() {
           display: "grid",
           gridTemplateColumns: {
             xs: "1fr",
-            lg: "minmax(300px, 0.8fr) minmax(0, 1.2fr)",
+            lg: "minmax(320px, 0.85fr) minmax(0, 1.15fr)",
           },
-          gap: 2,
+          gap: 2.5,
           alignItems: "start",
         }}
       >
-        {/* Form */}
+        {/* ---------------- Form ---------------- */}
         <Paper
           component="form"
           variant="outlined"
           onSubmit={saveNews}
-          sx={{ p: { xs: 2, md: 3 } }}
+          sx={{
+            p: { xs: 2, md: 3 },
+            borderRadius: 3,
+            position: { lg: "sticky" },
+            top: { lg: 88 },
+            borderColor: alpha(theme.palette.primary.main, 0.2),
+          }}
         >
-          <Typography variant="h5" fontWeight={700}>
-            {editingId ? "Edit news article" : "Add news article"}
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 2 }}>
-            Share news and updates on your website.
-          </Typography>
+          <Stack direction="row" alignItems="center" spacing={1.25} sx={{ mb: 0.5 }}>
+            <Box
+              sx={{
+                width: 36,
+                height: 36,
+                borderRadius: 2,
+                display: "grid",
+                placeItems: "center",
+                bgcolor: alpha(theme.palette.primary.main, 0.1),
+                color: "primary.main",
+              }}
+            >
+              {editingId ? <EditIcon size={18} /> : <AddIcon size={18} />}
+            </Box>
+            <Box>
+              <Typography variant="h6" fontWeight={700} lineHeight={1.2}>
+                {editingId ? "Edit article" : "Add article"}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {editingId
+                  ? "Update the details below and save."
+                  : "Fill in the details to publish a new update."}
+              </Typography>
+            </Box>
+          </Stack>
+          <Divider sx={{ my: 2 }} />
 
           <Stack spacing={2}>
             <TextField
@@ -250,8 +369,18 @@ export default function SiteAdminNews() {
               required
               inputProps={{ maxLength: 150 }}
               fullWidth
+              size="small"
             />
-            <Stack spacing={1}>
+
+            <Box>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                fontWeight={600}
+                sx={{ display: "block", mb: 1, textTransform: "uppercase", letterSpacing: ".06em" }}
+              >
+                Cover image
+              </Typography>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -259,37 +388,97 @@ export default function SiteAdminNews() {
                 hidden
                 onChange={handleFileChange}
               />
-              <Button
-                variant="outlined"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={busy}
-                startIcon={
-                  uploading ? (
-                    <CircularProgress size={18} />
-                  ) : (
-                    <CloudUploadOutlinedIcon />
-                  )
-                }
-                sx={{ alignSelf: "flex-start", whiteSpace: "nowrap" }}
-              >
-                {uploading ? "Uploading..." : "Upload image"}
-              </Button>
-
-              {form.imageUrl && (
+              {form.imageUrl ? (
                 <Box
-                  component="img"
-                  src={resolveImage(form.imageUrl)}
-                  alt="Selected preview"
                   sx={{
-                    width: "100%",
-                    maxHeight: 180,
-                    objectFit: "cover",
-                    borderRadius: 1,
+                    position: "relative",
+                    borderRadius: 2,
+                    overflow: "hidden",
+                    border: `1px solid ${theme.palette.divider}`,
                     bgcolor: "action.hover",
                   }}
-                />
+                >
+                  <Box
+                    component="img"
+                    src={resolveImage(form.imageUrl)}
+                    alt="Selected preview"
+                    sx={{
+                      width: "100%",
+                      height: 170,
+                      objectFit: "cover",
+                      display: "block",
+                    }}
+                  />
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{
+                      position: "absolute",
+                      bottom: 8,
+                      right: 8,
+                    }}
+                  >
+                    <Button
+                      size="small"
+                      variant="contained"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={busy}
+                      startIcon={
+                        uploading ? (
+                          <CircularProgress size={14} color="inherit" />
+                        ) : (
+                          <UploadIcon size={14} />
+                        )
+                      }
+                      sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 600 }}
+                    >
+                      {uploading ? "Uploading…" : "Replace"}
+                    </Button>
+                  </Stack>
+                </Box>
+              ) : (
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={busy}
+                  startIcon={
+                    uploading ? (
+                      <CircularProgress size={16} />
+                    ) : (
+                      <ImageIcon size={18} />
+                    )
+                  }
+                  sx={{
+                    py: 2.5,
+                    borderRadius: 2,
+                    borderStyle: "dashed",
+                    flexDirection: "column",
+                    gap: 0.5,
+                    textTransform: "none",
+                    fontWeight: 600,
+                    color: "text.secondary",
+                    "&:hover": {
+                      borderStyle: "dashed",
+                      bgcolor: alpha(theme.palette.primary.main, 0.04),
+                    },
+                  }}
+                >
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    {uploading ? (
+                      <CircularProgress size={18} />
+                    ) : (
+                      <UploadIcon size={18} />
+                    )}
+                    <span>{uploading ? "Uploading…" : "Upload cover image"}</span>
+                  </Stack>
+                  <Typography variant="caption" color="text.secondary" fontWeight={400}>
+                    JPG, PNG, WEBP or GIF · max 5 MB
+                  </Typography>
+                </Button>
               )}
-            </Stack>
+            </Box>
+
             <TextField
               label="Content"
               value={form.content}
@@ -298,33 +487,59 @@ export default function SiteAdminNews() {
               multiline
               minRows={5}
               fullWidth
+              size="small"
             />
+
             <TextField
               select
               label="Status"
               value={form.status}
               onChange={updateField("status")}
               fullWidth
+              size="small"
             >
               <MenuItem value="active">Active</MenuItem>
               <MenuItem value="inactive">Inactive</MenuItem>
             </TextField>
 
+            <Divider />
+
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
               <Button
                 type="submit"
                 variant="contained"
-                startIcon={<AddIcon />}
+                disableElevation
+                startIcon={
+                  saving ? (
+                    <CircularProgress size={16} color="inherit" />
+                  ) : editingId ? (
+                    <EditIcon size={16} />
+                  ) : (
+                    <AddIcon size={16} />
+                  )
+                }
                 disabled={busy}
+                sx={{
+                  borderRadius: 2,
+                  textTransform: "none",
+                  fontWeight: 700,
+                  px: 2.5,
+                  boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.25)}`,
+                }}
               >
                 {saving
-                  ? "Saving..."
+                  ? "Saving…"
                   : editingId
                     ? "Save changes"
-                    : "Add news article"}
+                    : "Publish article"}
               </Button>
               {editingId && (
-                <Button variant="outlined" disabled={busy} onClick={startNew}>
+                <Button
+                  variant="outlined"
+                  disabled={busy}
+                  onClick={startNew}
+                  sx={{ borderRadius: 2, textTransform: "none", fontWeight: 600 }}
+                >
                   Cancel
                 </Button>
               )}
@@ -332,10 +547,18 @@ export default function SiteAdminNews() {
           </Stack>
         </Paper>
 
-        {/* List */}
-        <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, minWidth: 0 }}>
-          <Typography variant="h6" fontWeight={700}>
-            Existing news
+        {/* ---------------- List ---------------- */}
+        <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, minWidth: 0 }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.5 }}>
+            <Typography variant="h6" fontWeight={700}>
+              Published articles
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {items.length} total
+            </Typography>
+          </Stack>
+          <Typography variant="body2" color="text.secondary">
+            Click edit to update an article, or delete to remove it.
           </Typography>
           <Divider sx={{ my: 2 }} />
 
@@ -344,47 +567,96 @@ export default function SiteAdminNews() {
               <CircularProgress />
             </Box>
           ) : items.length === 0 ? (
-            <Typography color="text.secondary" variant="body2" sx={{ py: 2 }}>
-              No news yet. Add the first article using the form.
-            </Typography>
+            <Box
+              sx={{
+                py: 6,
+                px: 2,
+                textAlign: "center",
+                border: `1px dashed ${theme.palette.divider}`,
+                borderRadius: 2,
+                bgcolor: alpha(theme.palette.primary.main, 0.02),
+              }}
+            >
+              <Box
+                sx={{
+                  width: 48,
+                  height: 48,
+                  mx: "auto",
+                  mb: 1.5,
+                  borderRadius: 2,
+                  display: "grid",
+                  placeItems: "center",
+                  bgcolor: alpha(theme.palette.primary.main, 0.08),
+                  color: "primary.main",
+                }}
+              >
+                <NewsIcon size={24} />
+              </Box>
+              <Typography fontWeight={600}>No articles yet</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Add your first news article using the form.
+              </Typography>
+            </Box>
           ) : (
             <Stack spacing={1.5}>
               {items.map((item) => (
-                <Paper key={item.id} variant="outlined" sx={{ p: 1.5 }}>
+                <Paper
+                  key={item.id}
+                  variant="outlined"
+                  sx={{
+                    p: 1.5,
+                    borderRadius: 2,
+                    transition: "border-color .15s ease, box-shadow .15s ease",
+                    "&:hover": {
+                      borderColor: alpha(theme.palette.primary.main, 0.4),
+                      boxShadow: `0 4px 14px ${alpha(theme.palette.primary.main, 0.08)}`,
+                    },
+                  }}
+                >
                   <Stack
                     direction={{ xs: "column", sm: "row" }}
                     spacing={1.5}
                     alignItems={{ xs: "stretch", sm: "center" }}
                   >
-                    {item.imageUrl && (
-                      <Box
-                        component="img"
-                        src={resolveImage(item.imageUrl)}
-                        alt={item.title || ""}
-                        sx={{
-                          width: { xs: "100%", sm: 100 },
-                          height: 76,
-                          objectFit: "cover",
-                          borderRadius: 1,
-                          bgcolor: "action.hover",
-                        }}
-                      />
-                    )}
+                    <Box
+                      sx={{
+                        width: { xs: "100%", sm: 96 },
+                        height: { xs: 140, sm: 72 },
+                        flexShrink: 0,
+                        borderRadius: 1.5,
+                        overflow: "hidden",
+                        bgcolor: alpha(theme.palette.primary.main, 0.06),
+                        display: "grid",
+                        placeItems: "center",
+                      }}
+                    >
+                      {item.imageUrl ? (
+                        <Box
+                          component="img"
+                          src={resolveImage(item.imageUrl)}
+                          alt={item.title || ""}
+                          sx={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                      ) : (
+                        <NewsIcon size={24} color={theme.palette.text.secondary} />
+                      )}
+                    </Box>
 
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Stack
                         direction="row"
                         spacing={1}
                         alignItems="center"
-                        sx={{ mb: 0.5 }}
+                        sx={{ mb: 0.5, flexWrap: "wrap" }}
                       >
-                        <Typography fontWeight={700} noWrap>
+                        <Typography fontWeight={700} noWrap sx={{ minWidth: 0 }}>
                           {item.title || "Untitled"}
                         </Typography>
                         <Chip
                           size="small"
                           label={item.status}
                           color={item.status === "active" ? "success" : "default"}
+                          sx={{ textTransform: "capitalize", fontWeight: 600 }}
                         />
                       </Stack>
                       <Typography
@@ -402,30 +674,46 @@ export default function SiteAdminNews() {
                       </Typography>
                       {item.createdAt && (
                         <Typography variant="caption" color="text.secondary">
-                          Created:{" "}
-                          {formatDateInput(item.createdAt).replace("T", " ")}
+                          Created: {formatDateInput(item.createdAt).replace("T", " ")}
                         </Typography>
                       )}
                     </Box>
 
-                    <Stack direction="row" justifyContent="flex-end">
+                    <Stack direction="row" spacing={0.5} sx={{ alignSelf: { xs: "flex-end", sm: "center" } }}>
                       <IconButton
                         aria-label={`Edit ${item.title || "news article"}`}
                         onClick={() => editNews(item)}
                         disabled={saving || deletingId === item.id}
+                        size="small"
+                        sx={{
+                          borderRadius: 1.5,
+                          color: "text.secondary",
+                          "&:hover": {
+                            color: "primary.main",
+                            bgcolor: alpha(theme.palette.primary.main, 0.08),
+                          },
+                        }}
                       >
-                        <EditOutlinedIcon />
+                        <EditIcon size={18} />
                       </IconButton>
                       <IconButton
                         aria-label={`Delete ${item.title || "news article"}`}
-                        color="error"
                         onClick={() => deleteNews(item)}
                         disabled={saving || deletingId === item.id}
+                        size="small"
+                        sx={{
+                          borderRadius: 1.5,
+                          color: "text.secondary",
+                          "&:hover": {
+                            color: "error.main",
+                            bgcolor: alpha(theme.palette.error.main, 0.08),
+                          },
+                        }}
                       >
                         {deletingId === item.id ? (
-                          <CircularProgress size={20} />
+                          <CircularProgress size={16} color="error" />
                         ) : (
-                          <DeleteIcon />
+                          <DeleteIcon size={18} />
                         )}
                       </IconButton>
                     </Stack>

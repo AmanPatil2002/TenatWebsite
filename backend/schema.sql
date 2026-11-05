@@ -272,7 +272,7 @@ CREATE TABLE IF NOT EXISTS sitepages (
   CONSTRAINT fkSitePagesSource FOREIGN KEY (sourcePagesId) REFERENCES pages(pagesId) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
-CREATE TABLE IF NOT EXISTS siteentries (
+CREATE TABLE IF NOT EXISTS siteEntries (
   id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   siteId        BIGINT UNSIGNED NOT NULL,
   sitePageId    BIGINT UNSIGNED NOT NULL,
@@ -280,14 +280,17 @@ CREATE TABLE IF NOT EXISTS siteentries (
   description   TEXT NULL,
   price         DECIMAL(10,2) NULL,
   imageUrl      VARCHAR(1000) NULL,
+  category      ENUM('student','restaurant','product','menu') NOT NULL,
   status        ENUM('active','inactive') NOT NULL DEFAULT 'active',
   customFields  JSON NULL,
   createdAt     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updatedAt     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idxSiteEntriesSitePage (siteId, sitePageId, status),
+  INDEX idxSiteEntriesCategory (category),
   CONSTRAINT fkSiteEntryPage FOREIGN KEY (sitePageId, siteId)
     REFERENCES sitepages(id, siteId) ON DELETE CASCADE
 ) ENGINE=InnoDB;
+
 
 CREATE TABLE siteemployees (
   id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -459,4 +462,55 @@ CREATE TABLE siteslider (
         FOREIGN KEY (siteId)
         REFERENCES sites(id)
         ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+
+-- ---------------------------------------------------------------------
+-- bugreports : users report errors/bugs; admin triages them.
+--   siteId is optional (a bug may be about the main platform, not a site).
+--   If siteId is set, the reporter must own that site (enforced in API:
+--   WHERE sites.id = ? AND sites.userId = <JWT user>).
+-- ---------------------------------------------------------------------
+CREATE TABLE bugreports (
+  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  reportedBy      BIGINT UNSIGNED NOT NULL,
+  siteId          BIGINT UNSIGNED NULL,
+  title           VARCHAR(190) NOT NULL,
+  description     TEXT NOT NULL,
+  screenshotUrl   VARCHAR(500) NULL,
+  type            ENUM('bug','error','suggestion','other') NOT NULL DEFAULT 'bug',
+  severity        ENUM('low','medium','high','critical') NOT NULL DEFAULT 'medium',
+  status          ENUM('open','in_progress','resolved','closed','rejected') NOT NULL DEFAULT 'open',
+  adminNote       TEXT NULL,
+  resolvedBy      BIGINT UNSIGNED NULL,
+  resolvedAt      DATETIME NULL,
+  createdAt       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idxBugUser (reportedBy, createdAt),
+  INDEX idxBugStatus (status, severity, createdAt),
+  INDEX idxBugSite (siteId),
+  CONSTRAINT fkBugReporter FOREIGN KEY (reportedBy) REFERENCES users(userId),
+  CONSTRAINT fkBugSite     FOREIGN KEY (siteId)     REFERENCES sites(id) ON DELETE SET NULL,
+  CONSTRAINT fkBugResolver FOREIGN KEY (resolvedBy) REFERENCES users(userId) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+
+CREATE TABLE siteheaders (
+  headerid                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  siteId            BIGINT UNSIGNED NOT NULL,
+
+  -- header
+  logoUrl           VARCHAR(500) NULL,
+  siteTitle         VARCHAR(150) NULL,
+  -- footer
+  footerText        TEXT NULL,
+  footerAddress     VARCHAR(300) NULL,
+  footerPhone       VARCHAR(30) NULL,
+  footerEmail       VARCHAR(190) NULL,
+  copyrightText     VARCHAR(255) NULL,
+  socialLinks       JSON NULL,   -- e.g. {"facebook":"...","instagram":"...","youtube":"..."}
+  createdAt         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uqSiteHeaderSite (siteId),
+  CONSTRAINT fkSiteHeaderSite  FOREIGN KEY (siteId)    REFERENCES sites(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;

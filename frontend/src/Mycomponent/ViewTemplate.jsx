@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import {
   Alert,
@@ -13,12 +13,11 @@ import {
   DialogTitle,
   Divider,
   FormControl,
-  FormControlLabel,
+  FormHelperText,
+  IconButton,
   InputLabel,
   MenuItem,
   Paper,
-  Radio,
-  RadioGroup,
   Select,
   Stack,
   Switch,
@@ -29,12 +28,19 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
-import VisibilityIcon from "@mui/icons-material/Visibility";
-import EditIcon from "@mui/icons-material/Edit";
-import DeleteIcon from "@mui/icons-material/Delete";
-import RefreshIcon from "@mui/icons-material/Refresh";
+import {
+  Add as AddIcon,
+  Close as CloseIcon,
+  CloudUploadOutlined,
+  Delete as DeleteIcon,
+  DeleteOutlineOutlined,
+  Edit as EditIcon,
+  ImageOutlined,
+  Refresh as RefreshIcon,
+} from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 
 const API_URL = (
@@ -45,6 +51,7 @@ const TEMPLATES_URL = `${API_URL}/templates`;
 const CATEGORIES_URL = `${API_URL}/categories`;
 const THEMES_URL = `${API_URL}/theme`;
 const PAGES_URL = `${API_URL}/pages`;
+const IMAGE_UPLOAD_URL = `${API_URL}/uploads/ckeditor`;
 const PAGES_PER_REQUEST = 100;
 
 const getHeaders = () => {
@@ -92,7 +99,6 @@ const parsePhotos = (photos) => {
   }
 };
 
-// Convert templatefull `pages` array → { [pagesId]: { isDefault, sortOrder } }
 const pagesToMap = (templatePages) => {
   const map = {};
   for (const p of templatePages || []) {
@@ -138,6 +144,381 @@ const EMPTY_FORM = {
   pages: {},
 };
 
+/* ------------------------------- UI helpers ------------------------------- */
+
+function SectionTitle({ children, hint }) {
+  return (
+    <Box sx={{ mb: 1.5 }}>
+      <Typography variant="subtitle2" fontWeight={700}>
+        {children}
+      </Typography>
+      {hint && (
+        <Typography variant="caption" color="text.secondary">
+          {hint}
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
+function StatusChip({ status }) {
+  const color =
+    status === "published"
+      ? "success"
+      : status === "archived"
+        ? "default"
+        : "warning";
+  return (
+    <Chip
+      label={(status || "draft").toUpperCase()}
+      color={color}
+      size="small"
+      variant="outlined"
+      sx={{ fontWeight: 700, letterSpacing: 0.4, minWidth: 92 }}
+    />
+  );
+}
+
+function ThemeSwatch({ theme, size = 28 }) {
+  const bg = theme?.background || "#ffffff";
+  const fg = theme?.color || "#111111";
+  return (
+    <Box
+      aria-hidden
+      sx={{
+        width: size,
+        height: size,
+        flex: "0 0 auto",
+        borderRadius: 1,
+        border: "1px solid",
+        borderColor: "divider",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: bg,
+        color: fg,
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: 0.2,
+      }}
+    >
+      Aa
+    </Box>
+  );
+}
+
+/* ----------------------------- Thumbnail field ---------------------------- */
+
+function ThumbnailField({ value, onChange, disabled }) {
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [value]);
+
+  const hasValue = Boolean((value || "").trim());
+
+  return (
+    <Box>
+      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+        Thumbnail
+      </Typography>
+      <Typography variant="caption" color="text.secondary">
+        Main image shown in listings. Paste a URL or upload below.
+      </Typography>
+
+      <Box
+        sx={{
+          mt: 1,
+          display: "grid",
+          gap: 2,
+          gridTemplateColumns: {
+            xs: "1fr",
+            sm: "minmax(0, 1fr) 220px",
+          },
+          alignItems: "start",
+        }}
+      >
+        <Stack spacing={1}>
+          <TextField
+            label="Thumbnail Image URL"
+            value={value || ""}
+            onChange={(e) => onChange(e.target.value)}
+            fullWidth
+            placeholder="https://example.com/thumbnail.jpg"
+            disabled={disabled}
+          />
+          {hasValue && (
+            <Box>
+              <Button
+                size="small"
+                color="error"
+                startIcon={<DeleteOutlineOutlined />}
+                onClick={() => onChange("")}
+                disabled={disabled}
+              >
+                Remove thumbnail
+              </Button>
+            </Box>
+          )}
+        </Stack>
+
+        {/* Preview */}
+        <Box
+          sx={{
+            width: "100%",
+            aspectRatio: "4 / 3",
+            borderRadius: 2,
+            border: "1px solid",
+            borderColor: "divider",
+            bgcolor: "action.hover",
+            overflow: "hidden",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {hasValue && !imgError ? (
+            <Box
+              component="img"
+              src={value}
+              alt="Thumbnail preview"
+              onError={() => setImgError(true)}
+              sx={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          ) : (
+            <Box sx={{ textAlign: "center", color: "text.disabled", p: 1 }}>
+              <ImageOutlined fontSize="large" />
+              <Typography variant="caption" display="block">
+                {hasValue && imgError ? "Could not load image" : "No preview"}
+              </Typography>
+            </Box>
+          )}
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
+/* ---------------------------- Photos uploader ----------------------------- */
+
+function PhotoUploader({ value = [], onChange, disabled = false }) {
+  const inputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+
+  const photos = useMemo(() => parsePhotos(value), [value]);
+
+  const handleFiles = useCallback(
+    async (event) => {
+      const files = Array.from(event.target.files || []);
+      event.target.value = "";
+      if (!files.length) return;
+
+      const invalidFile = files.find((f) => !f.type.startsWith("image/"));
+      if (invalidFile) {
+        setError("Please select image files only.");
+        return;
+      }
+      const oversizedFile = files.find((f) => f.size > 10 * 1024 * 1024);
+      if (oversizedFile) {
+        setError("Each image must be 10 MB or smaller.");
+        return;
+      }
+
+      setError("");
+      setUploading(true);
+
+      try {
+        const uploadedUrls = [];
+        for (const file of files) {
+          const body = new FormData();
+          body.append("upload", file);
+          const response = await axios.post(IMAGE_UPLOAD_URL, body, {
+            headers: getHeaders(),
+          });
+          const data = response.data;
+          const imageUrl =
+            data?.url ||
+            data?.data?.url ||
+            data?.file?.url ||
+            data?.data?.file?.url;
+
+          if (
+            typeof imageUrl !== "string" ||
+            !/^https?:\/\/\S+$/i.test(imageUrl.trim())
+          ) {
+            throw new Error(
+              `The upload response did not contain a valid URL for "${file.name}".`,
+            );
+          }
+          uploadedUrls.push(imageUrl.trim());
+        }
+
+        onChange([...photos, ...uploadedUrls]);
+      } catch (err) {
+        console.error("Photo upload failed:", err);
+        setError(
+          err.response?.data?.message ||
+            err.response?.data?.error ||
+            err.message ||
+            "Failed to upload photos.",
+        );
+      } finally {
+        setUploading(false);
+      }
+    },
+    [onChange, photos],
+  );
+
+  const removePhoto = (index) => {
+    onChange(photos.filter((_, i) => i !== index));
+  };
+
+  return (
+    <Box>
+      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+        Additional Photos
+      </Typography>
+      <Typography variant="caption" color="text.secondary">
+        Upload one or more gallery images. Each is saved to the template.
+      </Typography>
+
+      <input
+        ref={inputRef}
+        hidden
+        multiple
+        type="file"
+        accept="image/*"
+        onChange={handleFiles}
+        disabled={disabled || uploading}
+      />
+
+      <Box
+        onClick={() => !disabled && !uploading && inputRef.current?.click()}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if ((e.key === "Enter" || e.key === " ") && !disabled && !uploading) {
+            inputRef.current?.click();
+          }
+        }}
+        sx={{
+          mt: 1,
+          border: "1.5px dashed",
+          borderColor: "divider",
+          borderRadius: 2,
+          p: 2.5,
+          textAlign: "center",
+          cursor: disabled || uploading ? "not-allowed" : "pointer",
+          bgcolor: "grey.50",
+          transition: "all 120ms ease",
+          "&:hover": {
+            bgcolor: disabled || uploading ? "grey.50" : "action.hover",
+            borderColor: disabled || uploading ? "divider" : "primary.main",
+          },
+        }}
+      >
+        <Box
+          sx={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 44,
+            height: 44,
+            borderRadius: "50%",
+            bgcolor: "background.paper",
+            mb: 1,
+            boxShadow: 1,
+          }}
+        >
+          {uploading ? (
+            <CircularProgress size={20} />
+          ) : (
+            <CloudUploadOutlined color="primary" fontSize="small" />
+          )}
+        </Box>
+        <Typography variant="body2" fontWeight={600}>
+          {uploading ? "Uploading photos…" : "Click to upload photos"}
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          PNG, JPG, WEBP · max 10 MB each
+        </Typography>
+      </Box>
+
+      {error && (
+        <Alert severity="error" sx={{ mt: 1.5 }}>
+          {error}
+        </Alert>
+      )}
+
+      {photos.length > 0 && (
+        <Box
+          sx={{
+            mt: 2,
+            display: "grid",
+            gap: 1.25,
+            gridTemplateColumns: {
+              xs: "repeat(2, minmax(0, 1fr))",
+              sm: "repeat(3, minmax(0, 1fr))",
+              md: "repeat(4, minmax(0, 1fr))",
+            },
+          }}
+        >
+          {photos.map((photo, index) => (
+            <Paper
+              key={`${photo}-${index}`}
+              variant="outlined"
+              sx={{ overflow: "hidden", borderRadius: 2 }}
+            >
+              <Box
+                component="img"
+                src={photo}
+                alt={`Template photo ${index + 1}`}
+                sx={{
+                  display: "block",
+                  width: "100%",
+                  height: 96,
+                  objectFit: "cover",
+                  bgcolor: "grey.100",
+                }}
+              />
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  px: 1,
+                  py: 0.25,
+                }}
+              >
+                <Typography variant="caption" color="text.secondary" noWrap>
+                  Photo {index + 1}
+                </Typography>
+                <IconButton
+                  size="small"
+                  color="error"
+                  aria-label={`Remove photo ${index + 1}`}
+                  onClick={() => removePhoto(index)}
+                  disabled={disabled || uploading}
+                >
+                  <DeleteOutlineOutlined fontSize="small" />
+                </IconButton>
+              </Box>
+            </Paper>
+          ))}
+        </Box>
+      )}
+
+      <FormHelperText>
+        {photos.length} photo{photos.length === 1 ? "" : "s"}
+      </FormHelperText>
+    </Box>
+  );
+}
+
+/* ------------------------------- Main page -------------------------------- */
+
 export default function ViewTemplate() {
   const navigate = useNavigate();
 
@@ -153,7 +534,6 @@ export default function ViewTemplate() {
   const [notice, setNotice] = useState("");
 
   const [editOpen, setEditOpen] = useState(false);
-  const [viewOpen, setViewOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const [selectedTemplate, setSelectedTemplate] = useState(null);
@@ -220,7 +600,6 @@ export default function ViewTemplate() {
         }
       } catch (err) {
         if (controller.signal.aborted) return;
-
         setAllPages([]);
         setLoadedPagesCategoryId(String(form.categoryId));
         setError(
@@ -237,13 +616,6 @@ export default function ViewTemplate() {
 
   const updateField = (field, value) =>
     setForm((prev) => ({ ...prev, [field]: value }));
-
-  const openView = (template) => {
-    setError("");
-    setNotice("");
-    setSelectedTemplate(template);
-    setViewOpen(true);
-  };
 
   const openEdit = async (template) => {
     setError("");
@@ -393,7 +765,7 @@ export default function ViewTemplate() {
       shortDescription: form.shortDescription.trim() || null,
       description: form.description.trim() || null,
       thumbnailUrl: form.thumbnailUrl.trim() || null,
-      photos: form.photos,
+      photos: parsePhotos(form.photos),
       price,
       currency: form.currency.trim().toUpperCase(),
       validityDays,
@@ -439,7 +811,6 @@ export default function ViewTemplate() {
     try {
       await axios.delete(`${TEMPLATES_URL}/${id}`, { headers: getHeaders() });
       setDeleteOpen(false);
-      setViewOpen(false);
       setEditOpen(false);
       setSelectedTemplate(null);
       setNotice("Template deleted successfully.");
@@ -461,23 +832,6 @@ export default function ViewTemplate() {
     if (!saving) setDeleteOpen(false);
   };
 
-  const renderStatus = (status) => {
-    const color =
-      status === "published"
-        ? "success"
-        : status === "archived"
-          ? "default"
-          : "warning";
-    return (
-      <Chip
-        label={status || "draft"}
-        color={color}
-        size="small"
-        variant="outlined"
-      />
-    );
-  };
-
   const selectedPageIds = new Set(Object.keys(form.pages));
   const pagesById = new Map(
     (selectedTemplate?.pages || []).map((page) => [
@@ -496,30 +850,52 @@ export default function ViewTemplate() {
     form.categoryId &&
     String(loadedPagesCategoryId) !== String(form.categoryId);
 
+  const selectedThemeObjects = themes.filter((t) =>
+    form.themeIds.map(String).includes(String(getId(t))),
+  );
+
+  const grid3 = {
+    display: "grid",
+    gap: 2,
+    gridTemplateColumns: {
+      xs: "1fr",
+      sm: "repeat(2, minmax(0, 1fr))",
+      md: "repeat(3, minmax(0, 1fr))",
+    },
+  };
+
   return (
-    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1500, mx: "auto" }}>
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        justifyContent="space-between"
-        alignItems={{ xs: "stretch", sm: "center" }}
-        spacing={2}
-        sx={{ mb: 3 }}
+    <Box sx={{ px: { xs: 2, sm: 3 }, py: 4, maxWidth: 1400, mx: "auto" }}>
+      {/* Header */}
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: { xs: "column", sm: "row" },
+          alignItems: { xs: "stretch", sm: "center" },
+          justifyContent: "space-between",
+          gap: 2,
+          mb: 3,
+        }}
       >
         <Box>
-          <Typography variant="h4" fontWeight={700}>
+          <Typography
+            variant="overline"
+            sx={{ letterSpacing: 1.2, color: "text.secondary" }}
+          >
+            Admin · Templates
+          </Typography>
+          <Typography variant="h4" fontWeight={700} sx={{ lineHeight: 1.2 }}>
             Template Management
           </Typography>
           <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-            View, edit, and delete your website templates.
+            Edit and delete your website templates.
           </Typography>
         </Box>
-        
+
         <Stack
-          direction="row"
+          direction={{ xs: "column", sm: "row" }}
           spacing={1}
-          flexWrap="wrap"
-          justifyContent="flex-start"
-          alignItems="right"
+          sx={{ flexShrink: 0 }}
         >
           <Button
             variant="outlined"
@@ -529,51 +905,87 @@ export default function ViewTemplate() {
           >
             Refresh
           </Button>
-
           <Button
             variant="contained"
+            startIcon={<AddIcon />}
             onClick={() => navigate("/admin/templates")}
           >
             Add Template
           </Button>
         </Stack>
-      </Stack>
+      </Box>
 
-      {error && (
-        <Alert severity="error" onClose={() => setError("")} sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
-      {notice && (
-        <Alert severity="success" onClose={() => setNotice("")} sx={{ mb: 2 }}>
-          {notice}
-        </Alert>
-      )}
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2 }}>
+        {error && (
+          <Alert severity="error" onClose={() => setError("")}>
+            {error}
+          </Alert>
+        )}
+        {notice && (
+          <Alert severity="success" onClose={() => setNotice("")}>
+            {notice}
+          </Alert>
+        )}
+      </Box>
 
-      <Paper variant="outlined" sx={{ overflow: "hidden" }}>
+      {/* Table card */}
+      <Paper variant="outlined" sx={{ borderRadius: 2, overflow: "hidden" }}>
         {loading ? (
-          <Box sx={{ py: 8, textAlign: "center" }}>
+          <Box
+            sx={{
+              py: 10,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 2,
+            }}
+          >
             <CircularProgress />
-            <Typography color="text.secondary" sx={{ mt: 2 }}>
-              Loading templates...
-            </Typography>
+            <Typography color="text.secondary">Loading templates…</Typography>
           </Box>
         ) : templates.length === 0 ? (
-          <Box sx={{ p: 5, textAlign: "center" }}>
-            <Typography variant="h6">No templates found</Typography>
-            <Typography color="text.secondary" sx={{ mt: 1 }}>
+          <Box sx={{ py: 8, px: 3, textAlign: "center" }}>
+            <Box
+              sx={{
+                width: 56,
+                height: 56,
+                borderRadius: "50%",
+                bgcolor: "action.hover",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                mb: 1,
+              }}
+            >
+              <ImageOutlined color="disabled" />
+            </Box>
+            <Typography variant="h6" fontWeight={700}>
+              No templates found
+            </Typography>
+            <Typography color="text.secondary" sx={{ mt: 0.5, mb: 2 }}>
               Create a template using the Add Template page.
             </Typography>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => navigate("/admin/templates")}
+            >
+              Add Template
+            </Button>
           </Box>
         ) : (
-          <TableContainer sx={{ maxHeight: 560 }}>
-            <Table>
+          <TableContainer sx={{ maxHeight: 640 }}>
+            <Table stickyHeader size="medium">
               <TableHead>
-                <TableRow sx={{ bgcolor: "action.hover" }}>
-                  <TableCell>Template</TableCell>
-                  <TableCell>Price</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell align="center">Actions</TableCell>
+                <TableRow>
+                  <TableCell sx={{ width: "50%" }}>Template</TableCell>
+                  <TableCell sx={{ width: "18%" }} align="right">
+                    Price
+                  </TableCell>
+                  <TableCell sx={{ width: "16%" }}>Status</TableCell>
+                  <TableCell sx={{ width: "16%" }} align="right">
+                    Actions
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -587,10 +999,13 @@ export default function ViewTemplate() {
                   return (
                     <TableRow key={id ?? template.name} hover>
                       <TableCell>
-                        <Stack
-                          direction="row"
-                          spacing={1.5}
-                          alignItems="center"
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1.5,
+                            minWidth: 0,
+                          }}
                         >
                           {template.thumbnailUrl ? (
                             <Box
@@ -602,6 +1017,7 @@ export default function ViewTemplate() {
                                 height: 48,
                                 objectFit: "cover",
                                 borderRadius: 1,
+                                flex: "0 0 auto",
                                 bgcolor: "action.hover",
                               }}
                             />
@@ -612,63 +1028,80 @@ export default function ViewTemplate() {
                                 height: 48,
                                 borderRadius: 1,
                                 bgcolor: "action.hover",
-                                display: "grid",
-                                placeItems: "center",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flex: "0 0 auto",
                               }}
                             >
-                              <VisibilityIcon color="disabled" />
+                              <ImageOutlined
+                                fontSize="small"
+                                sx={{ color: "text.disabled" }}
+                              />
                             </Box>
                           )}
-                          <Box>
-                            <Typography fontWeight={600}>
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography fontWeight={600} noWrap>
                               {template.name || "Untitled template"}
                             </Typography>
                             <Typography
                               variant="caption"
                               color="text.secondary"
+                              noWrap
+                              component="div"
                             >
-                              {category?.name || template.categoryName || "—"}
+                              {category?.name ||
+                                template.categoryName ||
+                                "Uncategorized"}
                             </Typography>
                           </Box>
-                        </Stack>
+                        </Box>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Typography fontWeight={600}>
+                          {template.currency || "INR"}{" "}
+                          {Number(template.price || 0).toLocaleString("en-IN")}
+                        </Typography>
                       </TableCell>
                       <TableCell>
-                        {template.currency || "INR"}{" "}
-                        {Number(template.price || 0).toLocaleString("en-IN")}
+                        <StatusChip status={template.status} />
                       </TableCell>
-                      <TableCell>{renderStatus(template.status)}</TableCell>
-                      <TableCell align="center">
-                        <Stack
-                          direction="row"
-                          spacing={0.5}
-                          justifyContent="flex-start"
+                      <TableCell align="right">
+                        <Box
+                          sx={{
+                            display: "flex",
+                            gap: 0.5,
+                            justifyContent: "flex-end",
+                            flexWrap: "wrap",
+                          }}
                         >
-                          <Button
-                            size="small"
-                            startIcon={<VisibilityIcon />}
-                            onClick={() => openView(template)}
-                          >
-                            View
-                          </Button>
-                          <Button
-                            size="small"
-                            color="primary"
-                            startIcon={<EditIcon />}
-                            onClick={() => openEdit(template)}
-                            disabled={saving}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            size="small"
-                            color="error"
-                            startIcon={<DeleteIcon />}
-                            onClick={() => openDelete(template)}
-                            disabled={saving}
-                          >
-                            Delete
-                          </Button>
-                        </Stack>
+                          <Tooltip title="Edit">
+                            <span>
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                onClick={() => openEdit(template)}
+                                disabled={saving}
+                                aria-label="Edit template"
+                              >
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                          <Tooltip title="Delete">
+                            <span>
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => openDelete(template)}
+                                disabled={saving}
+                                aria-label="Delete template"
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </Box>
                       </TableCell>
                     </TableRow>
                   );
@@ -679,336 +1112,492 @@ export default function ViewTemplate() {
         )}
       </Paper>
 
-      {/* View dialog */}
+      {/* ----------------------------- Edit dialog ---------------------------- */}
       <Dialog
-        open={viewOpen}
-        onClose={() => setViewOpen(false)}
+        open={editOpen}
+        onClose={closeEdit}
         fullWidth
         maxWidth="md"
+        scroll="paper"
       >
-        <DialogTitle>Template Details</DialogTitle>
-        <DialogContent dividers>
-          {selectedTemplate && (
-            <Stack spacing={2}>
-              {selectedTemplate.thumbnailUrl && (
-                <Box
-                  component="img"
-                  src={selectedTemplate.thumbnailUrl}
-                  alt={selectedTemplate.name}
-                  sx={{
-                    width: "100%",
-                    maxHeight: 280,
-                    objectFit: "contain",
-                    borderRadius: 2,
-                    bgcolor: "action.hover",
-                  }}
-                />
-              )}
-              <Typography variant="h5" fontWeight={700}>
-                {selectedTemplate.name}
-              </Typography>
-              <Divider />
-              <Typography>
-                <strong>Category:</strong>{" "}
-                {categories.find(
-                  (item) =>
-                    String(item.categoryId ?? item.id) ===
-                    String(getCategoryId(selectedTemplate)),
-                )?.name ||
-                  selectedTemplate.categoryName ||
-                  "—"}
-              </Typography>
-              <Typography>
-                <strong>Price:</strong> {selectedTemplate.currency || "INR"}{" "}
-                {Number(selectedTemplate.price || 0).toLocaleString("en-IN")}
-              </Typography>
-              <Typography>
-                <strong>Validity:</strong>{" "}
-                {selectedTemplate.validityDays ?? 365} days
-              </Typography>
-              <Typography>
-                <strong>Status:</strong> {selectedTemplate.status || "draft"}
-              </Typography>
-              <Typography fontWeight={600}>Themes</Typography>
-              {Array.isArray(selectedTemplate.themes) &&
-              selectedTemplate.themes.length > 0 ? (
-                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                  {selectedTemplate.themes.map((t) => (
-                    <Chip
-                      key={t.themeId}
-                      label={`${t.name}${t.isDefault ? " (default)" : ""}`}
-                      variant={t.isDefault ? "filled" : "outlined"}
-                      color={t.isDefault ? "primary" : "default"}
-                    />
-                  ))}
-                </Stack>
-              ) : (
-                <Typography color="text.secondary">
-                  No themes linked.
-                </Typography>
-              )}
-              <Typography fontWeight={600}>Pages</Typography>
-              {Array.isArray(selectedTemplate.pages) &&
-              selectedTemplate.pages.length > 0 ? (
-                <Stack spacing={0.5}>
-                  {selectedTemplate.pages.map((p) => (
-                    <Box
-                      key={p.pagesId}
-                      sx={{ display: "flex", justifyContent: "space-between" }}
-                    >
-                      <Typography>{p.title}</Typography>
-                      <Chip
-                        size="small"
-                        label={
-                          p.isDefault
-                            ? "Included"
-                            : `+${selectedTemplate.currency || "INR"} ${Number(p.pagePrice || 0).toFixed(2)}`
-                        }
-                        color={p.isDefault ? "success" : "warning"}
-                        variant="outlined"
-                      />
-                    </Box>
-                  ))}
-                </Stack>
-              ) : (
-                <Typography color="text.secondary">No pages linked.</Typography>
-              )}
-            </Stack>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setViewOpen(false)}>Close</Button>
-          <Button
-            variant="contained"
-            startIcon={<EditIcon />}
-            onClick={() => {
-              const t = selectedTemplate;
-              setViewOpen(false);
-              if (t) openEdit(t);
-            }}
-          >
-            Edit Template
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Edit dialog — now supports themes + pages */}
-      <Dialog open={editOpen} onClose={closeEdit} fullWidth maxWidth="md">
         <Box component="form" onSubmit={saveTemplate}>
-          <DialogTitle>Edit Template</DialogTitle>
+          <DialogTitle sx={{ pr: 6 }}>
+            Edit Template
+            <IconButton
+              onClick={closeEdit}
+              disabled={saving}
+              sx={{ position: "absolute", right: 8, top: 8 }}
+              aria-label="Close"
+            >
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </DialogTitle>
           <DialogContent dividers>
-            <Stack spacing={2.5} sx={{ pt: 1 }}>
-              <TextField
-                label="Template Name"
-                value={form.name}
-                onChange={(e) => updateField("name", e.target.value)}
-                required
-                fullWidth
-              />
-              <FormControl fullWidth required>
-                <InputLabel id="edit-category-label">Category</InputLabel>
-                <Select
-                  labelId="edit-category-label"
-                  label="Category"
-                  value={form.categoryId ?? ""}
-                  onChange={(e) => updateField("categoryId", e.target.value)}
-                >
-                  {categories.map((c) => {
-                    const id = c.categoryId ?? c.id;
-                    return (
-                      <MenuItem key={id} value={String(id)}>
-                        {c.name || c.title || `Category ${id}`}
-                      </MenuItem>
-                    );
-                  })}
-                </Select>
-              </FormControl>
-
-              <TextField
-                label="Short Description"
-                value={form.shortDescription}
-                onChange={(e) =>
-                  updateField("shortDescription", e.target.value)
-                }
-                multiline
-                minRows={2}
-                fullWidth
-              />
-              <TextField
-                label="Description"
-                value={form.description}
-                onChange={(e) => updateField("description", e.target.value)}
-                multiline
-                minRows={4}
-                fullWidth
-              />
-              <TextField
-                label="Thumbnail Image URL"
-                value={form.thumbnailUrl}
-                onChange={(e) => updateField("thumbnailUrl", e.target.value)}
-                fullWidth
-              />
-
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                <TextField
-                  label="Price"
-                  type="number"
-                  value={form.price}
-                  onChange={(e) => updateField("price", e.target.value)}
-                  inputProps={{ min: 0, step: "0.01" }}
-                  required
-                  fullWidth
-                />
-                <TextField
-                  label="Currency"
-                  value={form.currency}
-                  onChange={(e) => updateField("currency", e.target.value)}
-                  required
-                  fullWidth
-                />
-                <TextField
-                  label="Validity (days)"
-                  type="number"
-                  value={form.validityDays}
-                  onChange={(e) => updateField("validityDays", e.target.value)}
-                  inputProps={{ min: 1, step: 1 }}
-                  required
-                  fullWidth
-                />
-              </Stack>
-
-              <Divider />
-              <Typography variant="subtitle1" fontWeight={700}>
-                Themes
-              </Typography>
-
-              <FormControl fullWidth>
-                <InputLabel id="edit-themes-label">Themes</InputLabel>
-                <Select
-                  labelId="edit-themes-label"
-                  multiple
-                  value={form.themeIds}
-                  label="Themes"
-                  onChange={handleThemeChange}
-                  renderValue={(selected) =>
-                    themes
-                      .filter((t) =>
-                        selected.map(String).includes(String(getId(t))),
-                      )
-                      .map((t) => t.name)
-                      .join(", ")
-                  }
-                >
-                  {themes.map((theme) => (
-                    <MenuItem key={getId(theme)} value={String(getId(theme))}>
-                      {theme.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              {form.themeIds.length > 0 && (
-                <FormControl>
-                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                    Default theme
-                  </Typography>
-                  <RadioGroup
-                    value={String(form.defaultThemeId)}
+            <Stack spacing={3} sx={{ pt: 1 }}>
+              {/* Basics */}
+              <Box>
+                <SectionTitle hint="Core details of the template.">
+                  Basics
+                </SectionTitle>
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <TextField
+                    label="Template Name"
+                    value={form.name}
+                    onChange={(e) => updateField("name", e.target.value)}
+                    required
+                    fullWidth
+                  />
+                  <FormControl fullWidth required>
+                    <InputLabel id="edit-category-label">Category</InputLabel>
+                    <Select
+                      labelId="edit-category-label"
+                      label="Category"
+                      value={form.categoryId ?? ""}
+                      onChange={(e) =>
+                        updateField("categoryId", e.target.value)
+                      }
+                    >
+                      {categories.map((c) => {
+                        const id = c.categoryId ?? c.id;
+                        return (
+                          <MenuItem key={id} value={String(id)}>
+                            {c.name || c.title || `Category ${id}`}
+                          </MenuItem>
+                        );
+                      })}
+                    </Select>
+                  </FormControl>
+                  <TextField
+                    label="Short Description"
+                    value={form.shortDescription}
                     onChange={(e) =>
-                      updateField("defaultThemeId", e.target.value)
+                      updateField("shortDescription", e.target.value)
                     }
-                  >
-                    {themes
-                      .filter((t) => form.themeIds.includes(String(getId(t))))
-                      .map((t) => (
-                        <FormControlLabel
-                          key={getId(t)}
-                          value={String(getId(t))}
-                          control={<Radio size="small" />}
-                          label={t.name}
-                        />
-                      ))}
-                  </RadioGroup>
-                </FormControl>
-              )}
+                    multiline
+                    minRows={2}
+                    fullWidth
+                  />
+                  <TextField
+                    label="Description"
+                    value={form.description}
+                    onChange={(e) =>
+                      updateField("description", e.target.value)
+                    }
+                    multiline
+                    minRows={4}
+                    fullWidth
+                  />
+                </Box>
+              </Box>
 
               <Divider />
-              <Typography variant="subtitle1" fontWeight={700}>
-                Pages
-              </Typography>
 
-              <Paper variant="outlined">
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell padding="checkbox">Include</TableCell>
-                      <TableCell>Page</TableCell>
-                      <TableCell align="right">Base price</TableCell>
-                      <TableCell align="center">Default</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {editPages.map((page) => {
-                      const id = String(getId(page));
-                      const selected = Boolean(form.pages[id]);
-                      const isDefault = form.pages[id]?.isDefault === 1;
-                      const price = Number(page.pagePrice ?? page.price ?? 0);
+              {/* Media — thumbnail preview + additional photos */}
+              <Box>
+                <SectionTitle hint="Thumbnail preview and gallery images.">
+                  Media
+                </SectionTitle>
+                <Stack spacing={3}>
+                  <ThumbnailField
+                    value={form.thumbnailUrl}
+                    onChange={(val) => updateField("thumbnailUrl", val)}
+                    disabled={saving}
+                  />
+                  <PhotoUploader
+                    value={form.photos}
+                    onChange={(photos) => updateField("photos", photos)}
+                    disabled={saving}
+                  />
+                </Stack>
+              </Box>
+
+              <Divider />
+
+              {/* Pricing */}
+              <Box>
+                <SectionTitle hint="Price, currency, and validity window.">
+                  Pricing
+                </SectionTitle>
+                <Box sx={grid3}>
+                  <TextField
+                    label="Price"
+                    type="number"
+                    value={form.price}
+                    onChange={(e) => updateField("price", e.target.value)}
+                    inputProps={{ min: 0, step: "0.01" }}
+                    required
+                    fullWidth
+                  />
+                  <TextField
+                    label="Currency"
+                    value={form.currency}
+                    onChange={(e) => updateField("currency", e.target.value)}
+                    required
+                    fullWidth
+                  />
+                  <TextField
+                    label="Validity (days)"
+                    type="number"
+                    value={form.validityDays}
+                    onChange={(e) =>
+                      updateField("validityDays", e.target.value)
+                    }
+                    inputProps={{ min: 1, step: 1 }}
+                    required
+                    fullWidth
+                  />
+                </Box>
+              </Box>
+
+              <Divider />
+
+              {/* Themes */}
+              <Box>
+                <SectionTitle hint="Pick themes and set exactly one as the default.">
+                  Themes
+                </SectionTitle>
+
+                <FormControl fullWidth>
+                  <InputLabel id="edit-themes-label">Themes</InputLabel>
+                  <Select
+                    labelId="edit-themes-label"
+                    multiple
+                    value={form.themeIds}
+                    label="Themes"
+                    onChange={handleThemeChange}
+                    renderValue={() => (
+                      <Box
+                        sx={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: 0.75,
+                          alignItems: "center",
+                        }}
+                      >
+                        {selectedThemeObjects.length === 0 ? (
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{ py: 0.25 }}
+                          >
+                            Select themes…
+                          </Typography>
+                        ) : (
+                          selectedThemeObjects.map((t) => {
+                            const id = String(getId(t));
+                            const isDefault =
+                              String(form.defaultThemeId) === id;
+                            return (
+                              <Box
+                                key={id}
+                                sx={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 0.75,
+                                  px: 0.75,
+                                  py: 0.25,
+                                  borderRadius: 1,
+                                  border: "1px solid",
+                                  borderColor: isDefault
+                                    ? "primary.main"
+                                    : "divider",
+                                  bgcolor: "background.paper",
+                                  maxWidth: "100%",
+                                }}
+                              >
+                                <ThemeSwatch theme={t} size={20} />
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    fontWeight: isDefault ? 700 : 500,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                    maxWidth: 140,
+                                  }}
+                                >
+                                  {t.name || `Theme ${id}`}
+                                </Typography>
+                                {isDefault && (
+                                  <Chip
+                                    size="small"
+                                    label="Default"
+                                    color="primary"
+                                    sx={{ height: 18, fontSize: 10 }}
+                                  />
+                                )}
+                              </Box>
+                            );
+                          })
+                        )}
+                      </Box>
+                    )}
+                  >
+                    {themes.map((theme) => {
+                      const id = String(getId(theme));
+                      const checked = form.themeIds
+                        .map(String)
+                        .includes(id);
+                      const isDefault =
+                        String(form.defaultThemeId) === id && checked;
                       return (
-                        <TableRow key={id} hover>
-                          <TableCell padding="checkbox">
-                            <Checkbox
-                              checked={selected}
-                              onChange={() => togglePage(id)}
-                            />
-                          </TableCell>
-                          <TableCell>{page.title || page.name}</TableCell>
-                          <TableCell align="right">
-                            {price > 0
-                              ? `${form.currency} ${price.toFixed(2)}`
-                              : "Free"}
-                          </TableCell>
-                          <TableCell align="center">
-                            <Switch
+                        <MenuItem
+                          key={id}
+                          value={id}
+                          sx={{ gap: 1.25, minHeight: 52 }}
+                        >
+                          <Checkbox
+                            size="small"
+                            checked={checked}
+                            tabIndex={-1}
+                            disableRipple
+                            sx={{ p: 0.25, mr: 0.25 }}
+                          />
+                          <ThemeSwatch theme={theme} size={32} />
+                          <Box sx={{ minWidth: 0, flex: "1 1 auto" }}>
+                            <Typography
+                              variant="body2"
+                              fontWeight={600}
+                              noWrap
+                            >
+                              {theme.name || `Theme ${id}`}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              noWrap
+                              component="div"
+                            >
+                              {theme.background || "#ffffff"} ·{" "}
+                              {theme.color || "#111111"}
+                            </Typography>
+                          </Box>
+                          {isDefault && (
+                            <Chip
                               size="small"
-                              checked={isDefault}
-                              disabled={!selected}
-                              onChange={(e) =>
-                                setPageDefault(id, e.target.checked)
-                              }
+                              label="Default"
+                              color="primary"
+                              sx={{ height: 20, fontSize: 11 }}
                             />
-                          </TableCell>
-                        </TableRow>
+                          )}
+                        </MenuItem>
                       );
                     })}
-                    {editPages.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={4} align="center">
-                          {pagesLoading
-                            ? "Loading pages..."
-                            : "No pages available for this category."}
-                        </TableCell>
-                      </TableRow>
+                    {themes.length === 0 && (
+                      <MenuItem disabled value="">
+                        No themes available
+                      </MenuItem>
                     )}
-                  </TableBody>
-                </Table>
-              </Paper>
+                  </Select>
+                </FormControl>
 
-              <FormControl fullWidth>
-                <InputLabel id="edit-status-label">Status</InputLabel>
-                <Select
-                  labelId="edit-status-label"
-                  label="Status"
-                  value={form.status}
-                  onChange={(e) => updateField("status", e.target.value)}
+                {selectedThemeObjects.length > 0 && (
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                      Default theme
+                    </Typography>
+                    <Box
+                      sx={{
+                        display: "grid",
+                        gap: 1.25,
+                        gridTemplateColumns: {
+                          xs: "1fr",
+                          sm: "repeat(2, minmax(0, 1fr))",
+                          md: "repeat(3, minmax(0, 1fr))",
+                        },
+                      }}
+                    >
+                      {selectedThemeObjects.map((theme) => {
+                        const id = String(getId(theme));
+                        const active = String(form.defaultThemeId) === id;
+                        return (
+                          <Box
+                            key={id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => updateField("defaultThemeId", id)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                updateField("defaultThemeId", id);
+                              }
+                            }}
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1.25,
+                              p: 1.25,
+                              borderRadius: 2,
+                              border: "2px solid",
+                              borderColor: active
+                                ? "primary.main"
+                                : "divider",
+                              bgcolor: active
+                                ? "action.selected"
+                                : "background.paper",
+                              cursor: "pointer",
+                              transition:
+                                "border-color 120ms ease, background-color 120ms ease",
+                              "&:hover": {
+                                borderColor: active
+                                  ? "primary.main"
+                                  : "text.disabled",
+                                bgcolor: active
+                                  ? "action.selected"
+                                  : "action.hover",
+                              },
+                              "&:focus-visible": {
+                                outline: "2px solid",
+                                outlineColor: "primary.main",
+                                outlineOffset: 2,
+                              },
+                            }}
+                          >
+                            <ThemeSwatch theme={theme} size={40} />
+                            <Box sx={{ minWidth: 0, flex: "1 1 auto" }}>
+                              <Typography
+                                variant="body2"
+                                fontWeight={600}
+                                noWrap
+                              >
+                                {theme.name || `Theme ${id}`}
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                noWrap
+                                component="div"
+                              >
+                                {active ? "Selected as default" : "Set default"}
+                              </Typography>
+                            </Box>
+                            {active && (
+                              <Chip
+                                size="small"
+                                label="Default"
+                                color="primary"
+                                sx={{ height: 22, fontSize: 11 }}
+                              />
+                            )}
+                          </Box>
+                        );
+                      })}
+                    </Box>
+                  </Box>
+                )}
+              </Box>
+
+              <Divider />
+
+              {/* Pages */}
+              <Box>
+                <SectionTitle hint="Choose the pages that belong to this template.">
+                  Pages
+                </SectionTitle>
+                <Paper
+                  variant="outlined"
+                  sx={{ borderRadius: 2, overflow: "hidden" }}
                 >
-                  <MenuItem value="draft">Draft</MenuItem>
-                  <MenuItem value="published">Published</MenuItem>
-                  <MenuItem value="archived">Archived</MenuItem>
-                </Select>
-              </FormControl>
+                  <TableContainer>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell padding="checkbox" sx={{ width: 64 }}>
+                            Include
+                          </TableCell>
+                          <TableCell>Page</TableCell>
+                          <TableCell align="right" sx={{ width: 140 }}>
+                            Base price
+                          </TableCell>
+                          <TableCell align="center" sx={{ width: 100 }}>
+                            Default
+                          </TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {editPages.map((page) => {
+                          const id = String(getId(page));
+                          const selected = Boolean(form.pages[id]);
+                          const isDefault = form.pages[id]?.isDefault === 1;
+                          const price = Number(
+                            page.pagePrice ?? page.price ?? 0,
+                          );
+                          return (
+                            <TableRow key={id} hover>
+                              <TableCell padding="checkbox">
+                                <Checkbox
+                                  checked={selected}
+                                  onChange={() => togglePage(id)}
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Typography variant="body2" noWrap>
+                                  {page.title || page.name || "Untitled page"}
+                                </Typography>
+                              </TableCell>
+                              <TableCell align="right">
+                                {price > 0
+                                  ? `${form.currency} ${price.toFixed(2)}`
+                                  : "Free"}
+                              </TableCell>
+                              <TableCell align="center">
+                                <Switch
+                                  size="small"
+                                  checked={isDefault}
+                                  disabled={!selected}
+                                  onChange={(e) =>
+                                    setPageDefault(id, e.target.checked)
+                                  }
+                                />
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                        {editPages.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={4} align="center">
+                              <Box sx={{ py: 3 }}>
+                                <Typography color="text.secondary">
+                                  {pagesLoading
+                                    ? "Loading pages…"
+                                    : "No pages available for this category."}
+                                </Typography>
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Paper>
+              </Box>
+
+              <Divider />
+
+              {/* Status */}
+              <Box>
+                <SectionTitle hint="Control whether this template is live.">
+                  Status
+                </SectionTitle>
+                <Box sx={{ maxWidth: 320 }}>
+                  <FormControl fullWidth>
+                    <InputLabel id="edit-status-label">Status</InputLabel>
+                    <Select
+                      labelId="edit-status-label"
+                      label="Status"
+                      value={form.status}
+                      onChange={(e) => updateField("status", e.target.value)}
+                    >
+                      <MenuItem value="draft">Draft</MenuItem>
+                      <MenuItem value="published">Published</MenuItem>
+                      <MenuItem value="archived">Archived</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Box>
+              </Box>
             </Stack>
           </DialogContent>
-          <DialogActions sx={{ p: 2 }}>
+          <DialogActions sx={{ px: 3, py: 2 }}>
             <Button onClick={closeEdit} disabled={saving}>
               Cancel
             </Button>
@@ -1024,23 +1613,33 @@ export default function ViewTemplate() {
                 )
               }
             >
-              {saving ? "Saving..." : "Save Changes"}
+              {saving ? "Saving…" : "Save Changes"}
             </Button>
           </DialogActions>
         </Box>
       </Dialog>
 
-      {/* Delete confirmation */}
+      {/* ---------------------------- Delete dialog --------------------------- */}
       <Dialog open={deleteOpen} onClose={closeDelete} maxWidth="xs" fullWidth>
-        <DialogTitle>Delete Template?</DialogTitle>
-        <DialogContent>
+        <DialogTitle sx={{ pr: 6 }}>
+          Delete Template?
+          <IconButton
+            onClick={closeDelete}
+            disabled={saving}
+            sx={{ position: "absolute", right: 8, top: 8 }}
+            aria-label="Close"
+          >
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
           <Typography>
             Are you sure you want to delete{" "}
             <strong>{selectedTemplate?.name || "this template"}</strong>? This
             cannot be undone.
           </Typography>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
+        <DialogActions sx={{ px: 3, py: 2 }}>
           <Button onClick={closeDelete} disabled={saving}>
             Cancel
           </Button>
@@ -1057,7 +1656,7 @@ export default function ViewTemplate() {
               )
             }
           >
-            {saving ? "Deleting..." : "Delete Template"}
+            {saving ? "Deleting…" : "Delete Template"}
           </Button>
         </DialogActions>
       </Dialog>

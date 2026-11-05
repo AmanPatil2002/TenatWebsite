@@ -12,8 +12,18 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
+import RateReviewOutlinedIcon from "@mui/icons-material/RateReviewOutlined";
+import ReviewsOutlinedIcon from "@mui/icons-material/ReviewsOutlined";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+const BRAND = {
+  indigo: "#4f46e5",
+  indigoDeep: "#3730a3",
+  ink: "#0f172a",
+  muted: "#64748b",
+};
 
 const formatDate = (value) =>
   new Date(value).toLocaleDateString(undefined, {
@@ -21,7 +31,6 @@ const formatDate = (value) =>
     month: "short",
     year: "numeric",
   });
-
 
 export default function Review() {
   const [reviews, setReviews] = useState([]);
@@ -94,138 +103,343 @@ export default function Review() {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: { xs: 3, md: 6 } }}>
-      <Typography variant="h4" component="h1" fontWeight={700} sx={{ mb: 1 }}>
-        Reviews
-      </Typography>
-      <Typography color="text.secondary" sx={{ mb: 3 }}>
-        Share your experience and keep track of the reviews you have posted.
-      </Typography>
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
-      {success && (
-        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess("")}>
-          {success}
-        </Alert>
-      )}
-
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-          gap: 3,
-          alignItems: "start",
-        }}
-      >
-        {/* LEFT: write a review */}
-        <Paper
-          component="form"
-          variant="outlined"
-          onSubmit={submitReview}
-          sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3 }}
-        >
-          <Typography variant="h6" fontWeight={700} sx={{ mb: 1 }}>
-            Write a review
+    <Box
+      sx={{
+        minHeight: "80vh",
+        py: { xs: 4, md: 7 },
+        background:
+          "linear-gradient(160deg, #f8fafc 0%, #eef2ff 45%, #f0fdfa 100%)",
+      }}
+    >
+      <Container maxWidth="lg">
+        {/* Page header */}
+        <Box sx={{ mb: { xs: 3, md: 4 }, textAlign: "center" }}>
+          <Typography
+            variant="overline"
+            sx={{
+              display: "block",
+              fontWeight: 700,
+              letterSpacing: "0.12em",
+              color: BRAND.indigo,
+            }}
+          >
+            Feedback
           </Typography>
-          <Stack spacing={2}>
-            <Box>
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                sx={{ mb: 0.5 }}
-              >
-                Your rating
-              </Typography>
-              <Rating
-                name="review-rating"
-                value={rating}
-                onChange={(_, value) => setRating(value || 0)}
-                precision={1}
-              />
-            </Box>
-            <TextField
-              label="Your review"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              multiline
-              minRows={4}
-              required
-              inputProps={{ maxLength: 2000 }}
-              helperText={`${description.length}/2000 characters`}
-            />
-            <Button type="submit" variant="contained" disabled={submitting}>
-              {submitting ? "Submitting…" : "Submit review"}
-            </Button>
-          </Stack>
-        </Paper>
+          <Typography
+            component="h1"
+            variant="h4"
+            sx={{
+              fontWeight: 800,
+              letterSpacing: "-0.02em",
+              color: BRAND.ink,
+              mt: 0.5,
+            }}
+          >
+            Reviews
+          </Typography>
+          <Typography
+            color="text.secondary"
+            sx={{ mt: 1, maxWidth: 560, mx: "auto" }}
+          >
+            Share your experience and keep track of the reviews you have posted.
+          </Typography>
+        </Box>
 
-        {/* RIGHT: my reviews (scrollable) */}
-        <Paper
-          variant="outlined"
+        {error && (
+          <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+            {error}
+          </Alert>
+        )}
+        {success && (
+          <Alert
+            severity="success"
+            sx={{ mb: 2, borderRadius: 2 }}
+            onClose={() => setSuccess("")}
+          >
+            {success}
+          </Alert>
+        )}
+
+        <Box
           sx={{
-            p: { xs: 2, sm: 3 },
-            borderRadius: 3,
-            display: "flex",
-            flexDirection: "column",
-            height: { xs: "auto", md: "45vh" },
-            minHeight: 0,
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+            gap: { xs: 2.5, md: 3 },
+            alignItems: "stretch",
           }}
         >
-          <Typography
-            variant="h5"
-            component="h2"
-            fontWeight={700}
-            sx={{ mb: 2 }}
+          {/* LEFT: write a review */}
+          <Paper
+            component="form"
+            variant="outlined"
+            onSubmit={submitReview}
+            elevation={0}
+            sx={{
+              p: { xs: 2.5, sm: 3.5 },
+              borderRadius: 3,
+              borderColor: "divider",
+              display: "flex",
+              flexDirection: "column",
+              minWidth: 0,
+              boxShadow: "0 12px 30px rgba(15,23,42,0.05)",
+            }}
           >
-            My reviews
-          </Typography>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, mb: 2 }}>
+              <Box
+                aria-hidden="true"
+                sx={{
+                  width: 40,
+                  height: 40,
+                  flexShrink: 0,
+                  display: "grid",
+                  placeItems: "center",
+                  borderRadius: 2,
+                  color: BRAND.indigo,
+                  bgcolor: alpha(BRAND.indigo, 0.08),
+                  "& .MuiSvgIcon-root": { fontSize: "1.25rem" },
+                }}
+              >
+                <RateReviewOutlinedIcon />
+              </Box>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="h6" fontWeight={700} color={BRAND.ink}>
+                  Write a review
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Tell others about your experience.
+                </Typography>
+              </Box>
+            </Box>
 
-          {loading ? (
-            <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
-              <CircularProgress />
+            <Divider sx={{ mb: 2.5 }} />
+
+            <Stack spacing={2.25} sx={{ flex: 1 }}>
+              <Box>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 0.75, fontWeight: 600 }}
+                >
+                  Your rating
+                </Typography>
+                <Rating
+                  name="review-rating"
+                  value={rating}
+                  onChange={(_, value) => setRating(value || 0)}
+                  precision={1}
+                  size="large"
+                  sx={{ color: BRAND.indigo }}
+                />
+              </Box>
+
+              <TextField
+                label="Your review"
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                multiline
+                minRows={5}
+                required
+                fullWidth
+                inputProps={{ maxLength: 2000 }}
+                helperText={`${description.length}/2000 characters`}
+                sx={{
+                  "& .MuiOutlinedInput-root": { borderRadius: 2 },
+                }}
+              />
+
+              <Box sx={{ mt: "auto" }}>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  disabled={submitting}
+                  size="large"
+                  fullWidth
+                  sx={{
+                    borderRadius: 2,
+                    textTransform: "none",
+                    fontWeight: 700,
+                    py: 1.15,
+                    bgcolor: BRAND.indigo,
+                    boxShadow: `0 8px 20px ${alpha(BRAND.indigo, 0.25)}`,
+                    "&:hover": {
+                      bgcolor: BRAND.indigoDeep,
+                      boxShadow: `0 10px 24px ${alpha(BRAND.indigo, 0.32)}`,
+                    },
+                  }}
+                >
+                  {submitting ? "Submitting…" : "Submit review"}
+                </Button>
+              </Box>
+            </Stack>
+          </Paper>
+
+          {/* RIGHT: my reviews */}
+          <Paper
+            variant="outlined"
+            elevation={0}
+            sx={{
+              p: { xs: 2.5, sm: 3.5 },
+              borderRadius: 3,
+              borderColor: "divider",
+              display: "flex",
+              flexDirection: "column",
+              minWidth: 0,
+              boxShadow: "0 12px 30px rgba(15,23,42,0.05)",
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, mb: 2 }}>
+              <Box
+                aria-hidden="true"
+                sx={{
+                  width: 40,
+                  height: 40,
+                  flexShrink: 0,
+                  display: "grid",
+                  placeItems: "center",
+                  borderRadius: 2,
+                  color: BRAND.indigo,
+                  bgcolor: alpha(BRAND.indigo, 0.08),
+                  "& .MuiSvgIcon-root": { fontSize: "1.25rem" },
+                }}
+              >
+                <ReviewsOutlinedIcon />
+              </Box>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography
+                  variant="h6"
+                  component="h2"
+                  fontWeight={700}
+                  color={BRAND.ink}
+                >
+                  My reviews
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {reviews.length > 0
+                    ? `${reviews.length} review${
+                        reviews.length === 1 ? "" : "s"
+                      } posted`
+                    : "Your submitted reviews will appear here."}
+                </Typography>
+              </Box>
             </Box>
-          ) : reviews.length === 0 ? (
-            <Typography color="text.secondary">
-              You haven&apos;t posted any reviews yet. Your reviews will appear
-              here.
-            </Typography>
-          ) : (
-            <Box
-              sx={{
-                flex: 1,
-                minHeight: 0,
-                overflowY: "auto",
-                maxHeight: { xs: 400, md: "none" }, // scroll on mobile too
-                pr: 1,
-              }}
-            >
-              <Stack spacing={2} divider={<Divider flexItem />}>
-                {reviews.map((review) => (
-                  <Box key={review.reviewId}>
-                    <Stack
-                      direction="row"
-                      justifyContent="space-between"
-                      alignItems="center"
+
+            <Divider sx={{ mb: 2.5 }} />
+
+            {loading ? (
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  py: 6,
+                  flex: 1,
+                }}
+              >
+                <CircularProgress
+                  size={32}
+                  sx={{ color: BRAND.indigo }}
+                  aria-label="Loading reviews"
+                />
+              </Box>
+            ) : reviews.length === 0 ? (
+              <Box
+                sx={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  textAlign: "center",
+                  py: 6,
+                  px: 2,
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: "50%",
+                    bgcolor: alpha(BRAND.indigo, 0.08),
+                    display: "grid",
+                    placeItems: "center",
+                    mb: 2,
+                  }}
+                >
+                  <ReviewsOutlinedIcon
+                    sx={{ fontSize: 28, color: BRAND.indigo }}
+                  />
+                </Box>
+                <Typography fontWeight={600} color={BRAND.ink} gutterBottom>
+                  No reviews yet
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  You haven&apos;t posted any reviews yet. Use the form on the
+                  left to share your first experience.
+                </Typography>
+              </Box>
+            ) : (
+              <Box
+                sx={{
+                  flex: 1,
+                  minHeight: 0,
+                  maxHeight: { xs: 420, md: 520 },
+                  overflowY: "auto",
+                  pr: 1,
+                  "&::-webkit-scrollbar": { width: 6 },
+                  "&::-webkit-scrollbar-thumb": {
+                    bgcolor: alpha(BRAND.indigo, 0.25),
+                    borderRadius: 3,
+                  },
+                }}
+              >
+                <Stack spacing={2} divider={<Divider flexItem />}>
+                  {reviews.map((review) => (
+                    <Box
+                      key={review.reviewId}
+                      sx={{
+                        p: 2,
+                        borderRadius: 2,
+                        bgcolor: alpha(BRAND.indigo, 0.02),
+                        border: "1px solid",
+                        borderColor: "divider",
+                      }}
                     >
-                      <Rating value={review.rating} readOnly size="small" />
-                    </Stack>
-                    <Typography sx={{ mt: 1, whiteSpace: "pre-wrap" }}>
-                      {review.description}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                        {formatDate(review.createdAt)}
+                      <Stack
+                        direction="row"
+                        justifyContent="space-between"
+                        alignItems="center"
+                        spacing={1}
+                        flexWrap="wrap"
+                      >
+                        <Rating
+                          value={review.rating}
+                          readOnly
+                          size="small"
+                          sx={{ color: BRAND.indigo }}
+                        />
+                        <Typography variant="caption" color="text.secondary">
+                          {formatDate(review.createdAt)}
+                        </Typography>
+                      </Stack>
+                      <Typography
+                        sx={{
+                          mt: 1,
+                          whiteSpace: "pre-wrap",
+                          color: BRAND.ink,
+                          fontSize: "0.95rem",
+                          lineHeight: 1.6,
+                        }}
+                      >
+                        {review.description}
                       </Typography>
-                  </Box>
-                ))}
-              </Stack>
-            </Box>
-          )}
-        </Paper>
-      </Box>
-    </Container>
+                    </Box>
+                  ))}
+                </Stack>
+              </Box>
+            )}
+          </Paper>
+        </Box>
+      </Container>
+    </Box>
   );
 }
