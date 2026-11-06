@@ -155,16 +155,6 @@ function ReportCard({ item }) {
 
           {/* Meta chips */}
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            <Chip
-              size="small"
-              variant="outlined"
-              label={statusLabel(item.type)}
-            />
-            <Chip
-              size="small"
-              variant="outlined"
-              label={`${statusLabel(item.severity)} severity`}
-            />
             {item.siteId && (
               <Chip
                 size="small"
@@ -813,7 +803,6 @@ export default function ErrorReport() {
                   justifyContent="space-between"
                   alignItems="center"
                 >
-                  <SectionLabel>My reports</SectionLabel>
                   <Button
                     size="small"
                     variant="outlined"

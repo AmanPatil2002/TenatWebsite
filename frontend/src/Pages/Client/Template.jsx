@@ -241,12 +241,20 @@ function PhotoSlider({ photos, alt = "Template" }) {
 
 /* ------------------------ Theme-aware page preview ------------------------ */
 
-function ThemePagePreview({ theme, pages, activePageKey, onPageChange, device }) {
+function ThemePagePreview({
+  theme,
+  pages,
+  activePageKey,
+  onPageChange,
+  device,
+}) {
   const background = theme?.background || "#ffffff";
   const color = theme?.color || "#222222";
 
   const keys = pages.map(getPageKey);
-  const selectedKey = keys.includes(activePageKey) ? activePageKey : keys[0] || "";
+  const selectedKey = keys.includes(activePageKey)
+    ? activePageKey
+    : keys[0] || "";
   const activePage = pages.find((p, i) => getPageKey(p, i) === selectedKey);
   const html = activePage?.page ?? "";
 
@@ -325,12 +333,15 @@ function ThemePagePreview({ theme, pages, activePageKey, onPageChange, device })
           overflowX: "auto",
         }}
       >
-        <Box sx={{ width: DEVICE_WIDTHS[device], maxWidth: "100%", mx: "auto" }}>
+        <Box
+          sx={{ width: DEVICE_WIDTHS[device], maxWidth: "100%", mx: "auto" }}
+        >
           <iframe
             key={`${selectedKey}-${device}`}
             title={activePage?.title || "Theme page preview"}
             srcDoc={srcDoc}
             sandbox=""
+            tabIndex={-1}
             style={{
               width: "100%",
               height: 700,
@@ -338,6 +349,7 @@ function ThemePagePreview({ theme, pages, activePageKey, onPageChange, device })
               borderRadius: 8,
               background,
               display: "block",
+              pointerEvents: "none",
             }}
           />
         </Box>
@@ -435,7 +447,9 @@ export default function Template() {
 
   const activeCategory = useMemo(
     () =>
-      categories.find((c) => String(c.categoryId ?? c.id) === String(categoryId)),
+      categories.find(
+        (c) => String(c.categoryId ?? c.id) === String(categoryId),
+      ),
     [categories, categoryId],
   );
 
@@ -449,10 +463,11 @@ export default function Template() {
         }
         return (
           !q ||
-          [t.name, t.shortDescription, t.description, t.categoryName].some((v) =>
-            String(v || "")
-              .toLowerCase()
-              .includes(q),
+          [t.name, t.shortDescription, t.description, t.categoryName].some(
+            (v) =>
+              String(v || "")
+                .toLowerCase()
+                .includes(q),
           )
         );
       })
@@ -463,7 +478,8 @@ export default function Template() {
         }
         const aDate = Date.parse(a.createdAt || "");
         const bDate = Date.parse(b.createdAt || "");
-        if (Number.isFinite(aDate) && Number.isFinite(bDate)) return bDate - aDate;
+        if (Number.isFinite(aDate) && Number.isFinite(bDate))
+          return bDate - aDate;
         return Number(b.templateId || 0) - Number(a.templateId || 0);
       });
   }, [categoryId, search, sort, templates]);
@@ -485,7 +501,9 @@ export default function Template() {
     setPreviewThemeId(pickDefaultTheme(template));
 
     try {
-      const response = await axios.get(`${API}/templates/${template.templateId}`);
+      const response = await axios.get(
+        `${API}/templates/${template.templateId}`,
+      );
       if (requestId !== detailRequestRef.current) return;
       const full = response?.data ?? template;
       setSelected(full);
@@ -550,7 +568,9 @@ export default function Template() {
         ["Language", selected.language || "Not specified"],
         [
           "Access period",
-          selected.validityDays ? `${selected.validityDays} days` : "Not specified",
+          selected.validityDays
+            ? `${selected.validityDays} days`
+            : "Not specified",
         ],
         ["Price", formatPrice(selected.price, selected.currency)],
       ]
@@ -559,7 +579,13 @@ export default function Template() {
   return (
     <Box sx={{ bgcolor: "#f7f8fb", minHeight: "100vh", pb: 8 }}>
       {/* Header */}
-      <Box sx={{ bgcolor: "#fff", borderBottom: "1px solid #e5e7eb", py: { xs: 4, md: 6 } }}>
+      <Box
+        sx={{
+          bgcolor: "#fff",
+          borderBottom: "1px solid #e5e7eb",
+          py: { xs: 4, md: 6 },
+        }}
+      >
         <Container maxWidth="lg">
           <Typography
             variant="h3"
@@ -570,7 +596,8 @@ export default function Template() {
             {activeCategory?.name || "Website templates"}
           </Typography>
           <Typography color="text.secondary" sx={{ maxWidth: 700, mb: 3 }}>
-            {(typeof activeCategory?.content === "string" && activeCategory.content) ||
+            {(typeof activeCategory?.content === "string" &&
+              activeCategory.content) ||
               "Browse published templates, preview their pages and themes, then purchase one to create your own site."}
           </Typography>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
@@ -609,7 +636,11 @@ export default function Template() {
       {/* Sidebar categories + grid */}
       <Container maxWidth="lg" sx={{ mt: 4, px: { xs: 2, md: 3 } }}>
         {categoryWarning && (
-          <Alert severity="warning" sx={{ mb: 2 }} onClose={() => setCategoryWarning("")}>
+          <Alert
+            severity="warning"
+            sx={{ mb: 2 }}
+            onClose={() => setCategoryWarning("")}
+          >
             {categoryWarning}
           </Alert>
         )}
@@ -673,7 +704,11 @@ export default function Template() {
 
           <Grid size={{ xs: 12, md: 9 }}>
             {error && (
-              <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>
+              <Alert
+                severity="error"
+                sx={{ mb: 2 }}
+                onClose={() => setError("")}
+              >
                 {error}
               </Alert>
             )}
@@ -691,7 +726,10 @@ export default function Template() {
                     </Grid>
                   ))
                 : visible.map((template) => (
-                    <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={template.templateId}>
+                    <Grid
+                      size={{ xs: 12, sm: 6, lg: 4 }}
+                      key={template.templateId}
+                    >
                       <Card
                         variant="outlined"
                         sx={{
@@ -699,7 +737,10 @@ export default function Template() {
                           borderRadius: 3,
                           overflow: "hidden",
                           transition: "box-shadow .2s, transform .2s",
-                          "&:hover": { boxShadow: 5, transform: "translateY(-2px)" },
+                          "&:hover": {
+                            boxShadow: 5,
+                            transform: "translateY(-2px)",
+                          },
                         }}
                       >
                         <CardActionArea
@@ -720,39 +761,27 @@ export default function Template() {
                               e.currentTarget.onerror = null;
                               e.currentTarget.src = PLACEHOLDER_IMAGE;
                             }}
-                            sx={{ height: 190, objectFit: "cover", bgcolor: "#eef2f7" }}
+                            sx={{
+                              height: 190,
+                              objectFit: "cover",
+                              bgcolor: "#eef2f7",
+                            }}
                           />
                           <CardContent sx={{ flexGrow: 1, width: "100%" }}>
                             <Stack spacing={1}>
-                              {template.categoryName && (
-                                <Box>
-                                  <Chip size="small" label={template.categoryName} />
-                                </Box>
-                              )}
                               <Typography
                                 variant="h6"
                                 fontWeight={700}
-                                sx={{ overflowWrap: "anywhere", lineHeight: 1.3 }}
+                                sx={{
+                                  overflowWrap: "anywhere",
+                                  lineHeight: 1.3,
+                                }}
                               >
                                 {template.name}
                               </Typography>
                               <Typography fontWeight={700}>
                                 {formatPrice(template.price, template.currency)}
                               </Typography>
-                              {/* <Typography
-                                variant="body2"
-                                color="text.secondary"
-                                sx={{
-                                  overflow: "hidden",
-                                  display: "-webkit-box",
-                                  WebkitBoxOrient: "vertical",
-                                  WebkitLineClamp: 2,
-                                }}
-                              >
-                                {template.shortDescription ||
-                                  template.description ||
-                                  "Explore this template."}
-                              </Typography> */}
                             </Stack>
                           </CardContent>
                         </CardActionArea>
@@ -762,7 +791,10 @@ export default function Template() {
             </Grid>
 
             {!loading && !visible.length && !error && (
-              <Paper variant="outlined" sx={{ p: 5, textAlign: "center", mt: 2 }}>
+              <Paper
+                variant="outlined"
+                sx={{ p: 5, textAlign: "center", mt: 2 }}
+              >
                 <Typography variant="h6">No templates found</Typography>
                 <Typography color="text.secondary">
                   Try another search or category.
@@ -810,22 +842,29 @@ export default function Template() {
               </Stack>
             </DialogTitle>
 
-            <DialogContent dividers sx={{ bgcolor: "#f7f8fb", px: { xs: 1, sm: 2, md: 3 } }}>
+            <DialogContent
+              dividers
+              sx={{ bgcolor: "#f7f8fb", px: { xs: 1, sm: 2, md: 3 } }}
+            >
               {detailLoading ? (
-                <Box sx={{ display: "grid", placeItems: "center", minHeight: 280 }}>
+                <Box
+                  sx={{ display: "grid", placeItems: "center", minHeight: 280 }}
+                >
                   <CircularProgress />
                 </Box>
               ) : (
                 <Container maxWidth="xl" disableGutters sx={{ py: 1 }}>
                   {detailError && (
-                    <Alert severity="warning" sx={{ mb: 2 }} onClose={() => setDetailError("")}>
+                    <Alert
+                      severity="warning"
+                      sx={{ mb: 2 }}
+                      onClose={() => setDetailError("")}
+                    >
                       {detailError}
                     </Alert>
                   )}
 
                   <Stack spacing={3}>
-                    
-
                     {/* 1. Images */}
                     {sliderPhotos.length > 0 && (
                       <PhotoSlider photos={sliderPhotos} alt={selected.name} />
@@ -847,10 +886,16 @@ export default function Template() {
                       <Grid container spacing={2}>
                         {infoRows.map(([label, value]) => (
                           <Grid size={{ xs: 6, sm: 3 }} key={label}>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
                               {label}
                             </Typography>
-                            <Typography fontWeight={700} sx={{ overflowWrap: "anywhere" }}>
+                            <Typography
+                              fontWeight={700}
+                              sx={{ overflowWrap: "anywhere" }}
+                            >
                               {value}
                             </Typography>
                           </Grid>
@@ -864,7 +909,11 @@ export default function Template() {
                       </Typography>
                       <Typography
                         color="text.secondary"
-                        sx={{ mt: 1, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}
+                        sx={{
+                          mt: 1,
+                          whiteSpace: "pre-wrap",
+                          overflowWrap: "anywhere",
+                        }}
                       >
                         {selected.description ||
                           "Explore the included pages, themes and preview for this template."}
@@ -890,13 +939,24 @@ export default function Template() {
                       <Typography variant="h6" fontWeight={700}>
                         Preview pages with a theme
                       </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mb: 2 }}
+                      >
                         Choose a theme on the left; the pages show on the right.
                       </Typography>
 
-                      <Grid container spacing={{ xs: 2, md: 3 }} alignItems="flex-start">
+                      <Grid
+                        container
+                        spacing={{ xs: 2, md: 3 }}
+                        alignItems="flex-start"
+                      >
                         <Grid size={{ xs: 12, md: 3 }}>
-                          <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 } }}>
+                          <Paper
+                            variant="outlined"
+                            sx={{ p: { xs: 1.5, sm: 2 } }}
+                          >
                             <Typography variant="subtitle1" fontWeight={700}>
                               Themes
                             </Typography>
@@ -904,20 +964,30 @@ export default function Template() {
                             {selectedThemes.length ? (
                               <Stack
                                 spacing={1}
-                                sx={{ maxHeight: { md: 700 }, overflowY: "auto", pr: 0.5 }}
+                                sx={{
+                                  maxHeight: { md: 700 },
+                                  overflowY: "auto",
+                                  pr: 0.5,
+                                }}
                               >
                                 {selectedThemes.map((theme, i) => {
                                   const active =
-                                    String(theme.themeId) === String(previewTheme?.themeId);
+                                    String(theme.themeId) ===
+                                    String(previewTheme?.themeId);
                                   return (
                                     <Box
                                       key={theme.themeId ?? i}
                                       role="button"
                                       tabIndex={0}
                                       aria-pressed={active}
-                                      onClick={() => setPreviewThemeId(theme.themeId)}
+                                      onClick={() =>
+                                        setPreviewThemeId(theme.themeId)
+                                      }
                                       onKeyDown={(e) => {
-                                        if (e.key === "Enter" || e.key === " ") {
+                                        if (
+                                          e.key === "Enter" ||
+                                          e.key === " "
+                                        ) {
                                           e.preventDefault();
                                           setPreviewThemeId(theme.themeId);
                                         }
@@ -929,8 +999,12 @@ export default function Template() {
                                         borderRadius: 1,
                                         bgcolor: theme.background || "#fff",
                                         color: theme.color || "#111",
-                                        border: active ? "2px solid" : "1px solid",
-                                        borderColor: active ? "primary.main" : "divider",
+                                        border: active
+                                          ? "2px solid"
+                                          : "1px solid",
+                                        borderColor: active
+                                          ? "primary.main"
+                                          : "divider",
                                         display: "flex",
                                         alignItems: "center",
                                         justifyContent: "space-between",
@@ -938,11 +1012,19 @@ export default function Template() {
                                         cursor: "pointer",
                                       }}
                                     >
-                                      <Typography variant="body2" fontWeight={700} noWrap>
+                                      <Typography
+                                        variant="body2"
+                                        fontWeight={700}
+                                        noWrap
+                                      >
                                         {theme.name || `Theme ${i + 1}`}
                                       </Typography>
                                       {isDefaultFlag(theme) && (
-                                        <Chip size="small" color="primary" label="Default" />
+                                        <Chip
+                                          size="small"
+                                          color="primary"
+                                          label="Default"
+                                        />
                                       )}
                                     </Box>
                                   );
@@ -957,7 +1039,14 @@ export default function Template() {
                         </Grid>
 
                         <Grid size={{ xs: 12, md: 9 }}>
-                          <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
+                          <Stack
+                            direction="row"
+                            sx={{
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              mb: 1.5,
+                            }}
+                          >
                             <Typography variant="body2" color="text.secondary">
                               {previewTheme
                                 ? `Theme: ${previewTheme.name || "selected"}`
@@ -970,7 +1059,10 @@ export default function Template() {
                               onChange={(_, value) => value && setDevice(value)}
                               aria-label="Preview size"
                             >
-                              <ToggleButton value="desktop" aria-label="Desktop">
+                              <ToggleButton
+                                value="desktop"
+                                aria-label="Desktop"
+                              >
                                 <DesktopWindowsIcon fontSize="small" />
                               </ToggleButton>
                               <ToggleButton value="tablet" aria-label="Tablet">

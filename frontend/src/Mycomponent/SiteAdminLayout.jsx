@@ -224,36 +224,7 @@ export default function SiteAdminLayout() {
   const pages = Array.isArray(site?.pages) ? site.pages : [];
   const siteName = site?.siteName || localStorage.getItem("siteAdminSiteName");
   const siteCategory = String(site?.categoryName || "").toLowerCase();
-  const recordItems = [];
-
-  if (/(education|school|college|university|academy|student)/.test(siteCategory)) {
-    recordItems.push({
-      text: "Students",
-      icon: <SchoolIcon size={20} />,
-      path: `${siteBasePath}/records/students`,
-    });
-  }
-  if (/(e.?commerce|commerce|product|shop|store|retail)/.test(siteCategory)) {
-    recordItems.push({
-      text: "Products",
-      icon: <ProductsIcon size={20} />,
-      path: `${siteBasePath}/records/products`,
-    });
-  }
-  if (/(restaurant|cafe|food|dining)/.test(siteCategory)) {
-    recordItems.push(
-      {
-        text: "Restaurants",
-        icon: <RestaurantIcon size={20} />,
-        path: `${siteBasePath}/records/restaurants`,
-      },
-      {
-        text: "Menu items",
-        icon: <MenuBookIcon size={20} />,
-        path: `${siteBasePath}/records/menus`,
-      },
-    );
-  }
+  
 
   const menuItems = [
     { text: "Dashboard", icon: <DashboardIcon size={20} />, path: `${siteBasePath}/panel` },
@@ -263,7 +234,7 @@ export default function SiteAdminLayout() {
     { text: "Gallery", icon: <GalleryIcon size={20} />, path: `${siteBasePath}/gallery` },
     { text: "Slider", icon: <SliderIcon size={20} />, path: `${siteBasePath}/slider` },
     { text: "Header & footer", icon: <BrandingIcon size={20} />, path: `${siteBasePath}/header-footer` },
-    ...recordItems,
+    // ...recordItems,
   ];
 
   const currentItem = menuItems.find((i) => i.path === location.pathname);
@@ -308,18 +279,7 @@ export default function SiteAdminLayout() {
           </IconButton>
 
           <Stack spacing={0.25} sx={{ flexGrow: 1, minWidth: 0 }}>
-            <Typography
-              variant="caption"
-              sx={{
-                color: "text.secondary",
-                fontWeight: 600,
-                letterSpacing: ".06em",
-                textTransform: "uppercase",
-                fontSize: 10.5,
-              }}
-            >
-              My site
-            </Typography>
+            
             <Typography variant="subtitle1" fontWeight={700} noWrap>
               {currentItem?.text || "Dashboard"}
             </Typography>
@@ -355,30 +315,6 @@ export default function SiteAdminLayout() {
                 <PreviewIcon size={20} />
               </IconButton>
             </Tooltip>
-            <Divider orientation="vertical" flexItem sx={{ my: 1.75 }} />
-            <Avatar
-              sx={{
-                width: 36,
-                height: 36,
-                bgcolor: alpha(theme.palette.primary.main, 0.12),
-                color: "primary.main",
-                fontWeight: 700,
-                fontSize: 14,
-              }}
-            >
-              {(siteName || "S").charAt(0).toUpperCase()}
-            </Avatar>
-            <Box sx={{ display: { xs: "none", md: "block" }, minWidth: 0 }}>
-              <Typography variant="body2" fontWeight={700} noWrap>
-                {siteName || "Site"}
-              </Typography>
-              <Stack direction="row" alignItems="center" spacing={0.5}>
-                <GlobeIcon size={12} color={theme.palette.text.secondary} />
-                <Typography variant="caption" color="text.secondary" noWrap>
-                  Live
-                </Typography>
-              </Stack>
-            </Box>
           </Stack>
         </Toolbar>
       </AppBar>

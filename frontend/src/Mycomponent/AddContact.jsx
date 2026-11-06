@@ -392,9 +392,6 @@ export default function AddContact() {
                 <Typography variant="h6" sx={{ fontWeight: 700 }}>
                   {editingContact ? "Edit Contact" : "Add Contact"}
                 </Typography>
-                {!editingContact && hasContact && (
-                  <Chip size="small" label="Limit reached" color="warning" variant="outlined" />
-                )}
               </Stack>
               <Typography variant="body2" color="text.secondary">
                 {editingContact

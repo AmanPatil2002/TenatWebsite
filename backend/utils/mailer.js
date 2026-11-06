@@ -17,6 +17,61 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+const escapeHtml = (value) =>
+  value.replace(/[&<>"']/g, (character) => {
+    const entities = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    };
+    return entities[character];
+  });
+
+const sendPasswordResetEmail = async ({ to, name, code, expiresInMinutes }) => {
+  if (!to || typeof to !== "string" || !to.includes("@")) {
+    throw new HttpError(400, "Invalid recipient email address.");
+  }
+  if (
+    typeof code !== "string" ||
+    !/^\d{6}$/.test(code) ||
+    typeof expiresInMinutes !== "number" ||
+    !Number.isFinite(expiresInMinutes) ||
+    expiresInMinutes <= 0
+  ) {
+    throw new HttpError(400, "Invalid password reset email data.");
+  }
+
+  const greeting = name ? `Hi ${escapeHtml(String(name))},` : "Hello,";
+  const mailOptions = {
+    from:
+      process.env.SMTP_FROM ||
+      `TenatWebsite <${process.env.SMTP_USER || "noreply@example.com"}>`,
+    to,
+    subject: "Your password reset code",
+    text: `${name ? `Hi ${name},` : "Hello,"}\n\nYour password reset verification code is ${code}. It expires in ${expiresInMinutes} minutes. If you did not request a password reset, you can ignore this email.`,
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2c3e50;">Password reset</h2>
+        <p>${greeting}</p>
+        <p>Use this verification code to reset your password:</p>
+        <p style="font-size: 24px; font-weight: bold; letter-spacing: 4px;">${code}</p>
+        <p>This code expires in ${expiresInMinutes} minutes. If you did not request a password reset, you can ignore this email.</p>
+      </div>
+    `,
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`Password reset email sent to ${to}: ${info.messageId}`);
+    return { messageId: info.messageId };
+  } catch (error) {
+    console.error("Mailer error:", error);
+    throw new HttpError(502, "Could not send password reset email.");
+  }
+};
+
 const sendSiteAdminCredentials = async ({ to, siteId, siteName, templateName, ownerName, password }) => {
   // Validate inputs
   if (!to || typeof to !== "string" || !to.includes("@")) {
@@ -74,4 +129,4 @@ const sendSiteAdminCredentials = async ({ to, siteId, siteName, templateName, ow
   }
 };
 
-module.exports = { sendSiteAdminCredentials };
+module.exports = { sendPasswordResetEmail, sendSiteAdminCredentials };

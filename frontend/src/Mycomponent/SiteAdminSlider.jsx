@@ -580,11 +580,7 @@ export default function SiteAdminSlider() {
                   )}`,
                 }}
               >
-                {saving
-                  ? "Saving…"
-                  : editingId
-                    ? "Save changes"
-                    : "Add slide"}
+                {saving ? "Saving…" : editingId ? "Save changes" : "Add slide"}
               </Button>
               {editingId && (
                 <Button
@@ -671,8 +667,7 @@ export default function SiteAdminSlider() {
                   sx={{
                     borderRadius: 2,
                     overflow: "hidden",
-                    transition:
-                      "border-color .15s ease, box-shadow .15s ease",
+                    transition: "border-color .15s ease, box-shadow .15s ease",
                     "&:hover": {
                       borderColor: alpha(theme.palette.primary.main, 0.4),
                       boxShadow: `0 6px 18px ${alpha(
@@ -778,27 +773,20 @@ export default function SiteAdminSlider() {
                           spacing={1}
                           sx={{ mt: 0.5 }}
                         >
-                          <Chip
-                            size="small"
-                            variant="outlined"
-                            label={`Order #${item.sortOrder ?? 0}`}
-                            sx={{
-                              fontSize: 10.5,
-                              height: 20,
-                              fontWeight: 600,
-                              "& .MuiChip-label": { px: 0.75 },
-                            }}
-                          />
                           {item.createdAt && (
                             <Typography
                               variant="caption"
                               color="text.secondary"
                             >
-                              Added {new Date(item.createdAt).toLocaleDateString("en-IN", {
-                                day: "2-digit",
-                                month: "short",
-                                year: "numeric",
-                              })}
+                              Added{" "}
+                              {new Date(item.createdAt).toLocaleDateString(
+                                "en-IN",
+                                {
+                                  day: "2-digit",
+                                  month: "short",
+                                  year: "numeric",
+                                },
+                              )}
                             </Typography>
                           )}
                         </Stack>
