@@ -129,4 +129,96 @@ const sendSiteAdminCredentials = async ({ to, siteId, siteName, templateName, ow
   }
 };
 
-module.exports = { sendPasswordResetEmail, sendSiteAdminCredentials };
+const sendPaymentEmail = async ({
+  to,
+  name,
+  templateName,
+  invoiceNumber,
+  transactionId,
+  amount,
+  currency,
+  method,
+  paidAt,
+  pages = [],
+}) => {
+  if (!to || typeof to !== "string" || !to.includes("@")) {
+    throw new HttpError(400, "Invalid recipient email address.");
+  }
+  if (
+    typeof templateName !== "string" ||
+    typeof invoiceNumber !== "string" ||
+    typeof transactionId !== "string" ||
+    !Number.isFinite(Number(amount)) ||
+    typeof currency !== "string"
+  ) {
+    throw new HttpError(400, "Invalid payment confirmation email data.");
+  }
+
+  const greeting = name ? `Hi ${escapeHtml(String(name))},` : "Hello,";
+  const safeTemplateName = escapeHtml(templateName);
+  const safeInvoiceNumber = escapeHtml(invoiceNumber);
+  const safeTransactionId = escapeHtml(transactionId);
+  const safeCurrency = escapeHtml(currency);
+  const safeAmount = Number(amount).toFixed(2);
+  const pageLines = Array.isArray(pages)
+    ? pages.map((page) => `- ${page.title}: ${page.price} ${currency}`).join("\n")
+    : "";
+  const pageRows = Array.isArray(pages)
+    ? pages
+        .map(
+          (page) =>
+            `<li>${escapeHtml(String(page.title ?? ""))}: ${escapeHtml(
+              String(page.price ?? ""),
+            )} ${safeCurrency}</li>`,
+        )
+        .join("")
+    : "";
+  const formattedPaidAt = paidAt ? new Date(paidAt).toLocaleString() : "N/A";
+
+  try {
+    const info = await transporter.sendMail({
+      from:
+        process.env.SMTP_FROM ||
+        `TenatWebsite <${process.env.SMTP_USER || "noreply@example.com"}>`,
+      to,
+      subject: `Payment confirmation — ${templateName}`,
+      text: [
+        name ? `Hi ${name},` : "Hello,",
+        "",
+        `Your purchase of ${templateName} is confirmed.`,
+        `Invoice: ${invoiceNumber}`,
+        `Transaction: ${transactionId}`,
+        `Amount: ${safeAmount} ${currency}`,
+        `Payment method: ${method || "N/A"}`,
+        `Paid at: ${formattedPaidAt}`,
+        pageLines ? `\nPurchased pages:\n${pageLines}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      html: `
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2c3e50;">Payment confirmed</h2>
+          <p>${greeting}</p>
+          <p>Your purchase of <strong>${safeTemplateName}</strong> is confirmed.</p>
+          <p><strong>Invoice:</strong> ${safeInvoiceNumber}<br>
+             <strong>Transaction:</strong> ${safeTransactionId}<br>
+             <strong>Amount:</strong> ${safeAmount} ${safeCurrency}<br>
+             <strong>Payment method:</strong> ${escapeHtml(String(method || "N/A"))}<br>
+             <strong>Paid at:</strong> ${escapeHtml(formattedPaidAt)}</p>
+          ${pageRows ? `<p>Purchased pages:</p><ul>${pageRows}</ul>` : ""}
+        </div>
+      `,
+    });
+    console.log(`Payment confirmation email sent to ${to}: ${info.messageId}`);
+    return { messageId: info.messageId };
+  } catch (error) {
+    console.error("Mailer error:", error);
+    throw new HttpError(502, "Could not send payment confirmation email.");
+  }
+};
+
+module.exports = {
+  sendPasswordResetEmail,
+  sendSiteAdminCredentials,
+  sendPaymentEmail,
+};

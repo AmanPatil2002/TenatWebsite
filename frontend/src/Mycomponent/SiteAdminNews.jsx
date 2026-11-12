@@ -19,7 +19,7 @@ import {
 } from "@mui/material";
 
 /* ------------------------------------------------------------------ */
-/*  Inline SVG icons — no MUI icon imports, no tree-shaking issues     */
+/*  Inline SVG icons                                                   */
 /* ------------------------------------------------------------------ */
 const SvgIcon = ({ children, size = 20, color = "currentColor" }) => (
   <Box
@@ -78,11 +78,15 @@ const ImageIcon = (p) => (
   </SvgIcon>
 );
 
+/* ------------------------------------------------------------------ */
+/*  Form shape — mirrors RESOURCE_CONFIG.news.fields                   */
+/* ------------------------------------------------------------------ */
 const EMPTY_FORM = {
   title: "",
   imageUrl: "",
   content: "",
   status: "active",
+  publishedAt: "", // nullable: false, format: datetime-local
 };
 
 const formatDateInput = (value) => {
@@ -95,10 +99,16 @@ const formatDateInput = (value) => {
   )}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
+const toApiDateTime = (raw) => (raw ? new Date(raw).toISOString() : null);
+
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
 export default function SiteAdminNews() {
   const theme = useTheme();
-  const { baseUrl, authConfig } = useOutletContext();
-  const newsUrl = `${baseUrl}/news`;
+  // Same credential destructure as SiteAdminData (adds `site`).
+  const { baseUrl, authConfig, site } = useOutletContext();
+  const newsUrl = `${baseUrl}/data/news`;
   const uploadUrl = `${baseUrl}/media/upload`;
   const assetOrigin = new URL(baseUrl, window.location.origin).origin;
   const resolveImage = (url) =>
@@ -170,6 +180,7 @@ export default function SiteAdminNews() {
       imageUrl: item.imageUrl || "",
       content: item.content || "",
       status: item.status || "active",
+      publishedAt: formatDateInput(item.publishedAt),
     });
     setError("");
     setNotice("");
@@ -180,12 +191,11 @@ export default function SiteAdminNews() {
     event.target.value = "";
     if (!file) return;
 
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-    if (!allowedTypes.includes(file.type)) {
+    if (!ALLOWED_TYPES.includes(file.type)) {
       setError("Only JPG, PNG, WEBP or GIF images are allowed.");
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > MAX_IMAGE_BYTES) {
       setError("Image must be 5 MB or smaller.");
       return;
     }
@@ -197,13 +207,8 @@ export default function SiteAdminNews() {
     setError("");
     setNotice("");
     try {
-      const { data } = await axios.post(uploadUrl, body, {
-        ...authConfig,
-        headers: {
-          ...authConfig?.headers,
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      // Let axios set the multipart boundary; only merge auth headers.
+      const { data } = await axios.post(uploadUrl, body, authConfig);
       setForm((current) => ({ ...current, imageUrl: data.imageUrl }));
       setNotice("Image uploaded. Save to add it to the news article.");
     } catch (requestError) {
@@ -219,13 +224,25 @@ export default function SiteAdminNews() {
     event.preventDefault();
     setError("");
     setNotice("");
+
+    // Same required-field rules as RESOURCE_CONFIG.news.fields
+    if (!form.title.trim()) {
+      setError("Title is required.");
+      return;
+    }
+    if (!form.content.trim()) {
+      setError("Content is required.");
+      return;
+    }
+
     setSaving(true);
 
     const payload = {
-      ...form,
-      publishedAt: form.publishedAt
-        ? new Date(form.publishedAt).toISOString()
-        : null,
+      title: form.title.trim(),
+      imageUrl: form.imageUrl || null,
+      content: form.content.trim(),
+      status: form.status || "active",
+      publishedAt: toApiDateTime(form.publishedAt),
     };
 
     try {
@@ -270,7 +287,7 @@ export default function SiteAdminNews() {
 
   return (
     <Box sx={{ maxWidth: 1400, mx: "auto" }}>
-      {/* ---------------- Page header ---------------- */}
+      {/* Page header — same chip pattern as SiteAdminData */}
       <Stack
         direction={{ xs: "column", sm: "row" }}
         justifyContent="space-between"
@@ -280,23 +297,31 @@ export default function SiteAdminNews() {
       >
         <Box>
           <Typography variant="h4" fontWeight={800} letterSpacing="-0.02em">
-            News & updates
+            News &amp; updates
           </Typography>
           <Typography color="text.secondary" sx={{ mt: 0.5 }}>
             Publish articles and announcements on your website.
           </Typography>
         </Box>
-        <Chip
-          icon={<NewsIcon size={14} />}
-          label={`${items.length} article${items.length === 1 ? "" : "s"}`}
-          variant="outlined"
-          sx={{
-            alignSelf: { xs: "flex-start", sm: "center" },
-            fontWeight: 600,
-            borderRadius: 2,
-            "& .MuiChip-icon": { color: "primary.main", ml: 0.5 },
-          }}
-        />
+        <Stack direction="row" spacing={1} alignItems="center">
+          {site?.categoryName && (
+            <Chip
+              label={site.categoryName}
+              variant="outlined"
+              sx={{ textTransform: "capitalize", fontWeight: 600 }}
+            />
+          )}
+          <Chip
+            icon={<NewsIcon size={14} />}
+            label={`${items.length} article${items.length === 1 ? "" : "s"}`}
+            variant="outlined"
+            sx={{
+              fontWeight: 600,
+              borderRadius: 2,
+              "& .MuiChip-icon": { color: "primary.main", ml: 0.5 },
+            }}
+          />
+        </Stack>
       </Stack>
 
       {error && (
@@ -321,7 +346,7 @@ export default function SiteAdminNews() {
           alignItems: "start",
         }}
       >
-        {/* ---------------- Form ---------------- */}
+        {/* Form */}
         <Paper
           component="form"
           variant="outlined"
@@ -402,22 +427,9 @@ export default function SiteAdminNews() {
                     component="img"
                     src={resolveImage(form.imageUrl)}
                     alt="Selected preview"
-                    sx={{
-                      width: "100%",
-                      height: 170,
-                      objectFit: "cover",
-                      display: "block",
-                    }}
+                    sx={{ width: "100%", height: 170, objectFit: "cover", display: "block" }}
                   />
-                  <Stack
-                    direction="row"
-                    spacing={1}
-                    sx={{
-                      position: "absolute",
-                      bottom: 8,
-                      right: 8,
-                    }}
-                  >
+                  <Stack direction="row" spacing={1} sx={{ position: "absolute", bottom: 8, right: 8 }}>
                     <Button
                       size="small"
                       variant="contained"
@@ -443,11 +455,7 @@ export default function SiteAdminNews() {
                   onClick={() => fileInputRef.current?.click()}
                   disabled={busy}
                   startIcon={
-                    uploading ? (
-                      <CircularProgress size={16} />
-                    ) : (
-                      <ImageIcon size={18} />
-                    )
+                    uploading ? <CircularProgress size={16} /> : <ImageIcon size={18} />
                   }
                   sx={{
                     py: 2.5,
@@ -465,11 +473,7 @@ export default function SiteAdminNews() {
                   }}
                 >
                   <Stack direction="row" alignItems="center" spacing={1}>
-                    {uploading ? (
-                      <CircularProgress size={18} />
-                    ) : (
-                      <UploadIcon size={18} />
-                    )}
+                    {uploading ? <CircularProgress size={18} /> : <UploadIcon size={18} />}
                     <span>{uploading ? "Uploading…" : "Upload cover image"}</span>
                   </Stack>
                   <Typography variant="caption" color="text.secondary" fontWeight={400}>
@@ -488,6 +492,16 @@ export default function SiteAdminNews() {
               minRows={5}
               fullWidth
               size="small"
+            />
+
+            <TextField
+              label="Publish date"
+              type="datetime-local"
+              value={form.publishedAt}
+              onChange={updateField("publishedAt")}
+              fullWidth
+              size="small"
+              InputLabelProps={{ shrink: true }}
             />
 
             <TextField
@@ -527,11 +541,7 @@ export default function SiteAdminNews() {
                   boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.25)}`,
                 }}
               >
-                {saving
-                  ? "Saving…"
-                  : editingId
-                    ? "Save changes"
-                    : "Publish article"}
+                {saving ? "Saving…" : editingId ? "Save changes" : "Publish article"}
               </Button>
               {editingId && (
                 <Button
@@ -547,7 +557,7 @@ export default function SiteAdminNews() {
           </Stack>
         </Paper>
 
-        {/* ---------------- List ---------------- */}
+        {/* List */}
         <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, minWidth: 0 }}>
           <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.5 }}>
             <Typography variant="h6" fontWeight={700}>
@@ -672,9 +682,11 @@ export default function SiteAdminNews() {
                       >
                         {item.content || "No additional details"}
                       </Typography>
-                      {item.createdAt && (
+                      {(item.publishedAt || item.createdAt) && (
                         <Typography variant="caption" color="text.secondary">
-                          Created: {formatDateInput(item.createdAt).replace("T", " ")}
+                          {item.publishedAt
+                            ? `Published: ${formatDateInput(item.publishedAt).replace("T", " ")}`
+                            : `Created: ${formatDateInput(item.createdAt).replace("T", " ")}`}
                         </Typography>
                       )}
                     </Box>

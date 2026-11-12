@@ -239,7 +239,9 @@ export default function SiteAdminManagePages() {
   };
 
   const selectedPage = pages.find((p) => String(p.sitePageId) === selectedId);
-  const currentTitle = creating ? "New custom page" : selectedPage?.title || "Page";
+  const currentTitle = creating
+    ? "New custom page"
+    : selectedPage?.title || "Page";
 
   return (
     <Box sx={{ maxWidth: 1440, mx: "auto" }}>
@@ -387,11 +389,7 @@ export default function SiteAdminManagePages() {
                   Colors
                 </Typography>
                 <Stack spacing={1}>
-                  <Stack
-                    direction="row"
-                    alignItems="center"
-                    spacing={1.25}
-                  >
+                  <Stack direction="row" alignItems="center" spacing={1.25}>
                     <Box
                       sx={{
                         width: 26,
@@ -406,20 +404,12 @@ export default function SiteAdminManagePages() {
                       <Typography variant="caption" color="text.secondary">
                         Background
                       </Typography>
-                      <Typography
-                        variant="body2"
-                        fontFamily="monospace"
-                        noWrap
-                      >
+                      <Typography variant="body2" fontFamily="monospace" noWrap>
                         {site.background || "#ffffff"}
                       </Typography>
                     </Box>
                   </Stack>
-                  <Stack
-                    direction="row"
-                    alignItems="center"
-                    spacing={1.25}
-                  >
+                  <Stack direction="row" alignItems="center" spacing={1.25}>
                     <Box
                       sx={{
                         width: 26,
@@ -434,11 +424,7 @@ export default function SiteAdminManagePages() {
                       <Typography variant="caption" color="text.secondary">
                         Text
                       </Typography>
-                      <Typography
-                        variant="body2"
-                        fontFamily="monospace"
-                        noWrap
-                      >
+                      <Typography variant="body2" fontFamily="monospace" noWrap>
                         {site.color || "#222222"}
                       </Typography>
                     </Box>
@@ -540,7 +526,10 @@ export default function SiteAdminManagePages() {
                                 height: 18,
                                 fontSize: 10,
                                 fontWeight: 700,
-                                bgcolor: alpha(theme.palette.primary.main, 0.15),
+                                bgcolor: alpha(
+                                  theme.palette.primary.main,
+                                  0.15,
+                                ),
                                 color: "primary.main",
                                 "& .MuiChip-label": { px: 0.75 },
                               }}
@@ -627,7 +616,12 @@ export default function SiteAdminManagePages() {
                 {creating ? <AddIcon size={18} /> : <EditIcon size={18} />}
               </Box>
               <Box sx={{ minWidth: 0 }}>
-                <Typography variant="h6" fontWeight={700} lineHeight={1.2} noWrap>
+                <Typography
+                  variant="h6"
+                  fontWeight={700}
+                  lineHeight={1.2}
+                  noWrap
+                >
                   {creating ? "Create a custom page" : "Edit page"}
                 </Typography>
                 <Typography variant="caption" color="text.secondary" noWrap>
@@ -748,31 +742,96 @@ export default function SiteAdminManagePages() {
                       height: 350,
                       language: "en",
                       allowedContent: true,
-                      extraPlugins: "uploadimage,localvideo",
-                      uploadUrl: `${API_URL}/uploads/ckeditor`,
-                      imageUploadUrl: `${API_URL}/uploads/ckeditor`,
-                      filebrowserImageUploadUrl: `${API_URL}/uploads/ckeditor`,
+                      // Enable the colorbutton plugin for text/background color
+                      extraPlugins:
+                        "uploadimage,localvideo,colorbutton,find,divarea",
+
+                      // Use toolbarGroups for better organization and future plugin compatibility
+                      toolbarGroups: [
+                        {
+                          name: "document",
+                          groups: ["mode", "document", "doctools"],
+                        },
+                        { name: "clipboard", groups: ["clipboard", "undo"] },
+                        {
+                          name: "editing",
+                          groups: ["find", "selection", "spellchecker"],
+                        },
+                        { name: "forms" },
+                        {
+                          name: "basicstyles",
+                          groups: ["basicstyles", "cleanup"],
+                        },
+                        {
+                          name: "paragraph",
+                          groups: ["list", "indent", "blocks", "align", "bidi"],
+                        },
+                        { name: "links" },
+                        { name: "insert" },
+                        { name: "styles" },
+                        { name: "colors" },
+                        { name: "tools" },
+                        { name: "others" },
+                        { name: "about" },
+                      ],
+
+                      // Explicitly add your custom LocalVideo button into the 'insert' group
+                      // (Since it is not a standard plugin, we add it to the toolbar array)
                       toolbar: [
                         {
                           name: "document",
-                          items: ["Source", "Preview", "Maximize"],
+                          items: ["Source", "-", "Preview", "-", "Maximize"],
                         },
-                        { name: "clipboard", items: ["Undo", "Redo"] },
-                        { name: "styles", items: ["Format", "FontSize"] },
+                        {
+                          name: "clipboard",
+                          items: [
+                            "Cut",
+                            "Copy",
+                            "Paste",
+                            "PasteText",
+                            "PasteFromWord",
+                            "-",
+                            "Undo",
+                            "Redo",
+                          ],
+                        },
+                        {
+                          name: "editing",
+                          items: ["Find", "Replace", "-", "SelectAll"],
+                        },
+                        "/",
                         {
                           name: "basicstyles",
-                          items: ["Bold", "Italic", "Underline", "Strike"],
+                          items: [
+                            "Bold",
+                            "Italic",
+                            "Underline",
+                            "Strike",
+                            "Subscript",
+                            "Superscript",
+                            "-",
+                            "RemoveFormat",
+                          ],
                         },
+                        { name: "colors", items: ["TextColor", "BGColor"] },
                         {
                           name: "paragraph",
                           items: [
                             "NumberedList",
                             "BulletedList",
+                            "-",
+                            "Outdent",
+                            "Indent",
+                            "-",
+                            "Blockquote",
+                            "-",
                             "JustifyLeft",
                             "JustifyCenter",
                             "JustifyRight",
+                            "JustifyBlock",
                           ],
                         },
+                        { name: "links", items: ["Link", "Unlink", "Anchor"] },
                         {
                           name: "insert",
                           items: [
@@ -783,8 +842,18 @@ export default function SiteAdminManagePages() {
                             "SpecialChar",
                           ],
                         },
-                        { name: "links", items: ["Link", "Unlink"] },
+                        { name: "styles", items: ["Format", "FontSize"] },
+                        { name: "tools", items: ["Maximize"] },
                       ],
+
+                      // Remove buttons you don't want to keep the toolbar clean
+                      removeButtons:
+                        "NewPage,Templates,Form,Checkbox,Radio,TextField,Textarea,Select,Button,ImageButton,HiddenField,About",
+
+                      // Keep your upload settings
+                      uploadUrl: `${API_URL}/uploads/ckeditor`,
+                      imageUploadUrl: `${API_URL}/uploads/ckeditor`,
+                      filebrowserImageUploadUrl: `${API_URL}/uploads/ckeditor`,
                     }}
                     onInstanceReady={(event) => {
                       event.editor.document.getBody().setStyles({

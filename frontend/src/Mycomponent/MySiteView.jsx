@@ -292,6 +292,7 @@ const buildSrcDoc = ({
   pageTitle,
   galleries,
   slides,
+  siteData = {},
 }) => {
   const isHome = /home/i.test(pageTitle);
   const isGallery = /gall[ae]ry/i.test(pageTitle);
@@ -303,11 +304,18 @@ const buildSrcDoc = ({
     ? pageHtml.replace(SLIDER_MARKER, () => sliderHtml)
     : `${sliderHtml}${pageHtml}`;
 
+  // Inject siteData as a global variable for page templates to use
+  const siteDataScript = `<script>
+    window.SITE_DATA = ${JSON.stringify(siteData)};
+    window.SITE_THEME = { background: "${background}", color: "${color}" };
+  </script>`;
+
   return `<!DOCTYPE html>
 <html>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    ${siteDataScript}
     <style>
       :root {
         --site-header-bg: color-mix(in srgb, ${color} 6%, ${background});
@@ -337,7 +345,7 @@ const buildSrcDoc = ({
       .site-gallery figcaption { padding: 10px 12px; }
     </style>
   </head>
-  <body><main class="site-page">${bodyHtml}${isGallery ? renderGallery(galleries) : ""}</main></body>
+  <body><main class="site-page">${bodyHtml}${isGallery ? renderGallery(galleries) : ""}</main>${siteDataScript}</body>
 </html>`;
 };
 
@@ -749,6 +757,7 @@ export default function MySiteView() {
   });
   const [pages, setPages] = useState([]);
   const [media, setMedia] = useState({ news: [], galleries: [], slider: [] });
+  const [siteData, setSiteData] = useState({});
   const [activeId, setActiveId] = useState("");
   const [devices, setDevices] = useState("laptop");
   const [newsIndex, setNewsIndex] = useState(0);
@@ -838,6 +847,33 @@ export default function MySiteView() {
             : [],
         });
 
+        // Fetch site data resources
+        try {
+          const dataRes = await axios.get(
+            siteAdminMode
+              ? `${API_URL}/sites/client-admin/${targetSiteId}/data`
+              : `${API_URL}/sites/${targetSiteId}/data`,
+            { headers }
+          );
+          if (cancelled) return;
+          const resources = Array.isArray(dataRes.data) ? dataRes.data : [];
+          const dataMap = {};
+          await Promise.all(
+            resources.map(async (resource) => {
+              const res = await axios.get(
+                siteAdminMode
+                  ? `${API_URL}/sites/client-admin/${targetSiteId}/data/${resource}`
+                  : `${API_URL}/sites/${targetSiteId}/data/${resource}`,
+                { headers }
+              );
+              dataMap[resource] = res.data;
+            })
+          );
+          setSiteData(dataMap);
+        } catch (e) {
+          console.warn("Could not load site data resources", e);
+        }
+
         setActiveId(list[0] ? pageKey(list[0]) : "");
         setSite({
           color: meta?.color || pagesRes.data?.color || "#222222",
@@ -902,8 +938,9 @@ export default function MySiteView() {
         pageTitle: activePage?.title || "Site",
         galleries: media.galleries,
         slides: media.slider,
+        siteData,
       }),
-    [activePage, theme, media.galleries, media.slider],
+    [activePage, theme, media.galleries, media.slider, siteData],
   );
 
   const handleNavigate = (id) => {

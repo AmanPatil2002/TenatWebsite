@@ -36,34 +36,25 @@ const BRAND = {
   muted: "#64748b",
 };
 
-// Limits mirror the backend and the categories table (VARCHAR(500)).
-const NAME_MAX = 500;
-const TAG_MAX = 500;
+// Limits mirror the controller and the categories table columns.
+const NAME_MAX = 190; // name    VARCHAR(190)
+const PACK_KEY_MAX = 30; // packKey VARCHAR(30)
+const TAG_MAX = 500; // tag     VARCHAR(500)
 
-const getInitialForm = () => ({ name: "", tag: "", content: "" });
+const getInitialForm = () => ({ name: "", packKey: "", tag: "" });
 
-// The API returns `content` as parsed JSON (or null). Show it as editable text.
-const contentToText = (content) => {
-  if (content === null || content === undefined) return "";
-  if (typeof content === "string") return content;
-  return JSON.stringify(content, null, 2);
+const fieldSx = { "& .MuiOutlinedInput-root": { borderRadius: 2 } };
+
+const headCellSx = {
+  fontWeight: 700,
+  bgcolor: alpha(BRAND.indigo, 0.04),
+  color: BRAND.ink,
 };
 
-// The API only accepts a JSON object/array (or empty) for `content`.
-const parseContent = (text) => {
-  const trimmed = text.trim();
-  if (!trimmed) return { value: null };
-  let parsed;
-  try {
-    parsed = JSON.parse(trimmed);
-  } catch {
-    return { error: "Content is not valid JSON" };
-  }
-  if (parsed === null) return { value: null };
-  if (typeof parsed !== "object") {
-    return { error: "Content must be a JSON object or array" };
-  }
-  return { value: parsed };
+const formatDate = (value) => {
+  if (!value) return "—";
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString();
 };
 
 const errorMessage = (error, fallback) => {
@@ -108,20 +99,21 @@ function CategoryForm({
   const validate = () => {
     const errs = {};
     const name = formData.name.trim();
+    const packKey = formData.packKey.trim();
     const tag = formData.tag.trim();
 
     if (!name) errs.name = "Category name is required";
     else if (name.length > NAME_MAX)
       errs.name = `Name must be ${NAME_MAX} characters or fewer`;
 
+    if (packKey.length > PACK_KEY_MAX)
+      errs.packKey = `Pack key must be ${PACK_KEY_MAX} characters or fewer`;
+
     if (tag.length > TAG_MAX)
       errs.tag = `Tag must be ${TAG_MAX} characters or fewer`;
 
-    const content = parseContent(formData.content);
-    if (content.error) errs.content = content.error;
-
     setErrors(errs);
-    return { ok: Object.keys(errs).length === 0, content: content.value };
+    return Object.keys(errs).length === 0;
   };
 
   const handleChange = (e) => {
@@ -133,12 +125,11 @@ function CategoryForm({
   const handleSubmit = (e) => {
     e.preventDefault();
     if (submitting) return;
-    const { ok, content } = validate();
-    if (!ok) return;
+    if (!validate()) return;
     onSubmit({
       name: formData.name.trim(),
+      packKey: formData.packKey.trim(),
       tag: formData.tag.trim(),
-      content,
     });
   };
 
@@ -157,7 +148,22 @@ function CategoryForm({
           slotProps={{ htmlInput: { maxLength: NAME_MAX } }}
           required
           autoFocus
-          sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+          sx={fieldSx}
+        />
+        <TextField
+          fullWidth
+          size="small"
+          name="packKey"
+          label="Pack key (optional)"
+          value={formData.packKey}
+          onChange={handleChange}
+          error={!!errors.packKey}
+          helperText={
+            errors.packKey ||
+            "Template pack, e.g. school, restaurant, ecommerce, medical, generic"
+          }
+          slotProps={{ htmlInput: { maxLength: PACK_KEY_MAX } }}
+          sx={fieldSx}
         />
         <TextField
           fullWidth
@@ -167,31 +173,9 @@ function CategoryForm({
           value={formData.tag}
           onChange={handleChange}
           error={!!errors.tag}
-          helperText={errors.tag || "A short label, e.g. portfolio"}
+          helperText={errors.tag || "Comma-separated, e.g. education, courses"}
           slotProps={{ htmlInput: { maxLength: TAG_MAX } }}
-          sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-        />
-        <TextField
-          fullWidth
-          size="small"
-          name="content"
-          label="Content (optional, JSON)"
-          multiline
-          minRows={5}
-          maxRows={12}
-          value={formData.content}
-          onChange={handleChange}
-          error={!!errors.content}
-          helperText={
-            errors.content || 'A JSON object or array, e.g. {"icon": "store"}'
-          }
-          slotProps={{
-            htmlInput: {
-              spellCheck: false,
-              style: { fontFamily: "monospace", fontSize: "0.85rem" },
-            },
-          }}
-          sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+          sx={fieldSx}
         />
         <Stack
           direction={{ xs: "column", sm: "row" }}
@@ -416,7 +400,6 @@ export default function AddCategory() {
                 borderRadius: 3,
                 borderColor: "divider",
                 boxShadow: "0 12px 30px rgba(15,23,42,0.05)",
-                // No height: "100%" — let it size to its content
               }}
             >
               <Box
@@ -470,8 +453,8 @@ export default function AddCategory() {
                   editingCategory
                     ? {
                         name: editingCategory.name || "",
+                        packKey: editingCategory.packKey || "",
                         tag: editingCategory.tag || "",
-                        content: contentToText(editingCategory.content),
                       }
                     : getInitialForm()
                 }
@@ -499,25 +482,15 @@ export default function AddCategory() {
                 flexDirection: "column",
               }}
             >
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  gap: 2,
-                  mb: 2,
-                }}
-              >
-                <Box sx={{ minWidth: 0 }}>
-                  <SectionLabel>Existing categories</SectionLabel>
-                  <Typography variant="body2" sx={{ color: BRAND.muted }}>
-                    {categories.length > 0
-                      ? `${categories.length} categor${
-                          categories.length === 1 ? "y" : "ies"
-                        } available`
-                      : "No categories yet."}
-                  </Typography>
-                </Box>
+              <Box sx={{ mb: 2 }}>
+                <SectionLabel>Existing categories</SectionLabel>
+                <Typography variant="body2" sx={{ color: BRAND.muted }}>
+                  {categories.length > 0
+                    ? `${categories.length} categor${
+                        categories.length === 1 ? "y" : "ies"
+                      } available`
+                    : "No categories yet."}
+                </Typography>
               </Box>
 
               <Divider sx={{ mb: 2 }} />
@@ -577,28 +550,22 @@ export default function AddCategory() {
                   <Table
                     size="small"
                     stickyHeader
-                    sx={{ minWidth: 520, tableLayout: "auto" }}
+                    sx={{ minWidth: 720, tableLayout: "auto" }}
                   >
                     <TableHead>
                       <TableRow>
-                        <TableCell
-                          sx={{
-                            minWidth: 200,
-                            fontWeight: 700,
-                            bgcolor: alpha(BRAND.indigo, 0.04),
-                            color: BRAND.ink,
-                          }}
-                        >
+                        <TableCell sx={{ minWidth: 180, ...headCellSx }}>
                           Name
+                        </TableCell>
+                        <TableCell sx={{ minWidth: 180, ...headCellSx }}>
+                          Tag
                         </TableCell>
                         <TableCell
                           align="right"
                           sx={{
                             minWidth: 100,
                             whiteSpace: "nowrap",
-                            fontWeight: 700,
-                            bgcolor: alpha(BRAND.indigo, 0.04),
-                            color: BRAND.ink,
+                            ...headCellSx,
                           }}
                         >
                           Actions
@@ -623,7 +590,7 @@ export default function AddCategory() {
                         >
                           <TableCell
                             sx={{
-                              minWidth: 200,
+                              minWidth: 180,
                               overflowWrap: "anywhere",
                               verticalAlign: "middle",
                               py: 1.5,
@@ -635,12 +602,34 @@ export default function AddCategory() {
                             >
                               {c.name}
                             </Typography>
+                            {c.packKey ? (
+                              <Chip
+                                size="small"
+                                variant="outlined"
+                                label={c.packKey}
+                                sx={{
+                                  borderColor: alpha(BRAND.indigo, 0.35),
+                                  color: BRAND.indigoDeep,
+                                  fontWeight: 600,
+                                  fontSize: "0.72rem",
+                                }}
+                              />
+                            ) : (
+                              <Typography
+                                variant="caption"
+                                sx={{ color: BRAND.muted }}
+                              >
+                                No pack key
+                              </Typography>
+                            )}
+                          </TableCell>
+
+                          <TableCell sx={{ verticalAlign: "middle", py: 1.5 }}>
                             {c.tag ? (
                               <Chip
                                 size="small"
                                 label={c.tag}
                                 sx={{
-                                  mt: 0.75,
                                   maxWidth: "100%",
                                   height: "auto",
                                   bgcolor: alpha(BRAND.indigo, 0.08),

@@ -94,6 +94,13 @@ const BrandingIcon = (p) => (
     <path d="M8 16h8" />
   </SvgIcon>
 );
+const DataIcon = (p) => (
+  <SvgIcon {...p}>
+    <ellipse cx="12" cy="5" rx="8" ry="3" />
+    <path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5" />
+    <path d="M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7" />
+  </SvgIcon>
+);
 const SchoolIcon = (p) => (
   <SvgIcon {...p}>
     <path d="m12 3 9 4-9 4-9-4 9-4Z" />
@@ -234,6 +241,7 @@ export default function SiteAdminLayout() {
     { text: "Gallery", icon: <GalleryIcon size={20} />, path: `${siteBasePath}/gallery` },
     { text: "Slider", icon: <SliderIcon size={20} />, path: `${siteBasePath}/slider` },
     { text: "Header & footer", icon: <BrandingIcon size={20} />, path: `${siteBasePath}/header-footer` },
+    { text: "Site data", icon: <DataIcon size={20} />, path: `${siteBasePath}/data` },
     // ...recordItems,
   ];
 

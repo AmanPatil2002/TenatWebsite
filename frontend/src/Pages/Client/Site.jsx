@@ -229,6 +229,7 @@ const buildSrcDoc = ({
   pageTitle,
   galleries,
   slides,
+  siteData,
 }) => {
   const isHome = /home/i.test(pageTitle);
   const isGallery = /gall[ae]ry/i.test(pageTitle);
@@ -245,6 +246,7 @@ const buildSrcDoc = ({
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>window.siteData = ${JSON.stringify(siteData || {})};</script>
     <style>
       :root {
         --site-header-bg: color-mix(in srgb, ${color} 6%, ${background});
@@ -644,6 +646,7 @@ export default function MySiteView() {
   });
   const [pages, setPages] = useState([]);
   const [media, setMedia] = useState({ news: [], galleries: [], slider: [] });
+  const [siteData, setSiteData] = useState({});
   const [activeId, setActiveId] = useState("");
   const [newsIndex, setNewsIndex] = useState(0);
   const [newsOpen, setNewsOpen] = useState(false);
@@ -705,6 +708,33 @@ export default function MySiteView() {
           axios.get(mediaUrl, { headers }),
         ]);
         if (cancelled) return;
+
+        // Fetch site data resources
+        const dataRes = await axios.get(
+          siteAdminMode
+            ? `${API_URL}/sites/client-admin/${targetSiteId}/data`
+            : `${API_URL}/sites/${targetSiteId}/data`,
+          { headers },
+        );
+        const dataSections = Array.isArray(dataRes.data?.sections)
+          ? dataRes.data.sections
+          : [];
+
+        const siteDataMap = {};
+        for (const section of dataSections) {
+          try {
+            const res = await axios.get(
+              siteAdminMode
+                ? `${API_URL}/sites/client-admin/${targetSiteId}/data/${section.resource}`
+                : `${API_URL}/sites/${targetSiteId}/data/${section.resource}`,
+              { headers },
+            );
+            siteDataMap[section.resource] = res.data;
+          } catch (e) {
+            console.error(`Error loading resource ${section.resource}`, e);
+          }
+        }
+        setSiteData(siteDataMap);
 
         const list = Array.isArray(pagesRes.data?.pages)
           ? pagesRes.data.pages
@@ -791,8 +821,9 @@ export default function MySiteView() {
         pageTitle: activePage?.title || "Site",
         galleries: media.galleries,
         slides: media.slider,
+        siteData,
       }),
-    [activePage, theme, media.galleries, media.slider],
+    [activePage, theme, media.galleries, media.slider, siteData],
   );
 
   const handleNavigate = (id) => {

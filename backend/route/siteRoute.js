@@ -12,10 +12,6 @@ const {
   createEmployee,
   updateEmployee,
   deleteEmployee,
-  getEntries,
-  createEntry,
-  updateEntry,
-  deleteEntry,
 } = require("../controller/siteContentController");
 const {
   getMySites,
@@ -28,6 +24,7 @@ const {
   reorderSitePages,
 } = require("../controller/siteController");
 const siteMedia = require("../controller/siteMediaController");
+const siteData = require("../controller/siteDataController");
 
 const router = express.Router();
 
@@ -78,6 +75,18 @@ router.get(
   authenticateSiteAdmin,
   getSitePageOptions,
 );
+router.get("/client-admin/:siteId/data", authenticateSiteAdmin, siteData.sections);
+router.get("/client-admin/:siteId/data/:resource", authenticateSiteAdmin, siteData.list);
+router.post("/client-admin/:siteId/data/:resource", authenticateSiteAdmin, siteData.create);
+router.put("/client-admin/:siteId/data/:resource/:id", authenticateSiteAdmin, siteData.update);
+router.delete("/client-admin/:siteId/data/:resource/:id", authenticateSiteAdmin, siteData.remove);
+
+// Enhanced inventory features (TODO: implement these methods in siteDataController)
+// router.get("/client-admin/:siteId/data/:resource/low-stock", authenticateSiteAdmin, siteData.lowStock);
+// router.post("/client-admin/:siteId/data/:resource/bulk-update", authenticateSiteAdmin, siteData.bulkUpdate);
+// router.get("/client-admin/:siteId/data/:resource/analytics", authenticateSiteAdmin, siteData.analytics);
+// router.post("/client-admin/:siteId/data/:resource/:id/adjust-stock", authenticateSiteAdmin, siteData.adjustStock);
+
 router.get("/client-admin/:siteId/employees", authenticateSiteAdmin, getEmployees);
 router.post("/client-admin/:siteId/employees", authenticateSiteAdmin, createEmployee);
 router.put(
@@ -89,18 +98,6 @@ router.delete(
   "/client-admin/:siteId/employees/:employeeId",
   authenticateSiteAdmin,
   deleteEmployee,
-);
-router.get("/client-admin/:siteId/entries", authenticateSiteAdmin, getEntries);
-router.post("/client-admin/:siteId/entries", authenticateSiteAdmin, createEntry);
-router.put(
-  "/client-admin/:siteId/entries/:entryId",
-  authenticateSiteAdmin,
-  updateEntry,
-);
-router.delete(
-  "/client-admin/:siteId/entries/:entryId",
-  authenticateSiteAdmin,
-  deleteEntry,
 );
 
 // Category-specific routes
@@ -129,6 +126,8 @@ router.get(
   siteMedia.listPublishedMedia,
 );
 router.get("/:siteId/media", authenticateToken, siteMedia.listPublishedMedia);
+router.get("/:siteId/data/:resource", authenticateToken, siteData.list);
+
 router.post(
   "/client-admin/:siteId/media/upload",
   authenticateSiteAdmin,

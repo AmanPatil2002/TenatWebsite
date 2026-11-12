@@ -111,6 +111,7 @@ const loginSiteAdmin = async (req, res) => {
 
   if (
     !isId(siteId) ||
+    
     !normalizedEmail ||
     typeof password !== "string" ||
     !password

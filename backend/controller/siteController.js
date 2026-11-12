@@ -1,5 +1,6 @@
 const db = require("../config/db").promise();
 const { HttpError, sendError } = require("../utils/tx");
+const { tn } = require("../config/provisionSite");
 
 const isId = (value) => {
   if (typeof value === "number" && !Number.isSafeInteger(value)) return false;
@@ -9,7 +10,7 @@ const isId = (value) => {
 
 const getActiveOwnedSite = async (siteId, userId) => {
   const [[site]] = await db.query(
-    `SELECT s.id, s.userId, s.status, s.expiresAt,
+    `SELECT s.id, s.userId, s.status, s.expiresAt, s.dbName,
             pay.status AS paymentStatus,
             s.expiresAt > CURRENT_TIMESTAMP AS notExpired
        FROM sites s
@@ -37,7 +38,7 @@ const getActiveManagedSite = async (siteId, req) => {
     throw new HttpError(403, "This login is not assigned to the requested site");
   }
   const [[site]] = await db.query(
-    `SELECT s.id, s.userId, s.status, s.expiresAt,
+    `SELECT s.id, s.userId, s.status, s.expiresAt, s.dbName,
             pay.status AS paymentStatus,
             s.expiresAt > CURRENT_TIMESTAMP AS notExpired
        FROM sites s
@@ -82,13 +83,12 @@ const isHttpUrl = (value) => {
   }
 };
 
-const readSiteHeader = async (siteId) => {
+const readSiteHeader = async (siteId, dbName) => {
   const [[header]] = await db.query(
-    `SELECT headerid, siteId, logoUrl, siteTitle, footerText, footerAddress,
+    `SELECT logoUrl, siteTitle, footerText, footerAddress,
             footerPhone, footerEmail, copyrightText, socialLinks, createdAt, updatedAt
-       FROM siteheaders
-      WHERE siteId = ?`,
-    [siteId],
+       FROM ${tn(siteId, "headers", dbName)}
+      LIMIT 1`
   );
   if (header && typeof header.socialLinks === "string") {
     try {
@@ -104,8 +104,8 @@ const getSiteHeader = async (req, res) => {
   const { siteId } = req.params;
   if (!isId(siteId)) return res.status(400).json({ message: "Invalid site id" });
   try {
-    await getActiveManagedSite(siteId, req);
-    return res.json({ header: await readSiteHeader(siteId) });
+    const site = await getActiveManagedSite(siteId, req);
+    return res.json({ header: await readSiteHeader(siteId, site.dbName) });
   } catch (error) {
     return sendError(res, error);
   }
@@ -160,19 +160,13 @@ const updateSiteHeader = async (req, res) => {
   );
 
   try {
-    await getActiveManagedSite(siteId, req);
+    const site = await getActiveManagedSite(siteId, req);
     await db.query(
-      `INSERT INTO siteheaders
-         (siteId, logoUrl, siteTitle, footerText, footerAddress, footerPhone,
-          footerEmail, copyrightText, socialLinks)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         logoUrl = VALUES(logoUrl), siteTitle = VALUES(siteTitle),
-         footerText = VALUES(footerText), footerAddress = VALUES(footerAddress),
-         footerPhone = VALUES(footerPhone), footerEmail = VALUES(footerEmail),
-         copyrightText = VALUES(copyrightText), socialLinks = VALUES(socialLinks)`,
+      `UPDATE ${tn(siteId, "headers", site.dbName)}
+       SET logoUrl = ?, siteTitle = ?, footerText = ?, footerAddress = ?,
+           footerPhone = ?, footerEmail = ?, copyrightText = ?, socialLinks = ?
+       LIMIT 1`,
       [
-        siteId,
         logoUrl,
         header.siteTitle,
         header.footerText,
@@ -185,7 +179,7 @@ const updateSiteHeader = async (req, res) => {
     );
     return res.json({
       message: "Site header and footer saved",
-      header: await readSiteHeader(siteId),
+      header: await readSiteHeader(siteId, site.dbName),
     });
   } catch (error) {
     return sendError(res, error);
@@ -198,7 +192,7 @@ const getMySites = async (req, res) => {
   `SELECT s.id, s.userId, s.templateId, t.name AS templateName,
           t.thumbnailUrl, t.shortDescription,
           s.themeId, th.name AS themeName, th.color, th.background,
-          s.paymentId, s.name, s.status,
+          s.paymentId, s.name, s.status, s.provisionStatus,
           CASE WHEN s.expiresAt <= CURRENT_TIMESTAMP THEN 'expired' ELSE s.status END AS currentStatus,
           (SELECT COUNT(*) FROM sitepages sp WHERE sp.siteId = s.id) AS pageCount,
           s.startsAt, s.expiresAt, s.createdAt
@@ -219,65 +213,31 @@ const getSitePages = async (req, res) => {
   const { siteId } = req.params;
   if (!isId(siteId)) return res.status(400).json({ message: "Invalid site id" });
   try {
-    await getActiveManagedSite(siteId, req);
+    const site = await getActiveManagedSite(siteId, req);
 
     const [pages] = await db.query(
       `SELECT id AS sitePageId, title, page, sortOrder
-         FROM sitepages
-        WHERE siteId = ?
-        ORDER BY sortOrder, id`,
-      [siteId],
+         FROM ${tn(siteId, "pages", site.dbName)}
+        ORDER BY sortOrder, id`
     );
-    const [entries] = await db.query(
-      `SELECT sitePageId, name, description, price, imageUrl, customFields
-         FROM siteEntries
-        WHERE siteId = ? AND status = 'active'
-        ORDER BY name, id`,
-      [siteId],
-    );
-    const entriesByPage = new Map();
-    for (const entry of entries) {
-      const key = String(entry.sitePageId);
-      entriesByPage.set(key, [...(entriesByPage.get(key) || []), entry]);
-    }
-    for (const page of pages) {
-      page.entries = entriesByPage.get(String(page.sitePageId)) || [];
-    }
-    const [[site]] = await db.query(
+
+    const [[siteDetails]] = await db.query(
       `SELECT s.id AS siteId, s.name AS siteName, s.templateId, s.expiresAt,
               c.categoryId, c.name AS categoryName,
               pay.currency,
-              th.themeId, th.name AS themeName, th.color, th.background,
-              sh.logoUrl, sh.siteTitle, sh.footerText, sh.footerAddress,
-              sh.footerPhone, sh.footerEmail, sh.copyrightText, sh.socialLinks
+              th.themeId, th.name AS themeName, th.color, th.background
          FROM sites s
          JOIN template t ON t.templateId = s.templateId
          JOIN categories c ON c.categoryId = t.categoryId
          JOIN payments pay ON pay.id = s.paymentId
          JOIN theme th ON th.themeId = s.themeId
-         LEFT JOIN siteheaders sh ON sh.siteId = s.id
         WHERE s.id = ?`,
       [siteId],
     );
-    let socialLinks = site.socialLinks;
-    if (typeof socialLinks === "string") {
-      try {
-        socialLinks = JSON.parse(socialLinks);
-      } catch {
-        socialLinks = {};
-      }
-    }
-    const header = {
-      logoUrl: site.logoUrl,
-      siteTitle: site.siteTitle,
-      footerText: site.footerText,
-      footerAddress: site.footerAddress,
-      footerPhone: site.footerPhone,
-      footerEmail: site.footerEmail,
-      copyrightText: site.copyrightText,
-      socialLinks: socialLinks || {},
-    };
-    return res.json({ ...site, header, pages });
+
+    const header = await readSiteHeader(siteId, site.dbName);
+
+    return res.json({ ...siteDetails, header, pages });
   } catch (error) {
     return sendError(res, error);
   }
@@ -322,16 +282,15 @@ const createSitePage = async (req, res) => {
   }
 
   try {
-    await getActiveManagedSite(siteId, req);
+    const site = await getActiveManagedSite(siteId, req);
     if (isLibraryPage) {
       const [result] = await db.query(
-        `INSERT INTO sitepages (siteId, sourcePagesId, title, page, sortOrder)
-         SELECT s.id, p.pagesId, p.title, p.page,
-                COALESCE((SELECT MAX(sortOrder) FROM sitepages WHERE siteId = s.id), 0) + 1
-           FROM sites s
-           JOIN template t ON t.templateId = s.templateId
+        `INSERT INTO ${tn(siteId, "pages", site.dbName)} (sourcePagesId, title, page, sortOrder)
+         SELECT p.pagesId, p.title, p.page,
+                COALESCE((SELECT MAX(sortOrder) FROM ${tn(siteId, "pages", site.dbName)}), 0) + 1
+           FROM template t
            JOIN pages p ON p.categoryId = t.categoryId
-          WHERE s.id = ? AND p.pagesId = ?`,
+          WHERE t.templateId = (SELECT templateId FROM sites WHERE id = ?) AND p.pagesId = ?`,
         [siteId, sourcePagesId],
       );
       if (!result.affectedRows) {
@@ -344,10 +303,10 @@ const createSitePage = async (req, res) => {
     }
 
     const [result] = await db.query(
-      `INSERT INTO sitepages (siteId, title, page, sortOrder)
-       SELECT ?, ?, ?, COALESCE(MAX(sortOrder), 0) + 1
-         FROM sitepages WHERE siteId = ?`,
-      [siteId, title.trim(), page, siteId],
+      `INSERT INTO ${tn(siteId, "pages", site.dbName)} (title, page, sortOrder)
+       SELECT ?, ?, COALESCE(MAX(sortOrder), 0) + 1
+         FROM ${tn(siteId, "pages", site.dbName)}`,
+      [title.trim(), page],
     );
     return res.status(201).json({
       message: "Page created successfully",
@@ -386,10 +345,10 @@ const updateSitePage = async (req, res) => {
   }
 
   try {
-    await getActiveManagedSite(siteId, req);
+    const site = await getActiveManagedSite(siteId, req);
     const [result] = await db.query(
-      `UPDATE sitepages SET ${fields.join(", ")} WHERE id = ? AND siteId = ?`,
-      [...values, pageId, siteId],
+      `UPDATE ${tn(siteId, "pages", site.dbName)} SET ${fields.join(", ")} WHERE id = ?`,
+      [...values, pageId],
     );
     if (!result.affectedRows) throw new HttpError(404, "Page not found");
     return res.json({ message: "Page updated successfully" });
@@ -418,13 +377,12 @@ const reorderSitePages = async (req, res) => {
 
   let connection;
   try {
-    await getActiveManagedSite(siteId, req);
+    const site = await getActiveManagedSite(siteId, req);
     connection = await db.getConnection();
     await connection.beginTransaction();
 
     const [existingPages] = await connection.query(
-      "SELECT id FROM sitepages WHERE siteId = ? ORDER BY id FOR UPDATE",
-      [siteId],
+      `SELECT id FROM ${tn(siteId, "pages", site.dbName)} ORDER BY id FOR UPDATE`
     );
     const existingIds = existingPages.map((page) => String(page.id)).sort();
     const requestedIds = pageIds.map(String).sort();
@@ -437,8 +395,8 @@ const reorderSitePages = async (req, res) => {
 
     for (let sortOrder = 0; sortOrder < pageIds.length; sortOrder += 1) {
       await connection.query(
-        "UPDATE sitepages SET sortOrder = ? WHERE id = ? AND siteId = ?",
-        [sortOrder, pageIds[sortOrder], siteId],
+        `UPDATE ${tn(siteId, "pages", site.dbName)} SET sortOrder = ? WHERE id = ?`,
+        [sortOrder, pageIds[sortOrder]],
       );
     }
 
@@ -458,6 +416,43 @@ const reorderSitePages = async (req, res) => {
   }
 };
 
+const getSiteData = async (req, res) => {
+  const { siteId } = req.params;
+  const { resource } = req.query;
+  if (!isId(siteId)) return res.status(400).json({ message: "Invalid site id" });
+
+  try {
+    const site = await getActiveManagedSite(siteId, req);
+    const dbName = site.dbName;
+
+    // If resource is specified, fetch only that resource
+    if (resource) {
+      const [rows] = await db.query(
+        `SELECT * FROM ${tn(siteId, resource, dbName)} WHERE status = 'active' ORDER BY id DESC`
+      );
+      return res.json({ [resource]: rows });
+    }
+
+    // Otherwise fetch all available resources for the site's category
+    const [tables] = await db.query(
+      'SELECT baseName FROM sitetables WHERE siteId = ? ORDER BY baseName',
+      [siteId]
+    );
+
+    const data = {};
+    for (const { baseName } of tables) {
+      const [rows] = await db.query(
+        `SELECT * FROM ${tn(siteId, baseName, dbName)} WHERE status = 'active' ORDER BY id DESC`
+      );
+      data[baseName] = rows;
+    }
+
+    return res.json(data);
+  } catch (error) {
+    return sendError(res, error);
+  }
+};
+
 module.exports = {
   getMySites,
   getSitePages,
@@ -467,4 +462,5 @@ module.exports = {
   createSitePage,
   updateSitePage,
   reorderSitePages,
+  getSiteData,
 };

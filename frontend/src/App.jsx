@@ -43,6 +43,7 @@ import ArrangeTemplatePages from "./Mycomponent/ArrangeTemplatePages";
 import SiteAdminNews from "./Mycomponent/SiteAdminNews";
 import SiteAdminGalary from "./Mycomponent/SiteAdminGalary";
 import SiteAdminSlider from "./Mycomponent/SiteAdminSlider";
+import SiteAdminData from "./Mycomponent/SiteAdminData";
 import BugReports from "./Mycomponent/BugReports";
 import SiteHeader from "./Mycomponent/SiteHeader";
 import Site from "./Pages/Client/Site";
@@ -67,6 +68,7 @@ function App() {
           <Route path="slider" element={<SiteAdminSlider />} />
           <Route path="gallery" element={<SiteAdminGalary />} />
           <Route path="header-footer" element={<SiteHeader />} />
+          <Route path="data" element={<SiteAdminData />} />
         </Route>
 
         {/* Client */}
@@ -85,7 +87,6 @@ function App() {
         </Route>
 
         <Route element={<ProtectedRoutes />}>
-         
           <Route path="/mysite/:siteSlug" element={<Site />} />
         </Route>
 

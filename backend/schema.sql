@@ -465,6 +465,8 @@ CREATE TABLE siteslider (
 ) ENGINE=InnoDB;
 
 
+
+
 -- ---------------------------------------------------------------------
 -- bugreports : users report errors/bugs; admin triages them.
 --   siteId is optional (a bug may be about the main platform, not a site).
@@ -514,3 +516,35 @@ CREATE TABLE siteheaders (
   UNIQUE KEY uqSiteHeaderSite (siteId),
   CONSTRAINT fkSiteHeaderSite  FOREIGN KEY (siteId)    REFERENCES sites(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
+
+
+USE tenant;
+
+ALTER TABLE categories
+  ADD COLUMN packKey VARCHAR(30) NULL AFTER name;
+
+ALTER TABLE sites
+  ADD COLUMN dbName VARCHAR(64) NULL AFTER name,
+  ADD UNIQUE KEY uqSitesDbName (dbName),
+  ADD COLUMN provisionStatus ENUM('pending','ready','failed') NOT NULL DEFAULT 'pending' AFTER status,
+  ADD COLUMN provisionError VARCHAR(500) NULL AFTER provisionStatus;
+
+CREATE TABLE sitetables (
+  id        BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  siteId    BIGINT UNSIGNED NOT NULL,
+  baseName  VARCHAR(40) NOT NULL,
+  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uqSiteBase (siteId, baseName),
+  CONSTRAINT fkSiteTablesSite FOREIGN KEY (siteId) REFERENCES sites(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- match your real category names; check with: SELECT categoryId, name FROM categories;
+UPDATE categories SET packKey='school'     WHERE name LIKE '%educat%' OR name LIKE '%school%';
+UPDATE categories SET packKey='medical'    WHERE name LIKE '%medic%'  OR name LIKE '%clinic%';
+UPDATE categories SET packKey='ecommerce'  WHERE name LIKE '%commerce%' OR name LIKE '%shop%';
+UPDATE categories SET packKey='restaurant' WHERE name LIKE '%restaur%' OR name LIKE '%food%';
+
+UPDATE categories SET packKey='school'
+ WHERE packKey IS NULL AND (name LIKE '%learning%' OR name LIKE '%education%');
+UPDATE categories SET packKey='restaurant'
+ WHERE packKey IS NULL AND (name LIKE '%bakery%' OR name LIKE '%cake%');

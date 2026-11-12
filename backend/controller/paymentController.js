@@ -3,6 +3,7 @@ const db = require("../config/db").promise();
 const { withTx, HttpError, sendError } = require("../utils/tx");
 const { buildQuote, buildPagesSnapshot, fromMinor } = require("../utils/pricing");
 const { provisionSite } = require("../utils/provision");
+const { provisionSiteDatabase } = require("../config/provisionSite");
 const { sendPaymentEmail } = require("../utils/mailer");
 
 const ID_PATTERN = /^[1-9]\d{0,19}$/;
@@ -186,6 +187,19 @@ const createPayment = async (req, res) => {
     });
 
     const { _mail, ...payload } = result;
+
+    try {
+      await provisionSiteDatabase(payload.siteId);
+      payload.siteProvisionStatus = "ready";
+    } catch (provisionError) {
+      console.error(
+        `Database provisioning failed for purchased site ${payload.siteId}:`,
+        provisionError,
+      );
+      payload.siteProvisionStatus = "failed";
+      payload.siteProvisionMessage =
+        "Your purchase completed, but site database setup needs attention.";
+    }
 
     // fire-and-forget: an email failure must not fail an already committed payment
     if (_mail?.to) {

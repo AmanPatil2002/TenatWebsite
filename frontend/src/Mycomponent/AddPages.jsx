@@ -62,7 +62,9 @@ const EMPTY_FORM = {
 // Convert CKEditor HTML to visible text for character counting.
 const getPlainText = (html = "") => {
   if (typeof document === "undefined") {
-    return String(html).replace(/<[^>]*>/g, "").trim();
+    return String(html)
+      .replace(/<[^>]*>/g, "")
+      .trim();
   }
   const element = document.createElement("div");
   element.innerHTML = html;
@@ -79,9 +81,7 @@ const getToken = () => {
 
 const getAuthConfig = () => {
   const token = getToken();
-  return token
-    ? { headers: { Authorization: `Bearer ${token}` } }
-    : {};
+  return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
 };
 
 const getErrorMessage = (error) => {
@@ -424,37 +424,114 @@ function PageForm({
                 height: 350,
                 language: "en",
                 allowedContent: true,
-                extraPlugins: "uploadimage,localvideo",
-                uploadUrl: `${API_URL}/uploads/ckeditor`,
-                imageUploadUrl: `${API_URL}/uploads/ckeditor`,
-                filebrowserImageUploadUrl: `${API_URL}/uploads/ckeditor`,
+                // Enable the colorbutton plugin for text/background color
+                extraPlugins: "uploadimage,localvideo,colorbutton,find,divarea",
+
+                // Use toolbarGroups for better organization and future plugin compatibility
+                toolbarGroups: [
+                  {
+                    name: "document",
+                    groups: ["mode", "document", "doctools"],
+                  },
+                  { name: "clipboard", groups: ["clipboard", "undo"] },
+                  {
+                    name: "editing",
+                    groups: ["find", "selection", "spellchecker"],
+                  },
+                  { name: "forms" },
+                  { name: "basicstyles", groups: ["basicstyles", "cleanup"] },
+                  {
+                    name: "paragraph",
+                    groups: ["list", "indent", "blocks", "align", "bidi"],
+                  },
+                  { name: "links" },
+                  { name: "insert" },
+                  { name: "styles" },
+                  { name: "colors" },
+                  { name: "tools" },
+                  { name: "others" },
+                  { name: "about" },
+                ],
+
+                // Explicitly add your custom LocalVideo button into the 'insert' group
+                // (Since it is not a standard plugin, we add it to the toolbar array)
                 toolbar: [
                   {
                     name: "document",
-                    items: ["Source", "Preview", "Maximize"],
+                    items: ["Source", "-", "Preview", "-", "Maximize"],
                   },
-                  { name: "clipboard", items: ["Undo", "Redo"] },
-                  { name: "styles", items: ["Format", "FontSize"] },
+                  {
+                    name: "clipboard",
+                    items: [
+                      "Cut",
+                      "Copy",
+                      "Paste",
+                      "PasteText",
+                      "PasteFromWord",
+                      "-",
+                      "Undo",
+                      "Redo",
+                    ],
+                  },
+                  {
+                    name: "editing",
+                    items: ["Find", "Replace", "-", "SelectAll"],
+                  },
+                  "/",
                   {
                     name: "basicstyles",
-                    items: ["Bold", "Italic", "Underline", "Strike"],
+                    items: [
+                      "Bold",
+                      "Italic",
+                      "Underline",
+                      "Strike",
+                      "Subscript",
+                      "Superscript",
+                      "-",
+                      "RemoveFormat",
+                    ],
                   },
+                  { name: "colors", items: ["TextColor", "BGColor"] },
                   {
                     name: "paragraph",
                     items: [
                       "NumberedList",
                       "BulletedList",
+                      "-",
+                      "Outdent",
+                      "Indent",
+                      "-",
+                      "Blockquote",
+                      "-",
                       "JustifyLeft",
                       "JustifyCenter",
                       "JustifyRight",
+                      "JustifyBlock",
                     ],
                   },
-                  { name: "links", items: ["Link", "Unlink"] },
+                  { name: "links", items: ["Link", "Unlink", "Anchor"] },
                   {
                     name: "insert",
-                    items: ["Image", "LocalVideo", "Table", "HorizontalRule"],
+                    items: [
+                      "Image",
+                      "LocalVideo",
+                      "Table",
+                      "HorizontalRule",
+                      "SpecialChar",
+                    ],
                   },
+                  { name: "styles", items: ["Format", "FontSize"] },
+                  { name: "tools", items: ["Maximize"] },
                 ],
+
+                // Remove buttons you don't want to keep the toolbar clean
+                removeButtons:
+                  "NewPage,Templates,Form,Checkbox,Radio,TextField,Textarea,Select,Button,ImageButton,HiddenField,About",
+
+                // Keep your upload settings
+                uploadUrl: `${API_URL}/uploads/ckeditor`,
+                imageUploadUrl: `${API_URL}/uploads/ckeditor`,
+                filebrowserImageUploadUrl: `${API_URL}/uploads/ckeditor`,
               }}
               onInstanceReady={() => setEditorReady(true)}
               onChange={(event) => {
@@ -509,11 +586,7 @@ function PageForm({
               },
             }}
           >
-            {submitting
-              ? "Saving…"
-              : isEditing
-                ? "Update page"
-                : "Create page"}
+            {submitting ? "Saving…" : isEditing ? "Update page" : "Create page"}
           </Button>
 
           {isEditing && (
@@ -799,9 +872,7 @@ export default function AddPages() {
             ) : (
               <PageForm
                 key={
-                  editingPage
-                    ? `edit-${getPageId(editingPage)}`
-                    : "create-page"
+                  editingPage ? `edit-${getPageId(editingPage)}` : "create-page"
                 }
                 categories={categories}
                 initialValues={editingPage}
@@ -991,10 +1062,7 @@ export default function AddPages() {
                         >
                           No pages found
                         </Typography>
-                        <Typography
-                          variant="body2"
-                          sx={{ color: BRAND.muted }}
-                        >
+                        <Typography variant="body2" sx={{ color: BRAND.muted }}>
                           Create your first page using the form on the left.
                         </Typography>
                       </TableCell>
