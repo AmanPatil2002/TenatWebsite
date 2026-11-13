@@ -96,8 +96,7 @@ function App() {
             <Route path="theme" element={<AddTheme />} />
             <Route path="page" element={<AddPages />} />
             <Route path="templates" element={<AddTemplate />} />
-            <Route
-              path="templates/:templateId/edit"
+            <Route path="templates/:templateId/edit"
               element={<AddTemplate />}
             />
             <Route path="category" element={<AddCategory />} />

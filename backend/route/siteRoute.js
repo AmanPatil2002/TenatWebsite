@@ -21,6 +21,7 @@ const {
   getSitePageOptions,
   createSitePage,
   updateSitePage,
+  deleteSitePage,
   reorderSitePages,
 } = require("../controller/siteController");
 const siteMedia = require("../controller/siteMediaController");
@@ -69,6 +70,11 @@ router.put(
   "/client-admin/:siteId/pages/:pageId",
   authenticateSiteAdmin,
   updateSitePage,
+);
+router.delete(
+  "/client-admin/:siteId/pages/:pageId",
+  authenticateSiteAdmin,
+  deleteSitePage,
 );
 router.get(
   "/client-admin/:siteId/page-options",

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import axios from "axios";
 import { CKEditor } from "ckeditor4-react";
@@ -53,13 +53,6 @@ const AddIcon = (p) => (
     <path d="M12 5v14M5 12h14" />
   </SvgIcon>
 );
-const PagesIcon = (p) => (
-  <SvgIcon {...p}>
-    <path d="M4 4h10l6 6v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
-    <path d="M14 4v6h6" />
-    <path d="M8 13h8M8 17h5" />
-  </SvgIcon>
-);
 const EditIcon = (p) => (
   <SvgIcon {...p}>
     <path d="M12 20h9" />
@@ -84,6 +77,11 @@ const CheckIcon = (p) => (
     <path d="M20 6 9 17l-5-5" />
   </SvgIcon>
 );
+const DeleteIcon = (p) => (
+  <SvgIcon {...p}>
+    <path d="M6 6h12v12H6zM8 9v6M16 9v6M10 9h4" />
+  </SvgIcon>
+);
 
 const API_URL = (
   import.meta.env.VITE_API_URL || "http://localhost:5000"
@@ -103,8 +101,32 @@ export default function SiteAdminManagePages() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [reordering, setReordering] = useState(false);
+  const [deletingId, setDeletingId] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  // Hold a reference to the CKEditor instance so we can re-apply the
+  // theme colors once the site data has finished loading.
+  const editorRef = useRef(null);
+
+  const applyTheme = (editor) => {
+    if (!editor) return;
+    const bg = site?.background || "#ffffff";
+    const fg = site?.color || "#222222";
+    const doc = editor.document.$;
+    const existing = doc.querySelector('style[data-tenat-theme="1"]');
+    if (existing) existing.remove();
+    const style = doc.createElement("style");
+    style.setAttribute("data-tenat-theme", "1");
+    style.textContent = `
+      body {
+        background-color: ${bg} !important;
+        color: ${fg} !important;
+      }
+    `;
+    doc.head.appendChild(style);
+    editor.document.getBody().setStyles({ backgroundColor: bg, color: fg });
+  };
 
   const loadPages = async (keepSelectedId = "") => {
     const { data } = await axios.get(pagesUrl, authConfig);
@@ -153,6 +175,15 @@ export default function SiteAdminManagePages() {
       cancelled = true;
     };
   }, [pagesUrl, authConfig]);
+
+  // Re-apply theme colors to the CKEditor instance whenever the loaded
+  // site data changes (the onInstanceReady callback runs before the
+  // first React render of `site`, so the theme would otherwise be null).
+  useEffect(() => {
+    if (site && editorRef.current) {
+      applyTheme(editorRef.current);
+    }
+  }, [site]);
 
   const selectPage = (page) => {
     setSelectedId(String(page.sitePageId));
@@ -238,6 +269,34 @@ export default function SiteAdminManagePages() {
     }
   };
 
+  const deletePage = async (page) => {
+    if (!window.confirm(`Delete "${page.title}"? This cannot be undone.`)) {
+      return;
+    }
+
+    setDeletingId(String(page.sitePageId));
+    setError("");
+    setSuccess("");
+    try {
+      await axios.delete(
+        `${pagesUrl}/${page.sitePageId}`,
+        authConfig,
+      );
+      // If the deleted page was the one being edited, clear the editor
+      // and let loadPages pick the next page (or enter creating mode).
+      const keepSelectedId =
+        String(page.sitePageId) === String(selectedId) ? "" : selectedId;
+      await loadPages(keepSelectedId);
+      setSuccess("Page deleted.");
+    } catch (requestError) {
+      setError(
+        requestError.response?.data?.message || "Could not delete this page.",
+      );
+    } finally {
+      setDeletingId("");
+    }
+  };
+
   const selectedPage = pages.find((p) => String(p.sitePageId) === selectedId);
   const currentTitle = creating
     ? "New custom page"
@@ -262,35 +321,7 @@ export default function SiteAdminManagePages() {
             order.
           </Typography>
         </Box>
-        <Stack
-          direction="row"
-          spacing={1}
-          sx={{ alignSelf: { xs: "flex-start", sm: "center" } }}
-        >
-          <Chip
-            icon={<PagesIcon size={14} />}
-            label={`${pages.length} page${pages.length === 1 ? "" : "s"}`}
-            variant="outlined"
-            sx={{
-              fontWeight: 600,
-              borderRadius: 2,
-              "& .MuiChip-icon": { color: "primary.main", ml: 0.5 },
-            }}
-          />
-          {site?.themeName && (
-            <Chip
-              icon={<PaletteIcon size={14} />}
-              label={site.themeName}
-              variant="outlined"
-              sx={{
-                fontWeight: 600,
-                borderRadius: 2,
-                "& .MuiChip-icon": { color: "primary.main", ml: 0.5 },
-              }}
-            />
-          )}
-        </Stack>
-      </Stack>
+      </Stack> 
 
       {error && (
         <Alert
@@ -549,25 +580,43 @@ export default function SiteAdminManagePages() {
                         </Box>
                       </Button>
 
-                      <Stack sx={{ flexShrink: 0 }}>
-                        <IconButton
-                          size="small"
-                          aria-label={`Move ${page.title} up`}
-                          disabled={reordering || index === 0}
-                          onClick={() => movePage(index, -1)}
-                          sx={{ p: 0.25, borderRadius: 1 }}
-                        >
-                          <UpIcon size={14} />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          aria-label={`Move ${page.title} down`}
-                          disabled={reordering || index === pages.length - 1}
-                          onClick={() => movePage(index, 1)}
-                          sx={{ p: 0.25, borderRadius: 1 }}
-                        >
-                          <DownIcon size={14} />
-                        </IconButton>
+                      <Stack direction="row" alignItems="center" spacing={0.25} sx={{ flexShrink: 0 }}>
+                        <Stack sx={{ flexShrink: 0 }}>
+                          <IconButton
+                            size="small"
+                            aria-label={`Move ${page.title} up`}
+                            disabled={reordering || deletingId || index === 0}
+                            onClick={() => movePage(index, -1)}
+                            sx={{ p: 0.25, borderRadius: 1 }}
+                          >
+                            <UpIcon size={14} />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            aria-label={`Move ${page.title} down`}
+                            disabled={reordering || deletingId || index === pages.length - 1}
+                            onClick={() => movePage(index, 1)}
+                            sx={{ p: 0.25, borderRadius: 1 }}
+                          >
+                            <DownIcon size={14} />
+                          </IconButton>
+                        </Stack>
+                        <Tooltip title={`Delete ${page.title}`}>
+                          <IconButton
+                            size="small"
+                            aria-label={`Delete ${page.title}`}
+                            color="error"
+                            disabled={reordering || deletingId || pages.length <= 1}
+                            onClick={() => deletePage(page)}
+                            sx={{ p: 0.25, borderRadius: 1 }}
+                          >
+                            {deletingId === String(page.sitePageId) ? (
+                              <CircularProgress size={14} color="error" />
+                            ) : (
+                              <DeleteIcon size={14} />
+                            )}
+                          </IconButton>
+                        </Tooltip>
                       </Stack>
                     </Box>
                   );
@@ -856,10 +905,9 @@ export default function SiteAdminManagePages() {
                       filebrowserImageUploadUrl: `${API_URL}/uploads/ckeditor`,
                     }}
                     onInstanceReady={(event) => {
-                      event.editor.document.getBody().setStyles({
-                        backgroundColor: site?.background || "#ffffff",
-                        color: site?.color || "#222222",
-                      });
+                      const editor = event.editor;
+                      editorRef.current = editor;
+                      applyTheme(editor);
                     }}
                     onChange={(event) => setContent(event.editor.getData())}
                   />

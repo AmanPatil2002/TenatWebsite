@@ -38,7 +38,10 @@ const generateDbName = (userName, siteName, siteId, suffix = "") => {
   // Clean siteName: remove userName if present to avoid redundancy
   let cleanedSiteName = siteName;
   if (userName && siteName.toLowerCase().includes(userName.toLowerCase())) {
-    cleanedSiteName = siteName.replace(new RegExp(userName, 'gi'), '').replace(/[^a-zA-Z0-9\s]/g, '').trim();
+    cleanedSiteName = siteName
+      .replace(new RegExp(userName, "gi"), "")
+      .replace(/[^a-zA-Z0-9\s]/g, "")
+      .trim();
   }
 
   const sitePart = toCamelCase(cleanedSiteName);
@@ -189,7 +192,7 @@ async function provisionSiteDatabase(siteId) {
              CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci`);
 
     const tables = [...packs.common()];
-    if (row[0].packKey && typeof packs[row[0].packKey] === 'function') {
+    if (row[0].packKey && typeof packs[row[0].packKey] === "function") {
       tables.push(...packs[row[0].packKey]());
     }
 

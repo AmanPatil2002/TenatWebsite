@@ -12,18 +12,67 @@ import {
   Divider,
   Grid,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   Typography,
   alpha,
   useTheme,
 } from "@mui/material";
 
 /* ------------------------------------------------------------------ */
-/*  Inline SVG icons (avoids any MUI icon import / tree-shaking issue) */
+/*  Resource metadata — mirrors RESOURCE_CONFIG in SiteAdminData       */
+/* ------------------------------------------------------------------ */
+const RESOURCE_META = {
+  students: {
+    label: "Students",
+    color: "#1976d2",
+  },
+  teachers: {
+    label: "Teachers",
+    color: "#2e7d32",
+  },
+  classes: {
+    label: "Classes",
+    color: "#6a1b9a",
+  },
+  departments: {
+    label: "Departments",
+    color: "#c62828",
+  },
+  doctors: {
+    label: "Doctors",
+    color: "#00695c",
+  },
+  productcategories: {
+    label: "Product categories",
+    color: "#ef6c00",
+  },
+  products: {
+    label: "Products",
+    color: "#4527a0",
+  },
+  menucategories: {
+    label: "Menu categories",
+    color: "#ad1457",
+  },
+  menuitems: {
+    label: "Menu items",
+    color: "#3e2723",
+  },
+};
+
+const RESOURCE_ORDER = [
+  "students",
+  "teachers",
+  "classes",
+  "departments",
+  "doctors",
+  "productcategories",
+  "products",
+  "menucategories",
+  "menuitems",
+];
+
+/* ------------------------------------------------------------------ */
+/*  Inline SVG icons                                                   */
 /* ------------------------------------------------------------------ */
 const SvgIcon = ({ children, size = 22, color = "currentColor" }) => (
   <Box
@@ -98,6 +147,14 @@ const IdIcon = (props) => (
     <rect x="2" y="5" width="20" height="14" rx="2" />
     <circle cx="8" cy="12" r="2" />
     <path d="M14 10h5M14 14h5" />
+  </SvgIcon>
+);
+
+const DatabaseIcon = (props) => (
+  <SvgIcon {...props}>
+    <ellipse cx="12" cy="5" rx="9" ry="3" />
+    <path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5" />
+    <path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3" />
   </SvgIcon>
 );
 
@@ -220,9 +277,12 @@ export default function SiteAdminDashboard() {
   } = useOutletContext();
 
   const [employees, setEmployees] = useState(null);
+  const [resourceCounts, setResourceCounts] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [employeesError, setEmployeesError] = useState("");
+  const [countsError, setCountsError] = useState("");
 
+  /* -------------------- data fetchers -------------------- */
   const fetchEmployees = useCallback(
     async (signal) => {
       const { data } = await axios.get(`${baseUrl}/employees`, {
@@ -234,8 +294,48 @@ export default function SiteAdminDashboard() {
     [authConfig, baseUrl],
   );
 
+  const fetchResourceCounts = useCallback(
+    async (signal) => {
+      // 1. Discover which data tables exist for this site
+      const { data } = await axios.get(`${baseUrl}/data`, {
+        ...authConfig,
+        signal,
+      });
+      const available = Array.isArray(data)
+        ? data.filter((name) => RESOURCE_META[name])
+        : [];
+
+      // 2. Fetch each list in parallel (tolerate individual failures)
+      const results = await Promise.allSettled(
+        available.map((name) =>
+          axios.get(`${baseUrl}/data/${name}`, {
+            ...authConfig,
+            signal,
+          }),
+        ),
+      );
+
+      if (signal?.aborted) return {};
+
+      const counts = {};
+      results.forEach((result, i) => {
+        const name = available[i];
+        if (result.status === "fulfilled") {
+          const rows = result.value.data;
+          counts[name] = Array.isArray(rows) ? rows.length : 0;
+        } else {
+          counts[name] = 0;
+        }
+      });
+      return counts;
+    },
+    [authConfig, baseUrl],
+  );
+
+  /* -------------------- initial load -------------------- */
   useEffect(() => {
     const controller = new AbortController();
+
     fetchEmployees(controller.signal)
       .then((data) => {
         if (!controller.signal.aborted) setEmployees(data);
@@ -248,36 +348,74 @@ export default function SiteAdminDashboard() {
           );
         }
       });
-    return () => controller.abort();
-  }, [fetchEmployees]);
 
-  const entries = useMemo(
-    () => pages.flatMap((page) => page.entries || []),
-    [pages],
-  );
+    fetchResourceCounts(controller.signal)
+      .then((counts) => {
+        if (!controller.signal.aborted) setResourceCounts(counts);
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          setResourceCounts({});
+          setCountsError(
+            error.response?.data?.message || "Could not load site data counts.",
+          );
+        }
+      });
+
+    return () => controller.abort();
+  }, [fetchEmployees, fetchResourceCounts]);
+
+  /* -------------------- derived values -------------------- */
   const employeesLoading = employees === null;
   const activeEmployees = (employees || []).filter(
     (employee) => employee.status === "active",
   ).length;
 
+  // Only resources the admin has actually populated (count > 0),
+  // sorted by RESOURCE_ORDER for a stable layout.
+  const populatedResources = useMemo(() => {
+    if (!resourceCounts) return [];
+    return Object.entries(resourceCounts)
+      .filter(([, count]) => count > 0)
+      .sort((a, b) => {
+        const ai = RESOURCE_ORDER.indexOf(a[0]);
+        const bi = RESOURCE_ORDER.indexOf(b[0]);
+        return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
+      });
+  }, [resourceCounts]);
+
+  const countsLoading = resourceCounts === null;
+  const totalRecords = populatedResources.reduce(
+    (sum, [, count]) => sum + count,
+    0,
+  );
+
+  /* -------------------- refresh handler -------------------- */
   const refresh = async () => {
     setRefreshing(true);
     setEmployeesError("");
+    setCountsError("");
     try {
-      const [, employeeData] = await Promise.all([
+      const [, employeeData, countsData] = await Promise.all([
         reloadSite(),
         fetchEmployees(),
+        fetchResourceCounts(),
       ]);
       setEmployees(employeeData);
+      setResourceCounts(countsData);
     } catch (error) {
-      setEmployeesError(
-        error.response?.data?.message || "Could not load site employees.",
-      );
+      const msg =
+        error.response?.data?.message || "Could not refresh dashboard.";
+      setEmployeesError(msg);
+      setCountsError(msg);
     } finally {
       setRefreshing(false);
     }
   };
 
+  const goToData = () => navigate(`${siteBasePath}/data`);
+
+  /* -------------------- render -------------------- */
   return (
     <Stack spacing={3}>
       {/* ---------- Page header ---------- */}
@@ -318,6 +456,7 @@ export default function SiteAdminDashboard() {
 
       {siteError && <Alert severity="error">{siteError}</Alert>}
       {employeesError && <Alert severity="error">{employeesError}</Alert>}
+      {countsError && <Alert severity="error">{countsError}</Alert>}
 
       {/* ---------- KPI cards ---------- */}
       <Grid container spacing={2}>
@@ -335,23 +474,45 @@ export default function SiteAdminDashboard() {
             title="Employees"
             value={employeesLoading ? "…" : employees.length}
             caption={
-              employeesLoading
-                ? "Loading employees"
-                : `${activeEmployees} active`
+              employeesLoading ? "Loading employees" : `${activeEmployees} active`
             }
             accent={theme.palette.success.main}
             icon={<EmployeesIcon size={22} />}
           />
         </Grid>
-        <Grid size={{ xs: 12, sm: 12, lg: 4 }}>
-          <SummaryCard
-            title="Entries"
-            value={employeesLoading ? "…" : entries.length}
-            caption="Total content entries"
-            accent={theme.palette.info.main}
-            icon={<LayersIcon size={22} />}
-          />
-        </Grid>
+
+        {/* Only show a Data KPI when the admin has actually added records */}
+        {!countsLoading && populatedResources.length > 0 && (
+          <Grid size={{ xs: 12, sm: 12, lg: 4 }}>
+            <SummaryCard
+              title="Data records"
+              value={totalRecords}
+              caption={`Across ${populatedResources.length} table${
+                populatedResources.length === 1 ? "" : "s"
+              }`}
+              accent={theme.palette.info.main}
+              icon={<DatabaseIcon size={22} />}
+            />
+          </Grid>
+        )}
+
+        {/* Placeholder while counts are still loading */}
+        {countsLoading && (
+          <Grid size={{ xs: 12, sm: 12, lg: 4 }}>
+            <Card
+              variant="outlined"
+              sx={{
+                height: "100%",
+                borderRadius: 3,
+                display: "grid",
+                placeItems: "center",
+                minHeight: 120,
+              }}
+            >
+              <CircularProgress size={28} />
+            </Card>
+          </Grid>
+        )}
       </Grid>
 
       {/* ---------- Site details ---------- */}
@@ -409,135 +570,166 @@ export default function SiteAdminDashboard() {
         </CardContent>
       </Card>
 
-      {/* ---------- Pages table ---------- */}
-      <Card variant="outlined" sx={{ borderRadius: 3 }}>
-        <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            justifyContent="space-between"
-            alignItems={{ xs: "stretch", sm: "center" }}
-            spacing={2}
-            sx={{ mb: 2 }}
-          >
-            <Box>
-              <Typography variant="h6" fontWeight={700}>
-                Your pages
-              </Typography>
-              <Typography color="text.secondary" variant="body2">
-                Manage the pages and content available on this site.
-              </Typography>
-            </Box>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+      {/* ---------- Your data (only populated resources) ---------- */}
+      {!countsLoading && populatedResources.length > 0 && (
+        <Card variant="outlined" sx={{ borderRadius: 3 }}>
+          <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              justifyContent="space-between"
+              alignItems={{ xs: "stretch", sm: "center" }}
+              spacing={2}
+              sx={{ mb: 2 }}
+            >
+              <Box>
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <Box
+                    sx={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 1.5,
+                      display: "grid",
+                      placeItems: "center",
+                      bgcolor: alpha(theme.palette.info.main, 0.1),
+                      color: theme.palette.info.main,
+                    }}
+                  >
+                    <DatabaseIcon size={18} />
+                  </Box>
+                  <Typography variant="h6" fontWeight={700}>
+                    Your data
+                  </Typography>
+                </Stack>
+                <Typography color="text.secondary" variant="body2" sx={{ mt: 0.5 }}>
+                  {totalRecords} record{totalRecords === 1 ? "" : "s"} across{" "}
+                  {populatedResources.length} table
+                  {populatedResources.length === 1 ? "" : "s"}.
+                </Typography>
+              </Box>
               <Button
                 variant="contained"
                 disableElevation
-                onClick={() => navigate(`${siteBasePath}/manage`)}
+                onClick={goToData}
                 sx={{ borderRadius: 2 }}
               >
-                Manage pages
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={() => navigate(`${siteBasePath}/employees`)}
-                sx={{ borderRadius: 2 }}
-              >
-                Employees
+                Manage data
               </Button>
             </Stack>
-          </Stack>
-
-          {pages.length ? (
-            <Box
-              sx={{
-                overflowX: "auto",
-                border: `1px solid ${theme.palette.divider}`,
-                borderRadius: 2,
-              }}
-            >
-              <Table size="small" sx={{ minWidth: 420 }}>
-                <TableHead>
-                  <TableRow sx={{ bgcolor: alpha(theme.palette.primary.main, 0.04) }}>
-                    <TableCell sx={{ fontWeight: 700 }}>Page</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 700, width: 120 }}>
-                      Entries
-                    </TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {pages.map((page) => (
-                    <TableRow
-                      key={page.sitePageId}
-                      hover
-                      sx={{ "&:last-child td": { borderBottom: 0 } }}
+            <Divider sx={{ mb: 2.5 }} />
+            <Grid container spacing={2}>
+              {populatedResources.map(([name, count]) => {
+                const meta = RESOURCE_META[name];
+                return (
+                  <Grid key={name} size={{ xs: 12, sm: 6, md: 4 }}>
+                    <Card
+                      variant="outlined"
+                      onClick={goToData}
+                      sx={{
+                        cursor: "pointer",
+                        borderRadius: 2,
+                        borderColor: alpha(meta.color, 0.25),
+                        transition:
+                          "transform .18s ease, box-shadow .18s ease, background-color .18s ease",
+                        "&:hover": {
+                          transform: "translateY(-2px)",
+                          bgcolor: alpha(meta.color, 0.04),
+                          boxShadow: `0 8px 20px ${alpha(meta.color, 0.15)}`,
+                        },
+                      }}
                     >
-                      <TableCell>
-                        <Stack direction="row" alignItems="center" spacing={1.25}>
-                          <Box
-                            sx={{
-                              width: 30,
-                              height: 30,
-                              borderRadius: 1.5,
-                              display: "grid",
-                              placeItems: "center",
-                              bgcolor: alpha(theme.palette.primary.main, 0.08),
-                              color: theme.palette.primary.main,
-                              flexShrink: 0,
-                            }}
-                          >
-                            <PagesIcon size={16} />
+                      <CardContent sx={{ p: 2 }}>
+                        <Stack
+                          direction="row"
+                          justifyContent="space-between"
+                          alignItems="center"
+                          spacing={1}
+                        >
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                              fontWeight={600}
+                              noWrap
+                            >
+                              {meta.label}
+                            </Typography>
+                            <Typography
+                              variant="h5"
+                              fontWeight={800}
+                              sx={{ color: meta.color, mt: 0.25 }}
+                            >
+                              {count}
+                            </Typography>
                           </Box>
-                          <Typography fontWeight={600} variant="body2" noWrap>
-                            {page.title}
-                          </Typography>
+                          <Chip
+                            label={`${count} record${count === 1 ? "" : "s"}`}
+                            size="small"
+                            variant="outlined"
+                            sx={{
+                              borderColor: alpha(meta.color, 0.4),
+                              color: meta.color,
+                              fontWeight: 600,
+                            }}
+                          />
                         </Stack>
-                      </TableCell>
-                      <TableCell align="right">
-                        <Chip
-                          size="small"
-                          label={(page.entries || []).length}
-                          variant="outlined"
-                          sx={{ fontWeight: 600, minWidth: 40 }}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Box>
-          ) : (
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                );
+              })}
+            </Grid>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ---------- Empty-state hint ---------- */}
+      {!countsLoading && populatedResources.length === 0 && (
+        <Card
+          variant="outlined"
+          sx={{
+            borderRadius: 3,
+            borderStyle: "dashed",
+            bgcolor: alpha(theme.palette.info.main, 0.02),
+          }}
+        >
+          <CardContent sx={{ p: { xs: 3, sm: 4 }, textAlign: "center" }}>
             <Box
               sx={{
-                py: 5,
-                px: 2,
-                textAlign: "center",
-                border: `1px dashed ${theme.palette.divider}`,
+                width: 56,
+                height: 56,
+                mx: "auto",
+                mb: 1.5,
                 borderRadius: 2,
-                bgcolor: alpha(theme.palette.primary.main, 0.02),
+                display: "grid",
+                placeItems: "center",
+                bgcolor: alpha(theme.palette.info.main, 0.1),
+                color: theme.palette.info.main,
               }}
             >
-              <Box
-                sx={{
-                  width: 48,
-                  height: 48,
-                  mx: "auto",
-                  mb: 1.5,
-                  borderRadius: 2,
-                  display: "grid",
-                  placeItems: "center",
-                  bgcolor: alpha(theme.palette.primary.main, 0.08),
-                  color: theme.palette.primary.main,
-                }}
-              >
-                <PagesIcon size={24} />
-              </Box>
-              <Typography fontWeight={600}>No pages yet</Typography>
-              <Typography color="text.secondary" variant="body2">
-                No pages have been added to this site yet.
-              </Typography>
+              <DatabaseIcon size={26} />
             </Box>
-          )}
-        </CardContent>
-      </Card>
+            <Typography variant="h6" fontWeight={700} sx={{ mb: 0.5 }}>
+              No data yet
+            </Typography>
+            <Typography
+              color="text.secondary"
+              variant="body2"
+              sx={{ maxWidth: 420, mx: "auto", mb: 2 }}
+            >
+              Once you add records in <strong>Site data</strong>, a summary of
+              each populated table will appear here.
+            </Typography>
+            <Button
+              variant="contained"
+              disableElevation
+              onClick={goToData}
+              sx={{ borderRadius: 2 }}
+            >
+              Go to Site data
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </Stack>
   );
 }

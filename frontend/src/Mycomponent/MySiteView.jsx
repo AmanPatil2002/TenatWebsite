@@ -285,6 +285,82 @@ const renderSlider = (items) => {
 
 const SLIDER_MARKER = /<!--\s*SITE_SLIDER\s*-->/i;
 
+const hydrateSiteData = (html, siteData = {}) => {
+  if (!html || !html.includes("data-entity")) return html;
+
+  const doc = new DOMParser().parseFromString(
+    `<div id="root">${html}</div>`,
+    "text/html",
+  );
+  const root = doc.getElementById("root");
+
+  const classMap = new Map(
+    (siteData.classes || []).map((c) => [String(c.id), c]),
+  );
+  const teacherMap = new Map(
+    (siteData.teachers || []).map((t) => [String(t.id), t]),
+  );
+
+  const enrich = (entity, item) => {
+    if (entity === "students") {
+      const cls = classMap.get(String(item.classId));
+      return {
+        ...item,
+        className:
+          item.className ||
+          (cls ? `${cls.name}${cls.section ? ` - ${cls.section}` : ""}` : ""),
+      };
+    }
+    if (entity === "classes") {
+      return {
+        ...item,
+        classTeacherName:
+          item.classTeacherName ||
+          teacherMap.get(String(item.classTeacherId))?.name ||
+          "",
+      };
+    }
+    return item;
+  };
+
+  root.querySelectorAll("[data-entity]").forEach((container) => {
+    const entity = container.getAttribute("data-entity");
+    const template = container.querySelector("[data-row]");
+    const source = siteData[entity];
+    if (!template || !Array.isArray(source)) return;
+
+    const holder = template.parentElement;
+    const rows = source.filter((r) => !r.status || r.status === "active");
+    holder.innerHTML = "";
+
+    if (!rows.length) {
+      container.insertAdjacentHTML(
+        "afterend",
+        '<p style="text-align:center;opacity:.7;padding:16px;">No records added yet.</p>',
+      );
+      return;
+    }
+
+    rows.forEach((raw) => {
+      const item = enrich(entity, raw);
+      const row = template.cloneNode(true);
+      row.querySelectorAll("[data-field]").forEach((el) => {
+        const value = item[el.getAttribute("data-field")];
+        const attr = el.getAttribute("data-attr");
+        if (attr) {
+          const safe = attr === "src" ? resolveMediaImage(value) : value;
+          if (safe) el.setAttribute(attr, safe);
+        } else {
+          el.textContent = value || "—";
+        }
+      });
+      holder.appendChild(row);
+    });
+  });
+
+  return root.innerHTML;
+};
+
 const buildSrcDoc = ({
   html,
   background,
@@ -292,30 +368,24 @@ const buildSrcDoc = ({
   pageTitle,
   galleries,
   slides,
-  siteData = {},
+  siteData,
 }) => {
   const isHome = /home/i.test(pageTitle);
   const isGallery = /gall[ae]ry/i.test(pageTitle);
 
   const sliderHtml = isHome ? renderSlider(slides) : "";
-  const pageHtml = html || "<p>This page has no content yet.</p>";
+ const pageHtml =
+  hydrateSiteData(html, siteData) || "<p>This page has no content yet.</p>";
 
   const bodyHtml = SLIDER_MARKER.test(pageHtml)
     ? pageHtml.replace(SLIDER_MARKER, () => sliderHtml)
     : `${sliderHtml}${pageHtml}`;
-
-  // Inject siteData as a global variable for page templates to use
-  const siteDataScript = `<script>
-    window.SITE_DATA = ${JSON.stringify(siteData)};
-    window.SITE_THEME = { background: "${background}", color: "${color}" };
-  </script>`;
 
   return `<!DOCTYPE html>
 <html>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    ${siteDataScript}
     <style>
       :root {
         --site-header-bg: color-mix(in srgb, ${color} 6%, ${background});
@@ -323,8 +393,10 @@ const buildSrcDoc = ({
       * { box-sizing: border-box; }
       html { scroll-behavior: smooth; }
       body {
+        width: 100%;
         margin: 0;
         padding: 0;
+        overflow-x: hidden;
         background: ${background};
         color: ${color};
         font-family: Arial, Helvetica, sans-serif;
@@ -345,7 +417,7 @@ const buildSrcDoc = ({
       .site-gallery figcaption { padding: 10px 12px; }
     </style>
   </head>
-  <body><main class="site-page">${bodyHtml}${isGallery ? renderGallery(galleries) : ""}</main>${siteDataScript}</body>
+  <body><main class="site-page">${bodyHtml}${isGallery ? renderGallery(galleries) : ""}</main></body>
 </html>`;
 };
 
@@ -955,12 +1027,17 @@ export default function MySiteView() {
 
     observerRef.current?.disconnect();
     const resize = () => {
-      frame.style.height = `${doc.documentElement.scrollHeight}px`;
+      const height = Math.max(
+        doc.documentElement.scrollHeight,
+        doc.body.scrollHeight,
+      );
+      frame.style.height = `${height}px`;
     };
     resize();
 
     if (typeof ResizeObserver !== "undefined") {
       observerRef.current = new ResizeObserver(resize);
+      observerRef.current.observe(doc.documentElement);
       observerRef.current.observe(doc.body);
     }
   };
@@ -971,11 +1048,13 @@ export default function MySiteView() {
   return (
     <Box
       sx={{
-        minHeight: "100vh",
+        height: "100vh",
+        "@supports (height: 100dvh)": { height: "100dvh" },
         width: "100%",
         bgcolor: "#f3f4f6",
         display: "flex",
         flexDirection: "column",
+        overflow: "hidden",
       }}
     >
       {/* ---------- Admin toolbar ---------- */}
@@ -1107,6 +1186,7 @@ export default function MySiteView() {
         sx={{
           flex: 1,
           minHeight: 0,
+          boxSizing: "border-box",
           display: "flex",
           justifyContent: "center",
           alignItems: "flex-start",
@@ -1140,9 +1220,8 @@ export default function MySiteView() {
             sx={{
               width: DEVICE_WIDTHS[devices],
               maxWidth: "100%",
-              height: framed
-                ? `calc(100vh - ${TOOLBAR_HEIGHT + 48}px)`
-                : `calc(100vh - ${TOOLBAR_HEIGHT}px)`,
+              height: "100%",
+              boxSizing: "border-box",
               overflowY: "auto",
               overflowX: "hidden",
               border: framed ? "1px solid" : 0,

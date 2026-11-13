@@ -99,7 +99,7 @@ const formatDateInput = (value) => {
   )}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
-const toApiDateTime = (raw) => (raw ? new Date(raw).toISOString() : null);
+const toApiDateTime = (raw) => (raw ? raw.replace('T', ' ') : null);
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;

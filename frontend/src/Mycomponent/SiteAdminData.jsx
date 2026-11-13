@@ -3,6 +3,7 @@ import { useOutletContext } from "react-router-dom";
 import axios from "axios";
 import {
   Alert,
+  Avatar,
   Box,
   Button,
   Chip,
@@ -27,9 +28,6 @@ import {
   Grid,
   Card,
   CardContent,
-  Divider,
-  Tabs,
-  Tab,
   alpha,
   useTheme,
 } from "@mui/material";
@@ -38,8 +36,9 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import SearchIcon from "@mui/icons-material/Search";
 import VisibilityIcon from "@mui/icons-material/Visibility";
-import DownloadIcon from "@mui/icons-material/Download";
-import FilterListIcon from "@mui/icons-material/FilterList";
+import ViewListIcon from "@mui/icons-material/ViewList";
+import GridViewIcon from "@mui/icons-material/GridView";
+import ImageIcon from "@mui/icons-material/Image";
 
 /* ------------------------------------------------------------------ */
 /*  Inline SVG icons for resource types                                 */
@@ -131,14 +130,6 @@ const FieldIcon = (p) => (
   </SvgIcon>
 );
 
-const EntriesIcon = (p) => (
-  <SvgIcon {...p}>
-    <path d="m12 3 9 5-9 5-9-5 9-5Z" />
-    <path d="m3 13 9 5 9-5" />
-    <path d="m3 18 9 5 9-5" />
-  </SvgIcon>
-);
-
 /* ------------------------------------------------------------------ */
 /*  Resource configuration                                              */
 /* ------------------------------------------------------------------ */
@@ -154,13 +145,18 @@ const status = field("Status", "select", {
   ],
   defaultValue: "active",
 });
-const text = (label, options = {}) => field(label, "text", options);
-const number = (label, options = {}) => field(label, "number", options);
+const text = (label, options = {}) => field(label, "text", { maxLength: 255, ...options });
+const number = (label, options = {}) => field(label, "number", { min: 0, ...options });
+const idNumber = (label, options = {}) =>
+  number(label, { integer: true, min: 1, ...options });
 const longText = (label, options = {}) =>
-  field(label, "textarea", { rows: 4, ...options });
+  field(label, "textarea", { rows: 4, maxLength: 2000, ...options });
 const date = (label, options = {}) => field(label, "date", options);
 const json = (label, options = {}) =>
   field(label, "json", { rows: 4, ...options });
+const email = (label, options = {}) => field(label, "email", { maxLength: 255, ...options });
+const phone = (label, options = {}) => field(label, "tel", { maxLength: 20, ...options });
+const image = (label, options = {}) => field(label, "image", options);
 
 const RESOURCE_CONFIG = {
   students: {
@@ -169,10 +165,10 @@ const RESOURCE_CONFIG = {
     icon: ResourceIcons.students,
     color: "#1976d2",
     fields: {
-      admissionNo: text("Admission number"),
-      name: text("Student name", { required: true }),
-      classId: number("Class ID"),
-      rollNo: text("Roll number"),
+      admissionNo: text("Admission number", { maxLength: 50 }),
+      name: text("Student name", { required: true, minLength: 2 }),
+      classId: idNumber("Class ID"),
+      rollNo: text("Roll number", { maxLength: 50 }),
       gender: field("Gender", "select", {
         options: [
           { value: "male", label: "Male" },
@@ -180,11 +176,11 @@ const RESOURCE_CONFIG = {
           { value: "other", label: "Other" },
         ],
       }),
-      dob: date("Date of birth"),
-      guardianName: text("Guardian name"),
-      guardianPhone: text("Guardian phone"),
+      dob: date("Date of birth", { min: "1900-01-01", max: "today" }),
+      guardianName: text("Guardian name", { minLength: 2 }),
+      guardianPhone: phone("Guardian phone"),
       address: longText("Address"),
-      photoUrl: text("Photo URL"),
+      photoUrl: image("Photo"),
       status,
     },
   },
@@ -194,13 +190,13 @@ const RESOURCE_CONFIG = {
     icon: ResourceIcons.teachers,
     color: "#2e7d32",
     fields: {
-      name: text("Name", { required: true }),
-      email: text("Email", { type: "email" }),
-      phone: text("Phone"),
+      name: text("Name", { required: true, minLength: 2 }),
+      email: email("Email"),
+      phone: phone("Phone"),
       qualification: text("Qualification"),
       subjectSpecialty: text("Subject specialty"),
-      photoUrl: text("Photo URL"),
-      joinedOn: date("Joined on"),
+      photoUrl: image("Photo"),
+      joinedOn: date("Joined on", { min: "1950-01-01" }),
       status,
     },
   },
@@ -210,10 +206,10 @@ const RESOURCE_CONFIG = {
     icon: ResourceIcons.classes,
     color: "#6a1b9a",
     fields: {
-      name: text("Class name", { required: true }),
-      section: text("Section"),
-      academicYear: text("Academic year"),
-      classTeacherId: number("Class teacher ID"),
+      name: text("Class name", { required: true, minLength: 1 }),
+      section: text("Section", { maxLength: 50 }),
+      academicYear: text("Academic year", { maxLength: 50 }),
+      classTeacherId: idNumber("Class teacher ID"),
       status,
     },
   },
@@ -223,7 +219,7 @@ const RESOURCE_CONFIG = {
     icon: ResourceIcons.departments,
     color: "#c62828",
     fields: {
-      name: text("Department name", { required: true }),
+      name: text("Department name", { required: true, minLength: 2 }),
       description: longText("Description"),
       status,
     },
@@ -234,14 +230,14 @@ const RESOURCE_CONFIG = {
     icon: ResourceIcons.doctors,
     color: "#00695c",
     fields: {
-      departmentId: number("Department ID"),
-      name: text("Name", { required: true }),
+      departmentId: idNumber("Department ID"),
+      name: text("Name", { required: true, minLength: 2 }),
       qualification: text("Qualification"),
       specialization: text("Specialization"),
-      experienceYears: number("Experience in years"),
-      consultationFee: number("Consultation fee", { step: "0.01" }),
+      experienceYears: number("Experience in years", { integer: true, max: 60 }),
+      consultationFee: number("Consultation fee", { step: "0.01", max: 1000000 }),
       bio: longText("Biography"),
-      photoUrl: text("Photo URL"),
+      photoUrl: image("Photo"),
       status,
     },
   },
@@ -251,7 +247,7 @@ const RESOURCE_CONFIG = {
     icon: ResourceIcons.productcategories,
     color: "#ef6c00",
     fields: {
-      name: text("Category name", { required: true }),
+      name: text("Category name", { required: true, minLength: 2 }),
       description: longText("Description"),
       status,
     },
@@ -262,14 +258,19 @@ const RESOURCE_CONFIG = {
     icon: ResourceIcons.products,
     color: "#4527a0",
     fields: {
-      categoryId: number("Category ID"),
-      name: text("Product name", { required: true }),
-      sku: text("SKU"),
+      categoryId: idNumber("Category ID"),
+      name: text("Product name", { required: true, minLength: 2 }),
+      sku: text("SKU", { maxLength: 100 }),
       description: longText("Description"),
-      price: number("Price", { required: true, step: "0.01", defaultValue: 0 }),
-      salePrice: number("Sale price", { step: "0.01" }),
-      stock: number("Stock", { defaultValue: 0 }),
-      thumbnailUrl: text("Thumbnail URL"),
+      price: number("Price", {
+        required: true,
+        step: "0.01",
+        max: 99999999.99,
+        defaultValue: 0,
+      }),
+      salePrice: number("Sale price", { step: "0.01", max: 99999999.99 }),
+      stock: number("Stock", { integer: true, max: 1000000, defaultValue: 0 }),
+      thumbnailUrl: image("Thumbnail"),
       attributes: json("Attributes"),
       status,
     },
@@ -280,9 +281,9 @@ const RESOURCE_CONFIG = {
     icon: ResourceIcons.menucategories,
     color: "#ad1457",
     fields: {
-      name: text("Category name", { required: true }),
+      name: text("Category name", { required: true, minLength: 2 }),
       description: longText("Description"),
-      sortOrder: number("Sort order", { defaultValue: 0 }),
+      sortOrder: number("Sort order", { integer: true, max: 9999, defaultValue: 0 }),
       status,
     },
   },
@@ -292,11 +293,16 @@ const RESOURCE_CONFIG = {
     icon: ResourceIcons.menuitems,
     color: "#3e2723",
     fields: {
-      categoryId: number("Category ID"),
-      name: text("Item name", { required: true }),
+      categoryId: idNumber("Category ID"),
+      name: text("Item name", { required: true, minLength: 2 }),
       description: longText("Description"),
-      price: number("Price", { required: true, step: "0.01", defaultValue: 0 }),
-      imageUrl: text("Image URL"),
+      price: number("Price", {
+        required: true,
+        step: "0.01",
+        max: 99999999.99,
+        defaultValue: 0,
+      }),
+      imageUrl: image("Image"),
       isVeg: field("Vegetarian", "boolean", { defaultValue: 0 }),
       isSpecial: field("Special item", "boolean", { defaultValue: 0 }),
       status,
@@ -316,8 +322,70 @@ const RESOURCE_ORDER = [
   "menuitems",
 ];
 
+const FK_MAP = {
+  classes: { classTeacherId: "teachers" },
+  students: { classId: "classes" },
+  doctors: { departmentId: "departments" },
+  products: { categoryId: "productcategories" },
+  menuitems: { categoryId: "menucategories" },
+  rooms: { roomTypeId: "roomtypes" },
+  bookings: { roomId: "rooms" },
+  properties: { propertyTypeId: "propertytypes" },
+  members: { planId: "membershipplans" },
+  blogposts: { categoryId: "blogcategories", authorId: "employees" },
+  comments: { postId: "blogposts" },
+  projects: { categoryId: "projectcategories" },
+  events: { eventTypeId: "eventtypes" },
+  registrations: { eventId: "events" },
+  donations: { causeId: "causes" },
+  appointments: { serviceId: "services", therapistId: "employees" },
+  attorneys: { practiceAreaId: "practiceareas" },
+  caseinquiries: { practiceAreaId: "practiceareas" },
+};
+
 /* ------------------------------------------------------------------ */
-/*  Helpers                                                            */
+/*  Date / time helpers                                                 */
+/* ------------------------------------------------------------------ */
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const pad = (part) => String(part).padStart(2, "0");
+
+const toDateInput = (dt) => `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+const toDateTimeInput = (dt) =>
+  `${toDateInput(dt)}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+
+const todayStr = () => toDateInput(new Date());
+const resolveBound = (bound) => (bound === "today" ? todayStr() : bound);
+
+const isRealDate = (str) => {
+  if (!DATE_RE.test(str)) return false;
+  const [y, m, d] = str.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
+};
+
+/* 2026-11-13 -> 13 Nov 2026 (string based, so there is no timezone shift) */
+const formatDate = (value) => {
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return String(value);
+  const [, y, m, d] = match;
+  return `${d} ${MONTHS[Number(m) - 1]} ${y}`;
+};
+
+/* 2026-11-13 14:30:00 -> 13 Nov 2026, 02:30 PM */
+const formatDateTime = (value) => {
+  const parsed = new Date(String(value).replace(" ", "T"));
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  const time = parsed.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+  return `${pad(parsed.getDate())} ${MONTHS[parsed.getMonth()]} ${parsed.getFullYear()}, ${time}`;
+};
+
+/* ------------------------------------------------------------------ */
+/*  Form helpers                                                        */
 /* ------------------------------------------------------------------ */
 const formatInputValue = (value, type) => {
   if (value === null || value === undefined) return "";
@@ -325,19 +393,16 @@ const formatInputValue = (value, type) => {
     return typeof value === "string" ? value : JSON.stringify(value, null, 2);
   }
   if (type === "date") {
-    if (value instanceof Date) {
-      const pad = (part) => String(part).padStart(2, "0");
-      return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
-    }
-    return String(value).replace(" ", "T").slice(0, 10);
+    if (value instanceof Date) return toDateInput(value);
+    const str = String(value).trim();
+    if (DATE_RE.test(str)) return str;
+    if (/^\d{4}-\d{2}-\d{2}[T ]/.test(str)) return str.slice(0, 10);
+    const parsed = new Date(str);
+    return Number.isNaN(parsed.getTime()) ? "" : toDateInput(parsed);
   }
   if (type === "datetime-local") {
-    let raw = String(value);
-    if (value instanceof Date) {
-      const pad = (part) => String(part).padStart(2, "0");
-      raw = `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}T${pad(value.getHours())}:${pad(value.getMinutes())}`;
-    }
-    return raw.replace(" ", "T").slice(0, 16);
+    if (value instanceof Date) return toDateTimeInput(value);
+    return String(value).replace(" ", "T").slice(0, 16);
   }
   if (type === "boolean") return String(Number(value));
   return String(value);
@@ -359,130 +424,214 @@ const formFromRecord = (record, config) =>
     ]),
   );
 
+const isValidImageUrl = (value) => {
+  if (value.startsWith("/")) return true;
+  // Existing records saved earlier may still hold an embedded image
+  if (value.startsWith("data:image/")) return true;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
+/* Single source of truth: returns an error message, or "" when valid */
+const validateField = (spec, raw) => {
+  const value = raw === undefined || raw === null ? "" : String(raw).trim();
+  if (!value) return spec.required ? `${spec.label} is required.` : "";
+
+  if (spec.minLength && value.length < spec.minLength) {
+    return `${spec.label} must be at least ${spec.minLength} characters.`;
+  }
+  if (spec.maxLength && value.length > spec.maxLength) {
+    return `${spec.label} must be at most ${spec.maxLength} characters.`;
+  }
+
+  switch (spec.type) {
+    case "number": {
+      const num = Number(value);
+      if (!Number.isFinite(num)) return `${spec.label} must be a number.`;
+      if (spec.integer && !Number.isInteger(num)) {
+        return `${spec.label} must be a whole number.`;
+      }
+      if (spec.step === "0.01" && !/^-?\d+(\.\d{1,2})?$/.test(value)) {
+        return `${spec.label} can have at most 2 decimal places.`;
+      }
+      if (spec.min !== undefined && num < spec.min) {
+        return `${spec.label} must be at least ${spec.min}.`;
+      }
+      if (spec.max !== undefined && num > spec.max) {
+        return `${spec.label} must be at most ${spec.max}.`;
+      }
+      return "";
+    }
+    case "email":
+      return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value)
+        ? ""
+        : `${spec.label} must be a valid email address.`;
+    case "tel": {
+      const digits = value.replace(/\D/g, "");
+      return /^\+?[0-9\s\-().]+$/.test(value) && digits.length >= 7 && digits.length <= 15
+        ? ""
+        : `${spec.label} must be a valid phone number (7–15 digits).`;
+    }
+    case "date": {
+      if (!isRealDate(value)) return `${spec.label} must be a valid date.`;
+      const min = resolveBound(spec.min);
+      const max = resolveBound(spec.max);
+      if (min && value < min) return `${spec.label} cannot be before ${formatDate(min)}.`;
+      if (max && value > max) return `${spec.label} cannot be after ${formatDate(max)}.`;
+      return "";
+    }
+    case "datetime-local":
+      return Number.isNaN(new Date(value).getTime())
+        ? `${spec.label} must be a valid date and time.`
+        : "";
+    case "image":
+      return isValidImageUrl(value)
+        ? ""
+        : `${spec.label} must be a valid http(s) URL or a path starting with "/".`;
+    case "json":
+      try {
+        JSON.parse(value);
+        return "";
+      } catch {
+        return `${spec.label} must be valid JSON.`;
+      }
+    case "select":
+      return spec.options.some((o) => String(o.value) === value)
+        ? ""
+        : `Please choose a valid ${spec.label.toLowerCase()}.`;
+    case "boolean":
+      return value === "0" || value === "1" ? "" : `${spec.label} must be Yes or No.`;
+    default:
+      return "";
+  }
+};
+
+/* Field rules + cross-field rules */
+const validateForm = (form, config) => {
+  const errors = {};
+  for (const [name, spec] of Object.entries(config.fields)) {
+    const message = validateField(spec, form[name]);
+    if (message) errors[name] = message;
+  }
+  if (
+    config.fields.salePrice &&
+    !errors.salePrice &&
+    !errors.price &&
+    form.salePrice !== "" &&
+    form.salePrice !== undefined &&
+    Number(form.salePrice) > Number(form.price)
+  ) {
+    errors.salePrice = "Sale price cannot be higher than the price.";
+  }
+  return errors;
+};
+
 const makePayload = (form, config) => {
   const payload = {};
   for (const [name, spec] of Object.entries(config.fields)) {
     const raw = form[name];
-    if (spec.required && (raw === "" || raw === undefined || !String(raw).trim())) {
-      throw new Error(`${spec.label} is required.`);
-    }
-    if (raw === "" || raw === undefined) {
+    const message = validateField(spec, raw);
+    if (message) throw new Error(message);
+
+    if (raw === "" || raw === undefined || raw === null) {
       if (spec.nullable !== false) payload[name] = null;
       continue;
     }
-    if (spec.type === "number") {
-      const value = Number(raw);
-      if (!Number.isFinite(value)) throw new Error(`${spec.label} must be a number.`);
-      payload[name] = value;
-    } else if (spec.type === "boolean") {
-      payload[name] = Number(raw);
-    } else if (spec.type === "json") {
-      try {
-        payload[name] = JSON.stringify(JSON.parse(raw));
-      } catch {
-        throw new Error(`${spec.label} must be valid JSON.`);
-      }
-    } else if (spec.type === "datetime-local") {
-      payload[name] = raw.replace("T", " ") + ":00";
-    } else {
-      payload[name] = raw.trim();
-    }
+    if (spec.type === "number") payload[name] = Number(raw);
+    else if (spec.type === "boolean") payload[name] = Number(raw);
+    else if (spec.type === "json") payload[name] = JSON.stringify(JSON.parse(raw));
+    else if (spec.type === "datetime-local") payload[name] = `${raw.replace("T", " ")}:00`;
+    else payload[name] = String(raw).trim();
   }
   return payload;
 };
 
-const formatCell = (value) => {
+const formatCell = (value, spec) => {
   if (value === null || value === undefined || value === "") return "—";
+  if (spec?.type === "date") return formatDate(value);
+  if (spec?.type === "datetime-local") return formatDateTime(value);
+  if (spec?.type === "number" && spec.step === "0.01" && Number.isFinite(Number(value))) {
+    return Number(value).toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
 };
 
 /* ------------------------------------------------------------------ */
-/*  Reusable UI components                                             */
+/*  Image URL field (no upload, URL only with live preview)             */
 /* ------------------------------------------------------------------ */
-function ResourceSummaryCard({ config, count, color }) {
-  const theme = useTheme();
-  const Icon = config.icon;
+function ImageUrlField({ spec, value, onChange, onBlur, error }) {
+  const [broken, setBroken] = useState(false);
+
+  useEffect(() => {
+    setBroken(false);
+  }, [value]);
+
   return (
-    <Card
-      variant="outlined"
+    <Box
       sx={{
-        height: "100%",
-        borderRadius: 3,
-        borderColor: alpha(color, 0.25),
-        background: `linear-gradient(180deg, ${alpha(color, 0.06)} 0%, ${theme.palette.background.paper} 70%)`,
-        transition: "transform .18s ease, box-shadow .18s ease",
-        "&:hover": {
-          transform: "translateY(-2px)",
-          boxShadow: `0 8px 24px ${alpha(color, 0.18)}`,
-        },
+        gridColumn: { xs: "auto", sm: "1 / -1" },
+        display: "flex",
+        gap: 2,
+        alignItems: "flex-start",
       }}
     >
-      <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
-          <Box sx={{ minWidth: 0 }}>
-            <Typography
-              color="text.secondary"
-              variant="body2"
-              fontWeight={600}
-              sx={{ textTransform: "uppercase", letterSpacing: ".06em", fontSize: 11 }}
-            >
-              {config.label}
-            </Typography>
-            <Typography variant="h4" fontWeight={800} sx={{ mt: 1, lineHeight: 1.1, color }}>
-              {count}
-            </Typography>
-            <Typography color="text.secondary" variant="caption" component="div" sx={{ mt: 0.5 }}>
-              {count === 1 ? "record" : "records"}
-            </Typography>
-          </Box>
-          <Box
-            sx={{
-              width: 48,
-              height: 48,
-              borderRadius: 2,
-              display: "grid",
-              placeItems: "center",
-              bgcolor: alpha(color, 0.12),
-              color: color,
-              flexShrink: 0,
-            }}
-          >
-            <Icon size={24} />
-          </Box>
-        </Stack>
-      </CardContent>
-    </Card>
-  );
-}
-
-function DetailItem({ icon, label, value }) {
-  const theme = useTheme();
-  return (
-    <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0 }}>
       <Box
         sx={{
-          width: 38,
-          height: 38,
+          width: 72,
+          height: 72,
           borderRadius: 2,
+          border: "1px solid",
+          borderColor: "divider",
           display: "grid",
           placeItems: "center",
-          bgcolor: alpha(theme.palette.primary.main, 0.08),
-          color: theme.palette.primary.main,
+          overflow: "hidden",
+          bgcolor: "action.hover",
           flexShrink: 0,
         }}
       >
-        {icon}
+        {value && !broken && !error ? (
+          <Box
+            component="img"
+            src={value}
+            alt={spec.label}
+            onError={() => setBroken(true)}
+            sx={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
+        ) : (
+          <ImageIcon sx={{ fontSize: 32, color: "text.disabled" }} />
+        )}
       </Box>
-      <Box sx={{ minWidth: 0 }}>
-        <Typography color="text.secondary" variant="caption" component="div">
-          {label}
-        </Typography>
-        <Typography fontWeight={600} variant="body2" noWrap>
-          {value}
-        </Typography>
-      </Box>
-    </Stack>
+      <TextField
+        label={`${spec.label} URL`}
+        value={value.startsWith("data:") ? "(embedded image)" : value}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
+        fullWidth
+        placeholder="https://example.com/image.jpg"
+        error={Boolean(error) || (Boolean(value) && broken)}
+        helperText={
+          error || (value && broken ? "This image could not be loaded." : undefined)
+        }
+        slotProps={{
+          htmlInput: { readOnly: value.startsWith("data:") },
+          input: {
+            endAdornment: value ? (
+              <Button size="small" onClick={() => onChange("")} sx={{ textTransform: "none" }}>
+                Clear
+              </Button>
+            ) : null,
+          },
+        }}
+      />
+    </Box>
   );
 }
 
@@ -491,7 +640,7 @@ function DetailItem({ icon, label, value }) {
 /* ------------------------------------------------------------------ */
 export default function SiteAdminData() {
   const theme = useTheme();
-  const { baseUrl, authConfig, site } = useOutletContext();
+  const { baseUrl, authConfig } = useOutletContext();
 
   const [resources, setResources] = useState([]);
   const [selectedResource, setSelectedResource] = useState("");
@@ -503,11 +652,44 @@ export default function SiteAdminData() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
   const [form, setForm] = useState({});
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [fkOptions, setFkOptions] = useState({});
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [viewMode, setViewMode] = useState("table"); // 'table' | 'cards'
-  const [selectedColumns, setSelectedColumns] = useState([]);
+  const [hiddenColumns, setHiddenColumns] = useState([]);
 
+  const config = RESOURCE_CONFIG[selectedResource];
+  const resourceColor = config?.color || theme.palette.primary.main;
+  const resourceUrl = `${baseUrl}/data/${selectedResource}`;
+  const fkMap = FK_MAP[selectedResource] || {};
+
+  /* ---------------- FK options ---------------- */
+  const fetchFkOptions = useCallback(async () => {
+    if (!config) return;
+    const newOptions = {};
+    for (const name of Object.keys(config.fields)) {
+      const fk = FK_MAP[selectedResource]?.[name];
+      if (fk) {
+        try {
+          const { data } = await axios.get(`${baseUrl}/data/${fk}`, authConfig);
+          newOptions[name] = Array.isArray(data) ? data : [];
+        } catch (e) {
+          if (e.response?.status !== 404) {
+            console.error(`Failed to load FK options for ${name}`, e);
+          }
+          newOptions[name] = [];
+        }
+      }
+    }
+    setFkOptions(newOptions);
+  }, [config, selectedResource, baseUrl, authConfig]);
+
+  useEffect(() => {
+    fetchFkOptions();
+  }, [fetchFkOptions]);
+
+  /* ---------------- Resources list ---------------- */
   const availableResources = useMemo(
     () =>
       [...resources].sort((a, b) => {
@@ -518,17 +700,7 @@ export default function SiteAdminData() {
     [resources],
   );
 
-  const config = RESOURCE_CONFIG[selectedResource];
-  const resourceColor = config?.color || theme.palette.primary.main;
-  const resourceUrl = `${baseUrl}/data/${selectedResource}`;
-
-  // Initialize selected columns when resource changes
-  useEffect(() => {
-    if (config) {
-      setSelectedColumns(Object.keys(config.fields).slice(0, 6));
-    }
-  }, [config]);
-
+  /* ---------------- Visible rows ---------------- */
   const visibleRows = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return rows;
@@ -537,7 +709,19 @@ export default function SiteAdminData() {
     );
   }, [rows, search]);
 
-  // Single data fetching effect
+  /* ---------------- Columns ---------------- */
+  const selectedColumns = useMemo(() => {
+    if (!config) return [];
+    return Object.keys(config.fields).filter((name) => !hiddenColumns.includes(name));
+  }, [config, hiddenColumns]);
+
+  const toggleColumn = (name) => {
+    setHiddenColumns((current) =>
+      current.includes(name) ? current.filter((c) => c !== name) : [...current, name],
+    );
+  };
+
+  /* ---------------- Fetch rows ---------------- */
   const fetchRows = useCallback(async () => {
     if (!selectedResource || !config) return;
     setLoading(true);
@@ -552,7 +736,7 @@ export default function SiteAdminData() {
     }
   }, [authConfig, resourceUrl, selectedResource, config]);
 
-  // Load resources on mount
+  /* ---------------- Load resource list on mount ---------------- */
   useEffect(() => {
     let cancelled = false;
     const loadResources = async () => {
@@ -569,25 +753,32 @@ export default function SiteAdminData() {
         setError("");
       } catch (requestError) {
         if (!cancelled) {
-          setError(requestError.response?.data?.message || "Could not load this site's data resources.");
+          setError(
+            requestError.response?.data?.message ||
+              "Could not load this site's data resources.",
+          );
         }
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
     loadResources();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [authConfig, baseUrl]);
 
-  // Fetch rows when resource changes
+  /* ---------------- Fetch rows when resource changes ---------------- */
   useEffect(() => {
     fetchRows();
   }, [fetchRows]);
 
+  /* ---------------- Dialog actions ---------------- */
   const openNewRecord = () => {
     if (!config) return;
     setEditingRecord(null);
     setForm(createEmptyForm(config));
+    setFieldErrors({});
     setError("");
     setNotice("");
     setDialogOpen(true);
@@ -596,6 +787,7 @@ export default function SiteAdminData() {
   const openEditRecord = (record) => {
     setEditingRecord(record);
     setForm(formFromRecord(record, config));
+    setFieldErrors({});
     setError("");
     setNotice("");
     setDialogOpen(true);
@@ -604,11 +796,21 @@ export default function SiteAdminData() {
   const saveRecord = async (event) => {
     event.preventDefault();
     if (!config) return;
+
+    const errors = validateForm(form, config);
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setError("Please fix the highlighted fields.");
+      return;
+    }
+
     setSaving(true);
     setError("");
+    setFieldErrors({});
     setNotice("");
     try {
       const payload = makePayload(form, config);
+
       if (editingRecord) {
         await axios.put(`${resourceUrl}/${editingRecord.id}`, payload, authConfig);
       } else {
@@ -616,16 +818,31 @@ export default function SiteAdminData() {
       }
       await fetchRows();
       setDialogOpen(false);
-      setNotice(editingRecord ? `${config.label} record updated.` : `${config.label} record created.`);
+      setNotice(
+        editingRecord ? `${config.label} record updated.` : `${config.label} record created.`,
+      );
     } catch (requestError) {
-      setError(requestError.response?.data?.message || requestError.message || "Could not save this record.");
+      const serverErrors = requestError.response?.data?.errors;
+      if (serverErrors && typeof serverErrors === "object") {
+        const mapped = {};
+        for (const [key, value] of Object.entries(serverErrors)) {
+          mapped[key] = Array.isArray(value) ? value.join(", ") : String(value);
+        }
+        setFieldErrors(mapped);
+      }
+      setError(
+        requestError.response?.data?.message ||
+          requestError.message ||
+          "Could not save this record.",
+      );
     } finally {
       setSaving(false);
     }
   };
 
   const deleteRecord = async (record) => {
-    const label = record.name || record.title || `${config?.label || "record"} #${record.id}`;
+    const label =
+      record.name || record.title || `${config?.label || "record"} #${record.id}`;
     if (!window.confirm(`Delete "${label}"? This cannot be undone.`)) return;
     setDeletingId(record.id);
     setError("");
@@ -641,52 +858,113 @@ export default function SiteAdminData() {
     }
   };
 
-  const updateForm = (name, value) =>
+  const updateForm = (name, value) => {
     setForm((current) => ({ ...current, [name]: value }));
-
-  const handleColumnToggle = (column) => {
-    setSelectedColumns((prev) =>
-      prev.includes(column)
-        ? prev.filter((c) => c !== column)
-        : [...prev, column],
-    );
+    if (fieldErrors[name]) {
+      setFieldErrors((current) => {
+        const next = { ...current };
+        delete next[name];
+        return next;
+      });
+    }
   };
 
+  const validateOnBlur = (name, spec) => {
+    const message = validateField(spec, form[name]);
+    setFieldErrors((current) => {
+      const next = { ...current };
+      if (message) next[name] = message;
+      else delete next[name];
+      return next;
+    });
+  };
+
+  /* ---------------- Form field renderer ---------------- */
   const renderFormField = ([name, spec]) => {
+    const isFk = Boolean(fkMap[name]);
+    const isSelect = spec.type === "select" || spec.type === "boolean" || isFk;
     const multiline = spec.type === "textarea" || spec.type === "json";
-    const isSelect = spec.type === "select" || spec.type === "boolean";
+    const errorText = fieldErrors[name];
+
+    if (spec.type === "image") {
+      return (
+        <ImageUrlField
+          key={name}
+          spec={spec}
+          value={form[name] ?? ""}
+          onChange={(value) => updateForm(name, value)}
+          onBlur={() => validateOnBlur(name, spec)}
+          error={errorText}
+        />
+      );
+    }
+
+    const inputType = isSelect
+      ? undefined
+      : ["date", "email", "tel", "number", "datetime-local"].includes(spec.type)
+        ? spec.type
+        : "text";
+
+    const htmlInput = {};
+    if (spec.maxLength) htmlInput.maxLength = spec.maxLength;
+    if (spec.type === "number") {
+      htmlInput.step = spec.step || (spec.integer ? "1" : "any");
+      if (spec.min !== undefined) htmlInput.min = spec.min;
+      if (spec.max !== undefined) htmlInput.max = spec.max;
+    }
+    if (spec.type === "date") {
+      if (spec.min) htmlInput.min = resolveBound(spec.min);
+      if (spec.max) htmlInput.max = resolveBound(spec.max);
+    }
+
+    const placeholder =
+      spec.type === "email"
+        ? "name@example.com"
+        : spec.type === "tel"
+          ? "+91 98765 43210"
+          : undefined;
+
+    const hint =
+      errorText ||
+      (spec.type === "json"
+        ? "Enter a valid JSON value."
+        : spec.type === "date"
+          ? "Pick a date from the calendar."
+          : isFk
+            ? "Select a related record"
+            : undefined);
 
     return (
       <TextField
         key={name}
         label={spec.label}
         value={form[name] ?? ""}
-        onChange={(event) => updateForm(name, event.target.value)}
-        type={isSelect ? undefined : spec.type === "number" ? "number" : "text"}
+        onChange={(e) => updateForm(name, e.target.value)}
+        onBlur={() => validateOnBlur(name, spec)}
+        type={inputType}
         required={Boolean(spec.required)}
         select={isSelect}
         multiline={multiline}
         minRows={multiline ? spec.rows : undefined}
         fullWidth
-        helperText={
-          spec.type === "json" ? "Enter a valid JSON value." :
-          spec.type === "number" && spec.step ? `Step: ${spec.step}` :
-          undefined
-        }
-        slotProps={
-          spec.type === "number"
-            ? { htmlInput: { step: spec.step || "1", min: spec.min } }
-            : undefined
-        }
-        sx={
-          multiline
-            ? { gridColumn: { xs: "auto", sm: "1 / -1" } }
-            : undefined
-        }
+        placeholder={placeholder}
+        error={Boolean(errorText)}
+        helperText={hint}
+        slotProps={{
+          inputLabel: ["date", "datetime-local"].includes(spec.type)
+            ? { shrink: true }
+            : undefined,
+          htmlInput,
+        }}
+        sx={multiline ? { gridColumn: { xs: "auto", sm: "1 / -1" } } : undefined}
       >
         {spec.type === "boolean" && [
-          <MenuItem key="0" value="0">No</MenuItem>,
-          <MenuItem key="1" value="1">Yes</MenuItem>,
+          <MenuItem key="0" value="0">
+            No
+          </MenuItem>,
+          <MenuItem key="1" value="1">
+            Yes
+          </MenuItem>,
         ]}
         {spec.type === "select" &&
           spec.options.map((option) => (
@@ -694,11 +972,22 @@ export default function SiteAdminData() {
               {option.label}
             </MenuItem>
           ))}
+        {isFk && (
+          <MenuItem key="clear" value="">
+            None
+          </MenuItem>
+        )}
+        {isFk &&
+          (fkOptions[name] || []).map((option) => (
+            <MenuItem key={option.id} value={String(option.id)}>
+              {option.name || option.title || option.id}
+            </MenuItem>
+          ))}
       </TextField>
     );
   };
 
-  // If no resources loaded yet, show loading
+  /* ---------------- Loading state ---------------- */
   if (loading && !config) {
     return (
       <Box sx={{ display: "grid", placeItems: "center", minHeight: 320 }}>
@@ -707,9 +996,10 @@ export default function SiteAdminData() {
     );
   }
 
+  /* ---------------- Render ---------------- */
   return (
     <Box sx={{ maxWidth: 1400, mx: "auto" }}>
-      {/* ---------- Page Header ---------- */}
+      {/* Page header */}
       <Stack
         direction={{ xs: "column", sm: "row" }}
         justifyContent="space-between"
@@ -745,14 +1035,6 @@ export default function SiteAdminData() {
           </Stack>
         </Box>
         <Stack direction="row" spacing={1.5} alignItems="center">
-          {site?.categoryName && (
-            <Chip
-              label={site.categoryName}
-              variant="outlined"
-              icon={<EntriesIcon size={16} />}
-              sx={{ textTransform: "capitalize", fontWeight: 600 }}
-            />
-          )}
           {config && (
             <Button
               variant="contained"
@@ -766,10 +1048,18 @@ export default function SiteAdminData() {
         </Stack>
       </Stack>
 
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      {notice && <Alert severity="success" sx={{ mb: 2 }}>{notice}</Alert>}
+      {error && !dialogOpen && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>
+          {error}
+        </Alert>
+      )}
+      {notice && (
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setNotice("")}>
+          {notice}
+        </Alert>
+      )}
 
-      {/* ---------- Resource Selector & Summary Cards ---------- */}
+      {/* Resource selector */}
       <Paper variant="outlined" sx={{ borderRadius: 3, overflow: "hidden", mb: 2 }}>
         <Box sx={{ p: 2, borderBottom: 1, borderColor: "divider" }}>
           <Stack
@@ -787,6 +1077,7 @@ export default function SiteAdminData() {
                 setSearch("");
                 setNotice("");
                 setError("");
+                setHiddenColumns([]);
               }}
               disabled={loading || availableResources.length === 0}
               sx={{ minWidth: { sm: 280 }, flex: { sm: 1 } }}
@@ -825,32 +1116,6 @@ export default function SiteAdminData() {
           </Stack>
         </Box>
 
-        {/* Summary cards for all resources */}
-        {availableResources.length > 0 && (
-          <Box sx={{ p: 2, borderBottom: 1, borderColor: "divider" }}>
-            <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
-              All data tables
-            </Typography>
-            <Grid container spacing={2}>
-              {availableResources.map((resource) => {
-                const resConfig = RESOURCE_CONFIG[resource];
-                const resourceRows = resource === selectedResource ? rows : [];
-                // We'd need to fetch counts for other resources, for now show current
-                return (
-                  <Grid key={resource} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
-                    <ResourceSummaryCard
-                      config={resConfig}
-                      count={resource === selectedResource ? rows.length : 0}
-                      color={resConfig.color}
-                    />
-                  </Grid>
-                );
-              })}
-            </Grid>
-          </Box>
-        )}
-
-        {/* Current resource table */}
         {config && (
           <Box sx={{ p: 2 }}>
             <Stack
@@ -865,10 +1130,11 @@ export default function SiteAdminData() {
                   {config.label}
                 </Typography>
                 <Typography color="text.secondary" variant="body2">
-                  {visibleRows.length} of {rows.length} record{rows.length === 1 ? "" : "s"}
+                  {visibleRows.length} of {rows.length} record
+                  {rows.length === 1 ? "" : "s"}
                 </Typography>
               </Box>
-              <Stack direction="row" spacing={1} alignItems="center">
+              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                 <TextField
                   size="small"
                   placeholder="Search records"
@@ -884,26 +1150,44 @@ export default function SiteAdminData() {
                 <Tooltip title="Toggle view">
                   <IconButton
                     onClick={() => setViewMode((prev) => (prev === "table" ? "cards" : "table"))}
-                    color={viewMode === "table" ? "primary" : "default"}
+                    color="primary"
                     aria-label="Toggle view mode"
                   >
-                    {viewMode === "table" ? (
-                      <FilterListIcon />
-                    ) : (
-                      <TableCell />
-                    )}
+                    {viewMode === "table" ? <GridViewIcon /> : <ViewListIcon />}
                   </IconButton>
                 </Tooltip>
                 <Tooltip title="Column visibility">
                   <IconButton
-                    onClick={() => {}}
-                    color="default"
+                    onClick={() => {
+                      setHiddenColumns((current) =>
+                        current.length ? [] : Object.keys(config.fields),
+                      );
+                    }}
+                    color={hiddenColumns.length ? "default" : "primary"}
                     aria-label="Column visibility"
                   >
                     <VisibilityIcon />
                   </IconButton>
                 </Tooltip>
               </Stack>
+            </Stack>
+
+            {/* Column visibility chips */}
+            <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 2 }}>
+              {Object.entries(config.fields).map(([name, spec]) => {
+                const hidden = hiddenColumns.includes(name);
+                return (
+                  <Chip
+                    key={name}
+                    label={spec.label}
+                    size="small"
+                    variant={hidden ? "outlined" : "filled"}
+                    color={hidden ? "default" : "primary"}
+                    onClick={() => toggleColumn(name)}
+                    sx={{ mb: 1 }}
+                  />
+                );
+              })}
             </Stack>
 
             {loading ? (
@@ -930,7 +1214,11 @@ export default function SiteAdminData() {
                 <Typography variant="h6" fontWeight={600} sx={{ mb: 1 }}>
                   {search ? "No matching records" : `No ${config.label.toLowerCase()} yet`}
                 </Typography>
-                <Typography color="text.secondary" variant="body2" sx={{ maxWidth: 360, mx: "auto" }}>
+                <Typography
+                  color="text.secondary"
+                  variant="body2"
+                  sx={{ maxWidth: 360, mx: "auto" }}
+                >
                   {search
                     ? "Try adjusting your search terms."
                     : "Add your first record to get started."}
@@ -947,7 +1235,9 @@ export default function SiteAdminData() {
                 )}
               </Box>
             ) : viewMode === "table" ? (
-              <TableContainer sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 2 }}>
+              <TableContainer
+                sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 2 }}
+              >
                 <Table size="small" sx={{ minWidth: 600 }}>
                   <TableHead>
                     <TableRow sx={{ bgcolor: alpha(resourceColor, 0.04) }}>
@@ -956,41 +1246,71 @@ export default function SiteAdminData() {
                           key={column}
                           sx={{ fontWeight: 700, whiteSpace: "nowrap", maxWidth: 280 }}
                         >
-                          {config.fields[column].label}
+                          {config?.fields[column]?.label || column}
                         </TableCell>
                       ))}
-                      <TableCell align="right" sx={{ fontWeight: 700, whiteSpace: "nowrap", width: 100 }}>
+                      <TableCell
+                        align="right"
+                        sx={{ fontWeight: 700, whiteSpace: "nowrap", width: 100 }}
+                      >
                         Actions
                       </TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {visibleRows.map((row) => (
-                      <TableRow key={row.id} hover sx={{ "&:last-child td": { borderBottom: 0 } }}>
-                        {selectedColumns.map((column) => (
-                          <TableCell key={column} sx={{ maxWidth: 280 }}>
-                            {column === "status" ? (
-                              <Chip
-                                size="small"
-                                label={formatCell(row[column])}
-                                color={row[column] === "active" ? "success" : "default"}
-                                variant="outlined"
-                              />
-                            ) : column === "isVeg" || column === "isSpecial" ? (
-                              <Chip
-                                size="small"
-                                label={row[column] ? "Yes" : "No"}
-                                color={row[column] ? "success" : "default"}
-                                variant="outlined"
-                                icon={row[column] ? <VisibilityIcon fontSize="small" /> : undefined}
-                              />
-                            ) : (
-                              <Typography variant="body2" noWrap title={formatCell(row[column])}>
-                                {formatCell(row[column])}
-                              </Typography>
-                            )}
-                          </TableCell>
-                        ))}
+                      <TableRow
+                        key={row.id}
+                        hover
+                        sx={{ "&:last-child td": { borderBottom: 0 } }}
+                      >
+                        {selectedColumns.map((column) => {
+                          const spec = config.fields[column];
+                          const value = row[column];
+
+                          // Image thumbnails in table
+                          if (spec?.type === "image" && value) {
+                            return (
+                              <TableCell key={column} sx={{ maxWidth: 280 }}>
+                                <Avatar
+                                  src={value}
+                                  variant="rounded"
+                                  sx={{ width: 40, height: 40 }}
+                                >
+                                  <ImageIcon fontSize="small" />
+                                </Avatar>
+                              </TableCell>
+                            );
+                          }
+
+                          return (
+                            <TableCell key={column} sx={{ maxWidth: 280 }}>
+                              {column === "status" ? (
+                                <Chip
+                                  size="small"
+                                  label={formatCell(value, spec)}
+                                  color={value === "active" ? "success" : "default"}
+                                  variant="outlined"
+                                />
+                              ) : column === "isVeg" || column === "isSpecial" ? (
+                                <Chip
+                                  size="small"
+                                  label={value ? "Yes" : "No"}
+                                  color={value ? "success" : "default"}
+                                  variant="outlined"
+                                />
+                              ) : (
+                                <Typography
+                                  variant="body2"
+                                  noWrap
+                                  title={formatCell(value, spec)}
+                                >
+                                  {formatCell(value, spec)}
+                                </Typography>
+                              )}
+                            </TableCell>
+                          );
+                        })}
                         <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
                           <Tooltip title="Edit">
                             <IconButton
@@ -1023,19 +1343,47 @@ export default function SiteAdminData() {
                 </Table>
               </TableContainer>
             ) : (
-              /* Card view for mobile */
+              /* Card view */
               <Grid container spacing={2}>
                 {visibleRows.map((row) => (
                   <Grid key={row.id} size={{ xs: 12, sm: 6, lg: 4 }}>
                     <Card variant="outlined" sx={{ height: "100%", borderRadius: 2 }}>
                       <CardContent sx={{ p: 2 }}>
-                        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1.5 }}>
-                          <Typography variant="subtitle1" fontWeight={700} noWrap>
-                            {row.name || row.title || row.admissionNo || `#${row.id}`}
-                          </Typography>
+                        <Stack
+                          direction="row"
+                          justifyContent="space-between"
+                          alignItems="flex-start"
+                          sx={{ mb: 1.5 }}
+                        >
+                          <Stack direction="row" spacing={1.5} alignItems="center">
+                            {config.fields.photoUrl && row.photoUrl && (
+                              <Avatar src={row.photoUrl} sx={{ width: 40, height: 40 }} />
+                            )}
+                            {config.fields.thumbnailUrl && row.thumbnailUrl && (
+                              <Avatar
+                                src={row.thumbnailUrl}
+                                variant="rounded"
+                                sx={{ width: 40, height: 40 }}
+                              />
+                            )}
+                            {config.fields.imageUrl && row.imageUrl && (
+                              <Avatar
+                                src={row.imageUrl}
+                                variant="rounded"
+                                sx={{ width: 40, height: 40 }}
+                              />
+                            )}
+                            <Typography variant="subtitle1" fontWeight={700} noWrap>
+                              {row.name || row.title || row.admissionNo || `#${row.id}`}
+                            </Typography>
+                          </Stack>
                           <Stack direction="row" spacing={0.5}>
                             <Tooltip title="Edit">
-                              <IconButton size="small" onClick={() => openEditRecord(row)}>
+                              <IconButton
+                                size="small"
+                                aria-label={`Edit record ${row.id}`}
+                                onClick={() => openEditRecord(row)}
+                              >
                                 <EditIcon fontSize="small" />
                               </IconButton>
                             </Tooltip>
@@ -1043,6 +1391,7 @@ export default function SiteAdminData() {
                               <IconButton
                                 size="small"
                                 color="error"
+                                aria-label={`Delete record ${row.id}`}
                                 disabled={deletingId === row.id}
                                 onClick={() => deleteRecord(row)}
                               >
@@ -1055,32 +1404,41 @@ export default function SiteAdminData() {
                             </Tooltip>
                           </Stack>
                         </Stack>
-                        {selectedColumns.map((column) => (
-                          <Box key={column} sx={{ mb: 0.75 }}>
-                            <Typography color="text.secondary" variant="caption" component="div">
-                              {config.fields[column].label}
-                            </Typography>
-                            <Typography variant="body2" fontWeight={500}>
-                              {column === "status" ? (
-                                <Chip
-                                  size="small"
-                                  label={formatCell(row[column])}
-                                  color={row[column] === "active" ? "success" : "default"}
-                                  variant="outlined"
-                                />
-                              ) : column === "isVeg" || column === "isSpecial" ? (
-                                <Chip
-                                  size="small"
-                                  label={row[column] ? "Yes" : "No"}
-                                  color={row[column] ? "success" : "default"}
-                                  variant="outlined"
-                                />
-                              ) : (
-                                formatCell(row[column])
-                              )}
-                            </Typography>
-                          </Box>
-                        ))}
+                        {selectedColumns.map((column) => {
+                          const spec = config.fields[column];
+                          // Image fields are already shown as avatars
+                          if (spec?.type === "image" && row[column]) return null;
+                          return (
+                            <Box component="div" key={column} sx={{ mb: 0.75 }}>
+                              <Typography
+                                color="text.secondary"
+                                variant="caption"
+                                component="div"
+                              >
+                                {spec.label}
+                              </Typography>
+                              <Typography variant="body2" fontWeight={500} component="div">
+                                {column === "status" ? (
+                                  <Chip
+                                    size="small"
+                                    label={formatCell(row[column], spec)}
+                                    color={row[column] === "active" ? "success" : "default"}
+                                    variant="outlined"
+                                  />
+                                ) : column === "isVeg" || column === "isSpecial" ? (
+                                  <Chip
+                                    size="small"
+                                    label={row[column] ? "Yes" : "No"}
+                                    color={row[column] ? "success" : "default"}
+                                    variant="outlined"
+                                  />
+                                ) : (
+                                  formatCell(row[column], spec)
+                                )}
+                              </Typography>
+                            </Box>
+                          );
+                        })}
                       </CardContent>
                     </Card>
                   </Grid>
@@ -1091,7 +1449,7 @@ export default function SiteAdminData() {
         )}
       </Paper>
 
-      {/* ---------- Add/Edit Dialog ---------- */}
+      {/* Add/Edit dialog */}
       <Dialog
         open={dialogOpen}
         onClose={() => !saving && setDialogOpen(false)}
@@ -1099,12 +1457,16 @@ export default function SiteAdminData() {
         maxWidth="md"
         PaperProps={{ sx: { borderRadius: 3 } }}
       >
-        <Box component="form" onSubmit={saveRecord}>
+        <Box component="form" onSubmit={saveRecord} noValidate>
           <DialogTitle fontWeight={800} sx={{ px: 3, py: 2 }}>
             {editingRecord ? "Edit" : "Add"} {config?.singular}
           </DialogTitle>
           <DialogContent dividers sx={{ maxHeight: "70vh" }}>
-            {error && <Alert severity="error" sx={{ mb: 2, mx: 3 }}>{error}</Alert>}
+            {error && (
+              <Alert severity="error" sx={{ mb: 2, mx: 3, mt: 2 }}>
+                {error}
+              </Alert>
+            )}
             <Box
               sx={{
                 display: "grid",
@@ -1113,8 +1475,7 @@ export default function SiteAdminData() {
                 p: 3,
               }}
             >
-              {config &&
-                Object.entries(config.fields).map(renderFormField)}
+              {config && Object.entries(config.fields).map(renderFormField)}
             </Box>
           </DialogContent>
           <DialogActions sx={{ px: 3, py: 2, borderTop: 1, borderColor: "divider" }}>

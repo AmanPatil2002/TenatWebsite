@@ -357,6 +357,24 @@ const updateSitePage = async (req, res) => {
   }
 };
 
+const deleteSitePage = async (req, res) => {
+  const { siteId, pageId } = req.params;
+  if (!isId(siteId)) return res.status(400).json({ message: "Invalid site id" });
+  if (!isId(pageId)) return res.status(400).json({ message: "Invalid page id" });
+
+  try {
+    const site = await getActiveManagedSite(siteId, req);
+    const [result] = await db.query(
+      `DELETE FROM ${tn(siteId, "pages", site.dbName)} WHERE id = ?`,
+      [pageId],
+    );
+    if (!result.affectedRows) throw new HttpError(404, "Page not found");
+    return res.json({ message: "Page deleted successfully" });
+  } catch (error) {
+    return sendError(res, error);
+  }
+};
+
 const reorderSitePages = async (req, res) => {
   const { siteId } = req.params;
   const { pageIds } = req.body ?? {};
@@ -461,6 +479,7 @@ module.exports = {
   getSitePageOptions,
   createSitePage,
   updateSitePage,
+  deleteSitePage,
   reorderSitePages,
   getSiteData,
 };

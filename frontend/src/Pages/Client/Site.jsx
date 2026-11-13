@@ -112,8 +112,6 @@ const API_URL = (
   import.meta.env.VITE_API_URL || "http://localhost:5000"
 ).replace(/\/+$/, "");
 
-const TOOLBAR_HEIGHT = 56;
-
 const SOCIALS = [
   { key: "facebook", label: "Facebook", Icon: FacebookIcon },
   { key: "instagram", label: "Instagram", Icon: InstagramIcon },
@@ -222,6 +220,88 @@ const renderSlider = (items) => {
 
 const SLIDER_MARKER = /<!--\s*SITE_SLIDER\s*-->/i;
 
+/* ------------------------------------------------------------------ */
+/* Hydrate [data-entity] tables with site data                         */
+/* ------------------------------------------------------------------ */
+const hydrateSiteData = (html, siteData = {}) => {
+  if (!html || !html.includes("data-entity")) return html;
+
+  const doc = new DOMParser().parseFromString(
+    `<div id="root">${html}</div>`,
+    "text/html",
+  );
+  const root = doc.getElementById("root");
+
+  const classMap = new Map(
+    (siteData.classes || []).map((c) => [String(c.id), c]),
+  );
+  const teacherMap = new Map(
+    (siteData.teachers || []).map((t) => [String(t.id), t]),
+  );
+
+  const enrich = (entity, item) => {
+    if (entity === "students") {
+      const cls = classMap.get(String(item.classId));
+      return {
+        ...item,
+        className:
+          item.className ||
+          (cls ? `${cls.name}${cls.section ? ` - ${cls.section}` : ""}` : ""),
+      };
+    }
+    if (entity === "classes") {
+      return {
+        ...item,
+        classTeacherName:
+          item.classTeacherName ||
+          teacherMap.get(String(item.classTeacherId))?.name ||
+          "",
+      };
+    }
+    return item;
+  };
+
+  root.querySelectorAll("[data-entity]").forEach((container) => {
+    const entity = container.getAttribute("data-entity");
+    const template = container.querySelector("[data-row]");
+    const source = siteData[entity];
+    if (!template || !Array.isArray(source)) return;
+
+    const holder = template.parentElement;
+    const rows = source.filter((r) => !r.status || r.status === "active");
+    holder.innerHTML = "";
+
+    if (!rows.length) {
+      container.insertAdjacentHTML(
+        "afterend",
+        '<p style="text-align:center;opacity:.7;padding:16px;">No records added yet.</p>',
+      );
+      return;
+    }
+
+    rows.forEach((raw) => {
+      const item = enrich(entity, raw);
+      const row = template.cloneNode(true);
+      row.querySelectorAll("[data-field]").forEach((el) => {
+        const value = item[el.getAttribute("data-field")];
+        const attr = el.getAttribute("data-attr");
+        if (attr) {
+          const safe = attr === "src" ? resolveMediaImage(value) : value;
+          if (safe) el.setAttribute(attr, safe);
+        } else {
+          el.textContent = value || "—";
+        }
+      });
+      holder.appendChild(row);
+    });
+  });
+
+  return root.innerHTML;
+};
+
+/* ------------------------------------------------------------------ */
+/* Build iframe srcdoc                                                 */
+/* ------------------------------------------------------------------ */
 const buildSrcDoc = ({
   html,
   background,
@@ -235,7 +315,11 @@ const buildSrcDoc = ({
   const isGallery = /gall[ae]ry/i.test(pageTitle);
 
   const sliderHtml = isHome ? renderSlider(slides) : "";
-  const pageHtml = html || "<p>This page has no content yet.</p>";
+
+  // Hydrate the page's [data-entity] tables BEFORE injecting into iframe
+  const pageHtml =
+    hydrateSiteData(html, siteData) ||
+    "<p>This page has no content yet.</p>";
 
   const bodyHtml = SLIDER_MARKER.test(pageHtml)
     ? pageHtml.replace(SLIDER_MARKER, () => sliderHtml)
@@ -246,7 +330,6 @@ const buildSrcDoc = ({
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <script>window.siteData = ${JSON.stringify(siteData || {})};</script>
     <style>
       :root {
         --site-header-bg: color-mix(in srgb, ${color} 6%, ${background});
@@ -709,32 +792,45 @@ export default function MySiteView() {
         ]);
         if (cancelled) return;
 
-        // Fetch site data resources
-        const dataRes = await axios.get(
-          siteAdminMode
-            ? `${API_URL}/sites/client-admin/${targetSiteId}/data`
-            : `${API_URL}/sites/${targetSiteId}/data`,
-          { headers },
-        );
-        const dataSections = Array.isArray(dataRes.data?.sections)
-          ? dataRes.data.sections
-          : [];
+        // Fetch site data resources (students, classes, teachers, ...)
+        try {
+          const dataRes = await axios.get(
+            siteAdminMode
+              ? `${API_URL}/sites/client-admin/${targetSiteId}/data`
+              : `${API_URL}/sites/${targetSiteId}/data`,
+            { headers },
+          );
 
-        const siteDataMap = {};
-        for (const section of dataSections) {
-          try {
-            const res = await axios.get(
-              siteAdminMode
-                ? `${API_URL}/sites/client-admin/${targetSiteId}/data/${section.resource}`
-                : `${API_URL}/sites/${targetSiteId}/data/${section.resource}`,
-              { headers },
-            );
-            siteDataMap[section.resource] = res.data;
-          } catch (e) {
-            console.error(`Error loading resource ${section.resource}`, e);
-          }
+          // Handle both response shapes:
+          //  - { sections: [{ resource: "students" }, ...] }
+          //  - ["students", "classes", ...]
+          const resources = Array.isArray(dataRes.data?.sections)
+            ? dataRes.data.sections.map((s) => s.resource)
+            : Array.isArray(dataRes.data)
+              ? dataRes.data
+              : [];
+
+          const siteDataMap = {};
+          await Promise.all(
+            resources.map(async (resource) => {
+              try {
+                const res = await axios.get(
+                  siteAdminMode
+                    ? `${API_URL}/sites/client-admin/${targetSiteId}/data/${resource}`
+                    : `${API_URL}/sites/${targetSiteId}/data/${resource}`,
+                  { headers },
+                );
+                siteDataMap[resource] = res.data;
+              } catch (e) {
+                console.error(`Error loading resource ${resource}`, e);
+              }
+            }),
+          );
+          if (cancelled) return;
+          setSiteData(siteDataMap);
+        } catch (e) {
+          console.warn("Could not load site data resources", e);
         }
-        setSiteData(siteDataMap);
 
         const list = Array.isArray(pagesRes.data?.pages)
           ? pagesRes.data.pages
@@ -812,6 +908,12 @@ export default function MySiteView() {
     [site.background, site.color],
   );
 
+  // Include data length so tables re-hydrate if data changes
+  const dataVersion = useMemo(
+    () => Object.keys(siteData).length,
+    [siteData],
+  );
+
   const srcDoc = useMemo(
     () =>
       buildSrcDoc({
@@ -848,10 +950,6 @@ export default function MySiteView() {
     }
   };
 
-  const backTarget = siteAdminMode
-    ? `/site-admin/${adminSiteId}/panel`
-    : "/mysite";
-
   return (
     <Box
       sx={{
@@ -862,7 +960,6 @@ export default function MySiteView() {
         flexDirection: "column",
       }}
     >
-      {/* -------- Running site (exactly like the original) -------- */}
       {loading ? (
         <Box
           sx={{
@@ -911,7 +1008,7 @@ export default function MySiteView() {
           >
             <Box
               component="iframe"
-              key={activeId}
+              key={`${activeId}-${dataVersion}`}
               title={activePage?.title || "Page preview"}
               sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
               srcDoc={srcDoc}
@@ -937,7 +1034,6 @@ export default function MySiteView() {
         </Box>
       )}
 
-      {/* -------- News dialog -------- */}
       {media.news[newsIndex] && (
         <Dialog
           open={newsOpen}
