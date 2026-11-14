@@ -6,6 +6,9 @@ const {
   listSitesForAdmin,
   createSiteAdmin,
   loginSiteAdmin,
+  getSiteAdminProfile,
+  updateSiteAdminProfile,
+  changeSiteAdminPassword,
 } = require("../controller/siteAdminController");
 const {
   getEmployees,
@@ -45,16 +48,36 @@ router.post(
 router.get("/my", authenticateToken, getMySites);
 router.get("/:siteId/header", authenticateToken, getSiteHeader);
 router.put("/:siteId/header", authenticateToken, updateSiteHeader);
-router.get("/client-admin/:siteId/header", authenticateSiteAdmin, getSiteHeader);
-router.put("/client-admin/:siteId/header", authenticateSiteAdmin, updateSiteHeader);
+router.get(
+  "/client-admin/:siteId/header",
+  authenticateSiteAdmin,
+  getSiteHeader,
+);
+router.put(
+  "/client-admin/:siteId/header",
+  authenticateSiteAdmin,
+  updateSiteHeader,
+);
+router.get(
+  "/client-admin/:siteId/profile",
+  authenticateSiteAdmin,
+  getSiteAdminProfile,
+);
+router.put(
+  "/client-admin/:siteId/profile",
+  authenticateSiteAdmin,
+  updateSiteAdminProfile,
+);
+router.put(
+  "/client-admin/:siteId/profile/password",
+  authenticateSiteAdmin,
+  changeSiteAdminPassword,
+);
+
 router.post("/:siteId/pages", authenticateToken, createSitePage);
 router.put("/:siteId/pages/:pageId", authenticateToken, updateSitePage);
 router.get("/:siteId/pages", authenticateToken, getSitePages);
-router.get(
-  "/client-admin/:siteId/pages",
-  authenticateSiteAdmin,
-  getSitePages,
-);
+router.get("/client-admin/:siteId/pages", authenticateSiteAdmin, getSitePages);
 router.post(
   "/client-admin/:siteId/pages",
   authenticateSiteAdmin,
@@ -81,20 +104,42 @@ router.get(
   authenticateSiteAdmin,
   getSitePageOptions,
 );
-router.get("/client-admin/:siteId/data", authenticateSiteAdmin, siteData.sections);
-router.get("/client-admin/:siteId/data/:resource", authenticateSiteAdmin, siteData.list);
-router.post("/client-admin/:siteId/data/:resource", authenticateSiteAdmin, siteData.create);
-router.put("/client-admin/:siteId/data/:resource/:id", authenticateSiteAdmin, siteData.update);
-router.delete("/client-admin/:siteId/data/:resource/:id", authenticateSiteAdmin, siteData.remove);
+router.get(
+  "/client-admin/:siteId/data",
+  authenticateSiteAdmin,
+  siteData.sections,
+);
+router.get(
+  "/client-admin/:siteId/data/:resource",
+  authenticateSiteAdmin,
+  siteData.list,
+);
+router.post(
+  "/client-admin/:siteId/data/:resource",
+  authenticateSiteAdmin,
+  siteData.create,
+);
+router.put(
+  "/client-admin/:siteId/data/:resource/:id",
+  authenticateSiteAdmin,
+  siteData.update,
+);
+router.delete(
+  "/client-admin/:siteId/data/:resource/:id",
+  authenticateSiteAdmin,
+  siteData.remove,
+);
 
-// Enhanced inventory features (TODO: implement these methods in siteDataController)
-// router.get("/client-admin/:siteId/data/:resource/low-stock", authenticateSiteAdmin, siteData.lowStock);
-// router.post("/client-admin/:siteId/data/:resource/bulk-update", authenticateSiteAdmin, siteData.bulkUpdate);
-// router.get("/client-admin/:siteId/data/:resource/analytics", authenticateSiteAdmin, siteData.analytics);
-// router.post("/client-admin/:siteId/data/:resource/:id/adjust-stock", authenticateSiteAdmin, siteData.adjustStock);
-
-router.get("/client-admin/:siteId/employees", authenticateSiteAdmin, getEmployees);
-router.post("/client-admin/:siteId/employees", authenticateSiteAdmin, createEmployee);
+router.get(
+  "/client-admin/:siteId/employees",
+  authenticateSiteAdmin,
+  getEmployees,
+);
+router.post(
+  "/client-admin/:siteId/employees",
+  authenticateSiteAdmin,
+  createEmployee,
+);
 router.put(
   "/client-admin/:siteId/employees/:employeeId",
   authenticateSiteAdmin,
@@ -106,26 +151,6 @@ router.delete(
   deleteEmployee,
 );
 
-// Category-specific routes
-// router.get("/client-admin/:siteId/students", authenticateSiteAdmin, require("../controller/siteStudentController").getStudents);
-// router.post("/client-admin/:siteId/students", authenticateSiteAdmin, require("../controller/siteStudentController").createStudent);
-// router.put("/client-admin/:siteId/students/:studentId", authenticateSiteAdmin, require("../controller/siteStudentController").updateStudent);
-// router.delete("/client-admin/:siteId/students/:studentId", authenticateSiteAdmin, require("../controller/siteStudentController").deleteStudent);
-
-// router.get("/client-admin/:siteId/restaurants", authenticateSiteAdmin, require("../controller/siteRestaurantController").getRestaurants);
-// router.post("/client-admin/:siteId/restaurants", authenticateSiteAdmin, require("../controller/siteRestaurantController").createRestaurant);
-// router.put("/client-admin/:siteId/restaurants/:restaurantId", authenticateSiteAdmin, require("../controller/siteRestaurantController").updateRestaurant);
-// router.delete("/client-admin/:siteId/restaurants/:restaurantId", authenticateSiteAdmin, require("../controller/siteRestaurantController").deleteRestaurant);
-
-// router.get("/client-admin/:siteId/products", authenticateSiteAdmin, require("../controller/siteProductController").getProducts);
-// router.post("/client-admin/:siteId/products", authenticateSiteAdmin, require("../controller/siteProductController").createProduct);
-// router.put("/client-admin/:siteId/products/:productId", authenticateSiteAdmin, require("../controller/siteProductController").updateProduct);
-// router.delete("/client-admin/:siteId/products/:productId", authenticateSiteAdmin, require("../controller/siteProductController").deleteProduct);
-
-// router.get("/client-admin/:siteId/menus", authenticateSiteAdmin, require("../controller/siteMenuController").getMenus);
-// router.post("/client-admin/:siteId/menus", authenticateSiteAdmin, require("../controller/siteMenuController").createMenu);
-// router.put("/client-admin/:siteId/menus/:menuId", authenticateSiteAdmin, require("../controller/siteMenuController").updateMenu);
-// router.delete("/client-admin/:siteId/menus/:menuId", authenticateSiteAdmin, require("../controller/siteMenuController").deleteMenu);
 router.get(
   "/client-admin/:siteId/media",
   authenticateSiteAdmin,
@@ -141,8 +166,16 @@ router.post(
 );
 for (const contentType of ["news", "galleries", "slider"]) {
   const handlers = siteMedia[contentType];
-  router.get(`/client-admin/:siteId/${contentType}`, authenticateSiteAdmin, handlers.list);
-  router.post(`/client-admin/:siteId/${contentType}`, authenticateSiteAdmin, handlers.create);
+  router.get(
+    `/client-admin/:siteId/${contentType}`,
+    authenticateSiteAdmin,
+    handlers.list,
+  );
+  router.post(
+    `/client-admin/:siteId/${contentType}`,
+    authenticateSiteAdmin,
+    handlers.create,
+  );
   router.put(
     `/client-admin/:siteId/${contentType}/:itemId`,
     authenticateSiteAdmin,

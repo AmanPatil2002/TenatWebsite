@@ -285,81 +285,331 @@ const renderSlider = (items) => {
 
 const SLIDER_MARKER = /<!--\s*SITE_SLIDER\s*-->/i;
 
-const hydrateSiteData = (html, siteData = {}) => {
-  if (!html || !html.includes("data-entity")) return html;
 
-  const doc = new DOMParser().parseFromString(
-    `<div id="root">${html}</div>`,
-    "text/html",
-  );
-  const root = doc.getElementById("root");
+const HYDRATION_RELATIONSHIPS = {
+  students: {
+    classId: {
+      entity: "classes",
+      fields: {
+        className: (record) =>
+          `${record.name || ""}${
+            record.section ? ` - ${record.section}` : ""
+          }`,
+      },
+    },
+  },
 
-  const classMap = new Map(
-    (siteData.classes || []).map((c) => [String(c.id), c]),
-  );
-  const teacherMap = new Map(
-    (siteData.teachers || []).map((t) => [String(t.id), t]),
-  );
+  classes: {
+    classTeacherId: {
+      entity: "teachers",
+      fields: {
+        classTeacherName: "name",
+      },
+    },
+  },
 
-  const enrich = (entity, item) => {
-    if (entity === "students") {
-      const cls = classMap.get(String(item.classId));
-      return {
-        ...item,
-        className:
-          item.className ||
-          (cls ? `${cls.name}${cls.section ? ` - ${cls.section}` : ""}` : ""),
-      };
-    }
-    if (entity === "classes") {
-      return {
-        ...item,
-        classTeacherName:
-          item.classTeacherName ||
-          teacherMap.get(String(item.classTeacherId))?.name ||
-          "",
-      };
-    }
-    return item;
+  products: {
+    categoryId: {
+      entity: "productcategories",
+      fields: {
+        categoryName: "name",
+      },
+      fallback: {
+        categoryName: "Uncategorized",
+      },
+    },
+  },
+};
+
+
+/* --------------------------------
+   Utility functions
+--------------------------------- */
+
+const isEmpty = (value) =>
+  value === null ||
+  value === undefined ||
+  value === "";
+
+const getNestedValue = (object, path) => {
+  if (!object || !path) return undefined;
+
+  return String(path)
+    .split(".")
+    .reduce((current, key) => current?.[key], object);
+};
+
+const resolveEntity = (entity, siteData) => {
+  const aliases = {
+    categories: "productcategories",
   };
 
-  root.querySelectorAll("[data-entity]").forEach((container) => {
-    const entity = container.getAttribute("data-entity");
-    const template = container.querySelector("[data-row]");
-    const source = siteData[entity];
-    if (!template || !Array.isArray(source)) return;
+  return siteData[entity] ??
+    siteData[aliases[entity] || entity];
+};
 
-    const holder = template.parentElement;
-    const rows = source.filter((r) => !r.status || r.status === "active");
-    holder.innerHTML = "";
 
-    if (!rows.length) {
-      container.insertAdjacentHTML(
-        "afterend",
-        '<p style="text-align:center;opacity:.7;padding:16px;">No records added yet.</p>',
+/* --------------------------------
+   Relationship maps
+--------------------------------- */
+
+const createEntityMaps = (siteData) => {
+  const maps = {};
+
+  Object.entries(siteData).forEach(([entity, records]) => {
+    if (!Array.isArray(records)) return;
+
+    maps[entity] = new Map(
+      records.map((record) => [
+        String(record.id),
+        record,
+      ])
+    );
+  });
+
+  if (!maps.productcategories && maps.categories) {
+    maps.productcategories = maps.categories;
+  }
+
+  return maps;
+};
+
+
+/* --------------------------------
+   Entity enrichment
+--------------------------------- */
+
+const enrichEntity = (entity, item, maps) => {
+  const result = { ...item };
+
+  const relationships =
+    HYDRATION_RELATIONSHIPS[entity] || {};
+
+  Object.entries(relationships).forEach(
+    ([foreignKey, config]) => {
+      const related = maps[config.entity]?.get(
+        String(item[foreignKey])
       );
-      return;
-    }
 
-    rows.forEach((raw) => {
-      const item = enrich(entity, raw);
-      const row = template.cloneNode(true);
-      row.querySelectorAll("[data-field]").forEach((el) => {
-        const value = item[el.getAttribute("data-field")];
-        const attr = el.getAttribute("data-attr");
-        if (attr) {
-          const safe = attr === "src" ? resolveMediaImage(value) : value;
-          if (safe) el.setAttribute(attr, safe);
-        } else {
-          el.textContent = value || "—";
+      if (related) {
+        Object.entries(config.fields || {}).forEach(
+          ([targetField, sourceField]) => {
+            if (!isEmpty(result[targetField])) return;
+
+            result[targetField] =
+              typeof sourceField === "function"
+                ? sourceField(related)
+                : getNestedValue(related, sourceField);
+          }
+        );
+      }
+
+      Object.entries(config.fallback || {}).forEach(
+        ([field, fallback]) => {
+          if (isEmpty(result[field])) {
+            result[field] = fallback;
+          }
         }
-      });
-      holder.appendChild(row);
-    });
+      );
+    }
+  );
+
+  return result;
+};
+
+
+/* --------------------------------
+   Safe attribute rendering
+--------------------------------- */
+
+const renderField = (element, item) => {
+  const field = element.getAttribute("data-field");
+
+  if (!field) return;
+
+  const value = getNestedValue(item, field);
+  const attr = element.getAttribute("data-attr");
+
+  if (!attr) {
+    const fallback = element.getAttribute("data-fallback");
+
+    element.textContent = isEmpty(value)
+      ? fallback ?? "—"
+      : String(value);
+
+    return;
+  }
+
+  const allowedAttributes = [
+    "src",
+    "href",
+    "alt",
+    "title",
+    "target",
+    "rel",
+    "loading",
+  ];
+
+  if (!allowedAttributes.includes(attr)) return;
+
+  let output = value;
+
+  if (attr === "src" && !isEmpty(value)) {
+    output =
+      typeof resolveMediaImage === "function"
+        ? resolveMediaImage(value)
+        : value;
+  }
+
+  if (attr === "src" || attr === "href") {
+    if (!isEmpty(output)) {
+      try {
+        const url = new URL(
+          String(output),
+          "https://hydration.invalid"
+        );
+
+        const relative =
+          !/^[a-z][a-z0-9+.-]*:/i.test(String(output));
+
+        if (
+          !relative &&
+          !["http:", "https:"].includes(url.protocol)
+        ) {
+          output = "";
+        }
+      } catch {
+        output = "";
+      }
+    }
+  }
+
+  if (isEmpty(output)) {
+    element.removeAttribute(attr);
+  } else {
+    element.setAttribute(attr, String(output));
+  }
+
+  if (
+    attr === "target" &&
+    output === "_blank"
+  ) {
+    element.setAttribute(
+      "rel",
+      "noopener noreferrer"
+    );
+  }
+};
+
+
+/* --------------------------------
+   Recursive hydration
+--------------------------------- */
+
+const hydrateContainer = (container, siteData, maps) => {
+  const entity = container.getAttribute("data-entity");
+
+  const source = resolveEntity(entity, siteData);
+
+  const template = Array.from(container.children)
+    .flatMap((child) => [
+      child,
+      ...child.querySelectorAll("[data-row]"),
+    ])
+    .find((element) => element.hasAttribute("data-row"));
+
+  if (!template || !Array.isArray(source)) return;
+
+  // Clone before clearing the original holder.
+  const holder = template.parentElement;
+  const rowTemplate = template.cloneNode(true);
+
+  const rows = source.filter((record) => {
+    return !record.status || record.status === "active";
+  });
+
+  holder.replaceChildren();
+
+  if (!rows.length) {
+    const empty = container.ownerDocument.createElement("p");
+
+    empty.className = "hydration-empty-state";
+
+    empty.textContent =
+      container.getAttribute("data-empty-text") ||
+      "No records added yet.";
+
+    empty.style.cssText =
+      "text-align:center;opacity:.7;padding:16px;";
+
+    holder.appendChild(empty);
+
+    return;
+  }
+
+  rows.forEach((raw) => {
+    const item = enrichEntity(entity, raw, maps);
+
+    const row = rowTemplate.cloneNode(true);
+
+    // Hydrate fields belonging to this row.
+    row.querySelectorAll("[data-field]").forEach(
+      (element) => renderField(element, item)
+    );
+
+    // Hydrate nested entity containers independently.
+    row.querySelectorAll("[data-entity]").forEach(
+      (nestedContainer) => {
+        hydrateContainer(
+          nestedContainer,
+          siteData,
+          maps
+        );
+      }
+    );
+
+    holder.appendChild(row);
+  });
+};
+
+
+/* --------------------------------
+   Main function
+--------------------------------- */
+
+const hydrateSiteData = (html, siteData = {}) => {
+  if (
+    typeof html !== "string" ||
+    !html.includes("data-entity")
+  ) {
+    return html;
+  }
+
+  const doc = new DOMParser().parseFromString(
+    `<div id="hydration-root">${html}</div>`,
+    "text/html"
+  );
+
+  const root = doc.getElementById("hydration-root");
+
+  if (!root) return html;
+
+  const maps = createEntityMaps(siteData);
+
+  // Process only top-level entity containers.
+  const containers = Array.from(
+    root.querySelectorAll("[data-entity]")
+  ).filter((container) => {
+    return !container.parentElement.closest("[data-entity]");
+  });
+
+  containers.forEach((container) => {
+    hydrateContainer(container, siteData, maps);
   });
 
   return root.innerHTML;
 };
+
 
 const buildSrcDoc = ({
   html,
@@ -374,8 +624,9 @@ const buildSrcDoc = ({
   const isGallery = /gall[ae]ry/i.test(pageTitle);
 
   const sliderHtml = isHome ? renderSlider(slides) : "";
- const pageHtml =
-  hydrateSiteData(html, siteData) || "<p>This page has no content yet.</p>";
+  const pageHtml =
+    hydrateSiteData(html, siteData) ||
+    "<p>This page has no content yet.</p>";
 
   const bodyHtml = SLIDER_MARKER.test(pageHtml)
     ? pageHtml.replace(SLIDER_MARKER, () => sliderHtml)
@@ -460,9 +711,10 @@ function SiteHeader({
           flexDirection: stacked ? "column" : "row",
           alignItems: stacked ? "stretch" : "center",
           justifyContent: "space-between",
-          gap: stacked ? 0 : 4,
+          gap: stacked ? 1 : 4,
         }}
       >
+        {/* Logo + title — never grows past its space */}
         {(logo || title) && (
           <Box
             component="a"
@@ -481,6 +733,7 @@ function SiteHeader({
               textDecoration: "none",
               minWidth: 0,
               flexShrink: 0,
+              maxWidth: stacked ? "100%" : "40%",
             }}
           >
             {logo && (
@@ -514,10 +767,13 @@ function SiteHeader({
                 component="span"
                 noWrap
                 sx={{
-                  fontSize: small ? "1.1rem" : "1.3rem",
+                  fontSize: small ? "1.05rem" : "1.3rem",
                   fontWeight: 700,
                   lineHeight: 1.2,
                   letterSpacing: "-0.01em",
+                  minWidth: 0,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
                 }}
               >
                 {title}
@@ -526,48 +782,69 @@ function SiteHeader({
           </Box>
         )}
 
-        <Tabs
-          component="nav"
-          aria-label="Site navigation"
-          value={activeId}
-          onChange={(_, value) => onNavigate(value)}
-          variant="scrollable"
-          scrollButtons="auto"
-          allowScrollButtonsMobile
+        {/* Navigation — scrollable so many pages stay usable */}
+        <Box
           sx={{
-            minHeight: 48,
             minWidth: 0,
-            color: theme.color,
-            "& .MuiTabs-flexContainer": { gap: 0.5 },
-            "& .MuiTabs-indicator": {
-              backgroundColor: theme.color,
-              height: 3,
-              borderRadius: "3px 3px 0 0",
-            },
-            "& .MuiTabScrollButton-root": { color: theme.color },
-            "& .MuiTab-root": {
-              minHeight: 48,
-              minWidth: 0,
-              px: 2,
-              textTransform: "none",
-              fontWeight: 600,
-              fontSize: "0.95rem",
-              color: theme.color,
-              opacity: 0.7,
-              borderRadius: 1,
-              transition: "opacity .2s, background-color .2s",
-              "&:hover": { opacity: 1, bgcolor: theme.hover },
-            },
-            "& .MuiTab-root.Mui-selected": {
-              color: theme.color,
-              opacity: 1,
-            },
+            maxWidth: "100%",
+            borderTop: stacked ? `1px solid ${theme.border}` : "none",
           }}
         >
-          {pages.map((p) => (
-            <Tab key={pageKey(p)} value={pageKey(p)} label={p.title} />
-          ))}
-        </Tabs>
+          <Tabs
+            component="nav"
+            aria-label="Site navigation"
+            value={activeId}
+            onChange={(_, value) => onNavigate(value)}
+            variant="scrollable"
+            scrollButtons="auto"
+            allowScrollButtonsMobile
+            sx={{
+              minHeight: 48,
+              minWidth: 0,
+              color: theme.color,
+              "& .MuiTabs-flexContainer": { gap: 0.5 },
+              "& .MuiTabs-indicator": {
+                backgroundColor: theme.color,
+                height: 3,
+                borderRadius: "3px 3px 0 0",
+              },
+              "& .MuiTabScrollButton-root": {
+                color: theme.color,
+                width: 32,
+              },
+              "& .MuiTab-root": {
+                minHeight: 48,
+                minWidth: "auto",
+                maxWidth: 220,
+                px: 2,
+                textTransform: "none",
+                fontWeight: 600,
+                fontSize: "0.95rem",
+                color: theme.color,
+                opacity: 0.7,
+                borderRadius: 1,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                transition: "opacity .2s, background-color .2s",
+                "&:hover": { opacity: 1, bgcolor: theme.hover },
+              },
+              "& .MuiTab-root.Mui-selected": {
+                color: theme.color,
+                opacity: 1,
+              },
+            }}
+          >
+            {pages.map((p) => (
+              <Tab
+                key={pageKey(p)}
+                value={pageKey(p)}
+                label={p.title}
+                title={p.title}
+              />
+            ))}
+          </Tabs>
+        </Box>
       </Box>
     </Box>
   );
@@ -645,6 +922,9 @@ function SiteFooter({
         ? "repeat(2, 1fr)"
         : "repeat(auto-fit, minmax(210px, 1fr))";
 
+  // Cap the height of very long link lists so the footer stays balanced.
+  const linkCap = pages.length > 12;
+
   const linkSx = {
     color: "inherit",
     textDecoration: "none",
@@ -682,10 +962,16 @@ function SiteFooter({
           }}
         >
           {hasAbout && (
-            <Box>
+            <Box sx={{ minWidth: 0 }}>
               {title && (
                 <Typography
-                  sx={{ fontSize: "1.2rem", fontWeight: 700, mb: 1 }}
+                  sx={{
+                    fontSize: "1.2rem",
+                    fontWeight: 700,
+                    mb: 1,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
                 >
                   {title}
                 </Typography>
@@ -704,33 +990,63 @@ function SiteFooter({
             </Box>
           )}
 
+          {/* ---- Quick links: responsive multi-column grid ---- */}
           {hasLinks && (
-            <Box component="nav" aria-label="Footer navigation">
+            <Box
+              component="nav"
+              aria-label="Footer navigation"
+              sx={{ minWidth: 0 }}
+            >
               <FooterHeading>Quick links</FooterHeading>
-              <Box sx={{ display: "grid", gap: 1 }}>
-                {pages.map((p) => (
-                  <Link
-                    key={pageKey(p)}
-                    component="button"
-                    type="button"
-                    onClick={() => onNavigate(pageKey(p))}
-                    sx={{
-                      ...linkSx,
-                      textAlign: "left",
-                      font: "inherit",
-                      fontWeight: pageKey(p) === activeId ? 700 : 400,
-                      justifySelf: "start",
-                    }}
-                  >
-                    {p.title}
-                  </Link>
-                ))}
+              <Box
+                sx={{
+                  display: "grid",
+                  // Flows into multiple columns as the number of pages grows
+                  gridTemplateColumns: {
+                    xs: "1fr",
+                    sm: "repeat(2, minmax(0, 1fr))",
+                    md: "repeat(3, minmax(0, 1fr))",
+                  },
+                  columnGap: 2,
+                  rowGap: 1,
+                  maxHeight: linkCap ? 240 : "none",
+                  overflowY: linkCap ? "auto" : "visible",
+                  pr: linkCap ? 1 : 0,
+                }}
+              >
+                {pages.map((p) => {
+                  const isActive = pageKey(p) === activeId;
+                  return (
+                    <Link
+                      key={pageKey(p)}
+                      component="button"
+                      type="button"
+                      onClick={() => onNavigate(pageKey(p))}
+                      aria-current={isActive ? "page" : undefined}
+                      title={p.title}
+                      sx={{
+                        ...linkSx,
+                        display: "block",
+                        textAlign: "left",
+                        font: "inherit",
+                        fontWeight: isActive ? 700 : 400,
+                        justifySelf: "stretch",
+                        minWidth: 0,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {p.title}
+                    </Link>
+                  );
+                })}
               </Box>
             </Box>
           )}
 
           {contacts.length > 0 && (
-            <Box>
+            <Box sx={{ minWidth: 0 }}>
               <FooterHeading>Contact</FooterHeading>
               <Box sx={{ display: "grid", gap: 1.25 }}>
                 {contacts.map(({ key, Icon, text, href }) => (
@@ -740,17 +1056,29 @@ function SiteFooter({
                       display: "flex",
                       gap: 1.25,
                       alignItems: "flex-start",
+                      minWidth: 0,
                     }}
                   >
                     <Icon
                       style={{ marginTop: 2, opacity: 0.8, flexShrink: 0 }}
                     />
                     {href ? (
-                      <Link href={href} sx={linkSx}>
+                      <Link
+                        href={href}
+                        sx={{
+                          ...linkSx,
+                          minWidth: 0,
+                          overflowWrap: "anywhere",
+                        }}
+                      >
                         {text}
                       </Link>
                     ) : (
-                      <Typography sx={{ opacity: 0.85 }}>{text}</Typography>
+                      <Typography
+                        sx={{ opacity: 0.85, overflowWrap: "anywhere" }}
+                      >
+                        {text}
+                      </Typography>
                     )}
                   </Box>
                 ))}
@@ -759,7 +1087,7 @@ function SiteFooter({
           )}
 
           {socials.length > 0 && (
-            <Box>
+            <Box sx={{ minWidth: 0 }}>
               <FooterHeading>Follow us</FooterHeading>
               <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
                 {socials.map(({ key, label, Icon }) => (
@@ -773,8 +1101,8 @@ function SiteFooter({
                     sx={{
                       color: theme.color,
                       border: `1px solid ${theme.border}`,
-                      width: 38,
-                      height: 38,
+                      width: 40,
+                      height: 40,
                       "&:hover": { bgcolor: theme.hover },
                     }}
                   >

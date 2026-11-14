@@ -6,7 +6,6 @@ import {
   Avatar,
   Box,
   Button,
-  Chip,
   CircularProgress,
   Divider,
   Drawer,
@@ -24,6 +23,7 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
+
 
 /* ------------------------------------------------------------------ */
 /*  Inline SVG icons — no MUI icon imports, no tree-shaking issues     */
@@ -99,33 +99,6 @@ const DataIcon = (p) => (
     <ellipse cx="12" cy="5" rx="8" ry="3" />
     <path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5" />
     <path d="M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7" />
-  </SvgIcon>
-);
-const SchoolIcon = (p) => (
-  <SvgIcon {...p}>
-    <path d="m12 3 9 4-9 4-9-4 9-4Z" />
-    <path d="M6 9v6c0 1.5 2.7 3 6 3s6-1.5 6-3V9" />
-  </SvgIcon>
-);
-const ProductsIcon = (p) => (
-  <SvgIcon {...p}>
-    <path d="M3 7h18v13a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7Z" />
-    <path d="M3 7l3-4h12l3 4" />
-    <path d="M9 11v5M15 11v5" />
-  </SvgIcon>
-);
-const RestaurantIcon = (p) => (
-  <SvgIcon {...p}>
-    <path d="M6 2v8a2 2 0 0 0 4 0V2" />
-    <path d="M8 10v12" />
-    <path d="M18 2v20" />
-    <path d="M15 2v6a3 3 0 0 0 6 0V2" />
-  </SvgIcon>
-);
-const MenuBookIcon = (p) => (
-  <SvgIcon {...p}>
-    <path d="M4 4h7a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H4V4Z" />
-    <path d="M20 4h-6v14a2 2 0 0 1 2-2h4V4Z" />
   </SvgIcon>
 );
 const LogoutIcon = (p) => (
@@ -230,7 +203,6 @@ export default function SiteAdminLayout() {
 
   const pages = Array.isArray(site?.pages) ? site.pages : [];
   const siteName = site?.siteName || localStorage.getItem("siteAdminSiteName");
-  const siteCategory = String(site?.categoryName || "").toLowerCase();
   
 
   const menuItems = [
@@ -311,21 +283,10 @@ export default function SiteAdminLayout() {
             >
               View site
             </Button>
-            <Tooltip title="View site">
-              <IconButton
-                onClick={() => navigate(`${siteBasePath}/preview`)}
-                sx={{
-                  display: { sm: "none" },
-                  color: "primary.main",
-                  bgcolor: alpha(theme.palette.primary.main, 0.08),
-                }}
-              >
-                <PreviewIcon size={20} />
-              </IconButton>
-            </Tooltip>
           </Stack>
         </Toolbar>
       </AppBar>
+
 
       {/* ---------------- Drawer ---------------- */}
       <Drawer

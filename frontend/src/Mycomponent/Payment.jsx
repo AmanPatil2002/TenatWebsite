@@ -22,6 +22,8 @@ import {
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserOutlined";
+import BoltOutlinedIcon from "@mui/icons-material/BoltOutlined";
 
 const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(
   /\/+$/,
@@ -73,7 +75,6 @@ const toFlag = (v) => {
   return false;
 };
 
-//const isDefaultPage = (page) => toFlag(page?.isDefault ?? page?.is_default);
 const isDefaultTheme = (theme) => toFlag(theme?.isDefault ?? theme?.is_default);
 
 const getToken = () =>
@@ -116,58 +117,68 @@ const isDefaultPage = (page) =>
   DEFAULT_PAGE_KEYS.has(normalizeKey(page.pageKey)) ||
   DEFAULT_PAGE_KEYS.has(normalizeKey(pageTitle(page)));
 
+/* ------------------------------ design tokens ------------------------------ */
+
+const PAGE_BG = "#F6F7F9";
+const CARD_RADIUS = 2;
+const cardSx = {
+  borderRadius: CARD_RADIUS,
+  borderColor: "#E3E6EB",
+  bgcolor: "#fff",
+  boxShadow: "0 1px 2px rgba(16,24,40,0.04)",
+};
+
 /* --------------------------- small components --------------------------- */
 
-// A numbered step: checkout really is a sequence (theme -> pages -> pay).
-function Step({ number, title, hint, children }) {
+function Section({ number, title, hint, children, last = false }) {
   return (
-    <Box sx={{ p: { xs: 2.5, md: 3.5 } }}>
-      <Stack
-        direction="row"
-        spacing={2}
-        alignItems="flex-start"
-        sx={{ mb: 2.5 }}
-      >
+    <Box
+      sx={{
+        p: { xs: 2.5, md: 3.5 },
+        borderBottom: last ? "none" : "1px solid #E3E6EB",
+      }}
+    >
+      <Stack direction="row" spacing={1.75} alignItems="flex-start" sx={{ mb: 2.5 }}>
         <Box
           sx={{
-            width: 28,
-            height: 28,
+            width: 26,
+            height: 26,
+            mt: 0.25,
             flexShrink: 0,
             borderRadius: "50%",
-            bgcolor: "primary.main",
-            color: "primary.contrastText",
+            bgcolor: (t) => alpha(t.palette.primary.main, 0.1),
+            color: "primary.main",
             display: "grid",
             placeItems: "center",
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: 700,
           }}
         >
           {number}
         </Box>
         <Box>
-          <Typography variant="h6" fontWeight={700} lineHeight={1.3}>
+          <Typography variant="subtitle1" fontWeight={700} lineHeight={1.3}>
             {title}
           </Typography>
           {hint && (
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
               {hint}
             </Typography>
           )}
         </Box>
       </Stack>
-      <Box sx={{ pl: { sm: 6 } }}>{children}</Box>
+      {children}
     </Box>
   );
 }
 
-function SummaryRow({ label, caption, value, strong = false }) {
+function SummaryRow({ label, caption, value, muted = false }) {
   return (
-    <Stack direction="row" justifyContent="space-between" spacing={2}>
+    <Stack direction="row" justifyContent="space-between" alignItems="baseline" spacing={2}>
       <Box sx={{ minWidth: 0 }}>
         <Typography
           variant="body2"
-          color={strong ? "text.primary" : "text.secondary"}
-          fontWeight={strong ? 700 : 400}
+          color={muted ? "text.secondary" : "text.primary"}
           sx={{ overflowWrap: "anywhere" }}
         >
           {label}
@@ -180,11 +191,21 @@ function SummaryRow({ label, caption, value, strong = false }) {
       </Box>
       <Typography
         variant="body2"
-        fontWeight={strong ? 700 : 600}
+        fontWeight={600}
+        color={muted ? "text.secondary" : "text.primary"}
         sx={{ whiteSpace: "nowrap", ...numeric }}
       >
         {value}
       </Typography>
+    </Stack>
+  );
+}
+
+function TrustItem({ icon, children }) {
+  return (
+    <Stack direction="row" spacing={1} alignItems="center" sx={{ color: "text.secondary" }}>
+      {icon}
+      <Typography variant="caption">{children}</Typography>
     </Stack>
   );
 }
@@ -195,15 +216,12 @@ export default function Payment() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Template passed from the list/card. It may be a light version without
-  // pages[].isDefault, so we re-fetch the full template below.
   const passedTemplate = location.state?.template || null;
   const initialThemeId = location.state?.themeId ?? null;
 
   const [fullTemplate, setFullTemplate] = useState(null);
   const [templateLoading, setTemplateLoading] = useState(false);
 
-  // Prefer the full template once loaded; fall back to what was passed in.
   const template = fullTemplate || passedTemplate;
 
   const themes = useMemo(() => asArray(template?.themes), [template]);
@@ -225,13 +243,11 @@ export default function Payment() {
     [pages],
   );
 
-  // Pages marked "Default" in Edit Template: already included in the price.
   const defaultPages = useMemo(
     () => normalizedPages.filter((p) => p.isDefault),
     [normalizedPages],
   );
 
-  // Everything else: optional, priced, selectable.
   const additionalPages = useMemo(
     () => normalizedPages.filter((p) => !p.isDefault),
     [normalizedPages],
@@ -282,7 +298,6 @@ export default function Payment() {
         });
         const data = res?.data?.data ?? res?.data?.template ?? res?.data;
         if (!cancelled && data && typeof data === "object") {
-          // Keep any fields the list version had, overlay the full version.
           setFullTemplate({ ...passedTemplate, ...data });
         }
       } catch {
@@ -314,7 +329,6 @@ export default function Payment() {
   const selectedThemeId = getId(themeId);
   const templateId = getId(template?.templateId ?? template?.id);
 
-  // Only additional (non-default) pages can ever be sent to the server.
   const additionalPageIds = useMemo(() => {
     const valid = new Set(additionalPages.map((p) => p.pageKey));
     return [...new Set(selectedExtraIds.map(getId).filter(Boolean))].filter(
@@ -380,6 +394,10 @@ export default function Payment() {
     : selectedExtras.reduce((sum, p) => sum + p.pagePrice, 0);
 
   const total = quote ? Number(quote.total) : templatePrice + extrasAmount;
+
+  const selectedTheme = themes.find(
+    (t) => String(t.themeId ?? t.id) === String(themeId),
+  );
 
   const toggleExtraPage = (rawId) => {
     const id = getId(rawId);
@@ -452,455 +470,500 @@ export default function Payment() {
     ].filter(Boolean);
 
     return (
-      <Container maxWidth="sm" sx={{ py: { xs: 4, md: 8 } }}>
-        <Paper variant="outlined" sx={{ p: { xs: 3, md: 5 }, borderRadius: 2 }}>
-          <Stack
-            alignItems="center"
-            spacing={1}
-            sx={{ textAlign: "center", mb: 3 }}
-          >
-            <CheckCircleIcon color="success" sx={{ fontSize: 56 }} />
-            <Typography variant="h5" fontWeight={700}>
-              Purchase successful
-            </Typography>
-            <Typography color="text.secondary">
-              Your website has been created. You can view and manage it in My
-              Sites.
-            </Typography>
-          </Stack>
-
-          <Box
-            sx={{
-              border: "1px solid",
-              borderColor: "divider",
-              borderRadius: 1.5,
-            }}
-          >
-            {rows.map(([label, value], i) => (
-              <Stack
-                key={label}
-                direction="row"
-                justifyContent="space-between"
-                spacing={2}
+      <Box sx={{ bgcolor: PAGE_BG, minHeight: "100vh" }}>
+        <Container maxWidth="sm" sx={{ py: { xs: 4, md: 10 } }}>
+          <Paper variant="outlined" sx={{ ...cardSx, p: { xs: 3, md: 5 } }}>
+            <Stack alignItems="center" spacing={1.5} sx={{ textAlign: "center", mb: 4 }}>
+              <Box
                 sx={{
-                  px: 2,
-                  py: 1.25,
-                  borderTop: i === 0 ? "none" : "1px solid",
-                  borderColor: "divider",
+                  width: 72,
+                  height: 72,
+                  borderRadius: "50%",
+                  display: "grid",
+                  placeItems: "center",
+                  bgcolor: (t) => alpha(t.palette.success.main, 0.12),
                 }}
               >
-                <Typography variant="body2" color="text.secondary">
-                  {label}
-                </Typography>
-                <Typography
-                  variant="body2"
-                  fontWeight={600}
+                <CheckCircleIcon color="success" sx={{ fontSize: 44 }} />
+              </Box>
+              <Typography variant="h5" fontWeight={700}>
+                Payment successful
+              </Typography>
+              <Typography color="text.secondary" sx={{ maxWidth: 380 }}>
+                Your website has been created. You can view and manage it in My
+                Sites.
+              </Typography>
+            </Stack>
+
+            <Box
+              sx={{
+                border: "1px solid #E3E6EB",
+                borderRadius: 1.5,
+                bgcolor: "#FAFBFC",
+              }}
+            >
+              {rows.map(([label, value], i) => (
+                <Stack
+                  key={label}
+                  direction="row"
+                  justifyContent="space-between"
+                  spacing={2}
                   sx={{
-                    overflowWrap: "anywhere",
-                    textAlign: "right",
-                    ...numeric,
+                    px: 2.5,
+                    py: 1.5,
+                    borderTop: i === 0 ? "none" : "1px solid #E3E6EB",
                   }}
                 >
-                  {value}
-                </Typography>
-              </Stack>
-            ))}
-          </Box>
+                  <Typography variant="body2" color="text.secondary">
+                    {label}
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    fontWeight={600}
+                    sx={{ overflowWrap: "anywhere", textAlign: "right", ...numeric }}
+                  >
+                    {value}
+                  </Typography>
+                </Stack>
+              ))}
+            </Box>
 
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={1.5}
-            sx={{ mt: 3 }}
-          >
-            <Button
-              fullWidth
-              variant="contained"
-              size="large"
-              onClick={() =>
-                success.siteId != null
-                  ? navigate(`/mysite/${success.siteId}`)
-                  : navigate("/mysite")
-              }
-            >
-              View your site
-            </Button>
-            <Button
-              fullWidth
-              variant="outlined"
-              size="large"
-              onClick={() => navigate("/mysite")}
-            >
-              My sites
-            </Button>
-          </Stack>
-        </Paper>
-      </Container>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ mt: 4 }}>
+              <Button
+                fullWidth
+                variant="contained"
+                size="large"
+                disableElevation
+                sx={{ py: 1.3, fontWeight: 600, textTransform: "none" }}
+                onClick={() =>
+                  success.siteId != null
+                    ? navigate(`/mysite/${success.siteId}`)
+                    : navigate("/mysite")
+                }
+              >
+                View your site
+              </Button>
+              <Button
+                fullWidth
+                variant="outlined"
+                size="large"
+                sx={{ py: 1.3, fontWeight: 600, textTransform: "none" }}
+                onClick={() => navigate("/mysite")}
+              >
+                My sites
+              </Button>
+            </Stack>
+          </Paper>
+        </Container>
+      </Box>
     );
   }
 
   /* ------------------------------ checkout ------------------------------ */
 
   return (
-    <Container maxWidth="lg" sx={{ py: { xs: 3, md: 5 } }}>
-      <Button
-        startIcon={<ArrowBackIcon />}
-        onClick={() => navigate("/templates")}
-        disabled={paying}
-        sx={{ mb: 1, ml: -1 }}
-      >
-        Back to templates
-      </Button>
-
-      <Typography variant="h4" fontWeight={700}>
-        Checkout
-      </Typography>
-      <Typography color="text.secondary" sx={{ mt: 0.5, mb: 3 }}>
-        Pick a theme, add any extra pages, and review your order.
-      </Typography>
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError("")}>
-          {error}
-        </Alert>
-      )}
-
-      {!template ? (
-        <Paper
-          variant="outlined"
-          sx={{ p: 4, textAlign: "center", borderRadius: 2 }}
+    <Box sx={{ bgcolor: PAGE_BG, minHeight: "100vh" }}>
+      <Container maxWidth="lg" sx={{ py: { xs: 3, md: 5 } }}>
+        <Button
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate("/templates")}
+          disabled={paying}
+          sx={{ mb: 1, ml: -1, textTransform: "none", color: "text.secondary" }}
         >
-          <Typography variant="h6" fontWeight={700} gutterBottom>
-            No template selected
-          </Typography>
-          <Typography color="text.secondary" sx={{ mb: 2 }}>
-            Choose a template first, then come back to check out.
-          </Typography>
-          <Button variant="contained" onClick={() => navigate("/templates")}>
-            Browse templates
-          </Button>
-        </Paper>
-      ) : (
-        <Grid container spacing={3} alignItems="flex-start">
-          {/* ------------------------- LEFT: steps ------------------------- */}
-          <Grid size={{ xs: 12, md: 7 }}>
-            <Paper
-              variant="outlined"
-              sx={{ borderRadius: 2, overflow: "hidden" }}
-            >
-              {/* 1. Theme */}
-              <Step
-                number={1}
-                title="Choose a theme"
-                hint="You can only pick one. Colors apply to every page of your site."
-              >
-                {themes.length === 0 ? (
-                  <Typography variant="body2" color="text.secondary">
-                    No themes are available for this template.
-                  </Typography>
-                ) : (
-                  <RadioGroup
-                    value={String(themeId)}
-                    onChange={(e) => {
-                      setError("");
-                      setThemeId(e.target.value);
-                    }}
-                  >
-                    <Grid container spacing={2}>
-                      {themes.map((theme) => {
-                        const value = String(theme.themeId ?? theme.id);
-                        const selected = value === String(themeId);
-                        const name = theme.name || `Theme ${value}`;
+          Back to templates
+        </Button>
 
-                        return (
-                          <Grid
-                            key={value}
-                            size={{ xs: 12, sm: 6, md: 4 }}
-                            sx={{ display: "flex" }}
-                          >
-                            <FormControlLabel
-                              value={value}
-                              control={<Radio size="small" sx={{ p: 0.5 }} />}
-                              sx={{
-                                m: 0,
-                                flex: 1,
-                                minWidth: 0,
-                                boxSizing: "border-box",
-                                alignItems: "center",
-                                gap: 1,
-                                px: 1.5,
-                                py: 1,
-                                border: "1px solid",
-                                borderColor: selected
-                                  ? "primary.main"
-                                  : "divider",
-                                borderRadius: 1.5,
-                                bgcolor: selected
-                                  ? (t) => alpha(t.palette.primary.main, 0.06)
-                                  : "transparent",
-                                "& .MuiFormControlLabel-label": {
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="flex-end"
+          flexWrap="wrap"
+          useFlexGap
+          spacing={1}
+          sx={{ mb: 3.5 }}
+        >
+          <Box>
+            <Typography variant="h4" fontWeight={800} letterSpacing="-0.02em">
+              Checkout
+            </Typography>
+            <Typography color="text.secondary" sx={{ mt: 0.5 }}>
+              Pick a theme, add any extra pages, and review your order.
+            </Typography>
+          </Box>
+          <Stack direction="row" spacing={0.75} alignItems="center" sx={{ color: "text.secondary" }}>
+            <LockOutlinedIcon sx={{ fontSize: 16 }} />
+            <Typography variant="body2">Secure checkout</Typography>
+          </Stack>
+        </Stack>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 3, borderRadius: 1.5 }} onClose={() => setError("")}>
+            {error}
+          </Alert>
+        )}
+
+        {!template ? (
+          <Paper variant="outlined" sx={{ ...cardSx, p: 5, textAlign: "center" }}>
+            <Typography variant="h6" fontWeight={700} gutterBottom>
+              No template selected
+            </Typography>
+            <Typography color="text.secondary" sx={{ mb: 3 }}>
+              Choose a template first, then come back to check out.
+            </Typography>
+            <Button
+              variant="contained"
+              disableElevation
+              sx={{ textTransform: "none", fontWeight: 600 }}
+              onClick={() => navigate("/templates")}
+            >
+              Browse templates
+            </Button>
+          </Paper>
+        ) : (
+          <Grid container spacing={3} alignItems="flex-start">
+            {/* ------------------------- LEFT: steps ------------------------- */}
+            <Grid size={{ xs: 12, md: 7.5 }}>
+              <Paper variant="outlined" sx={{ ...cardSx, overflow: "hidden" }}>
+                <Section
+                  number={1}
+                  title="Choose a theme"
+                  hint="Pick one. The colors apply to every page of your site."
+                >
+                  {themes.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary">
+                      No themes are available for this template.
+                    </Typography>
+                  ) : (
+                    <RadioGroup
+                      value={String(themeId)}
+                      onChange={(e) => {
+                        setError("");
+                        setThemeId(e.target.value);
+                      }}
+                    >
+                      <Grid container spacing={1.5}>
+                        {themes.map((theme) => {
+                          const value = String(theme.themeId ?? theme.id);
+                          const selected = value === String(themeId);
+                          const name = theme.name || `Theme ${value}`;
+
+                          return (
+                            <Grid
+                              key={value}
+                              size={{ xs: 12, sm: 6 }}
+                              sx={{ display: "flex" }}
+                            >
+                              <FormControlLabel
+                                value={value}
+                                control={<Radio size="small" sx={{ p: 0.5 }} />}
+                                sx={{
+                                  m: 0,
                                   flex: 1,
                                   minWidth: 0,
-                                },
-                              }}
-                              label={
-                                <Stack
-                                  direction="row"
-                                  spacing={1}
-                                  alignItems="center"
-                                  sx={{ width: "100%" }}
-                                >
-                                  <Box
-                                    aria-hidden
-                                    sx={{
-                                      flex: 1,
-                                      minWidth: 0,
-                                      height: 38,
-                                      px: 1,
-                                      borderRadius: 1,
-                                      border: "1px solid",
-                                      borderColor: "divider",
-                                      backgroundColor:
-                                        theme.background || "#fff",
-                                      color: theme.color || "#111",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontSize: 12,
-                                      fontWeight: 700,
-                                      overflow: "hidden",
-                                      whiteSpace: "nowrap",
-                                      textOverflow: "ellipsis",
-                                    }}
+                                  boxSizing: "border-box",
+                                  alignItems: "center",
+                                  gap: 1,
+                                  px: 1.5,
+                                  py: 1.25,
+                                  border: "1.5px solid",
+                                  borderColor: selected ? "primary.main" : "#E3E6EB",
+                                  borderRadius: 1.5,
+                                  bgcolor: selected
+                                    ? (t) => alpha(t.palette.primary.main, 0.05)
+                                    : "#fff",
+                                  transition: "border-color .15s, background-color .15s",
+                                  "&:hover": {
+                                    borderColor: selected ? "primary.main" : "#C5CAD3",
+                                  },
+                                  "& .MuiFormControlLabel-label": {
+                                    flex: 1,
+                                    minWidth: 0,
+                                  },
+                                }}
+                                label={
+                                  <Stack
+                                    direction="row"
+                                    spacing={1.25}
+                                    alignItems="center"
+                                    sx={{ width: "100%" }}
                                   >
-                                    {name}
-                                  </Box>
+                                    <Box
+                                      aria-hidden
+                                      sx={{
+                                        width: 40,
+                                        height: 40,
+                                        flexShrink: 0,
+                                        borderRadius: 1,
+                                        border: "1px solid #E3E6EB",
+                                        backgroundColor: theme.background || "#fff",
+                                        color: theme.color || "#111",
+                                        display: "grid",
+                                        placeItems: "center",
+                                        fontSize: 15,
+                                        fontWeight: 800,
+                                      }}
+                                    >
+                                      Aa
+                                    </Box>
+                                    <Typography
+                                      variant="body2"
+                                      fontWeight={600}
+                                      noWrap
+                                      sx={{ flex: 1, minWidth: 0 }}
+                                    >
+                                      {name}
+                                    </Typography>
+                                    {isDefaultTheme(theme) && (
+                                      <Chip
+                                        size="small"
+                                        label="Default"
+                                        sx={{
+                                          flexShrink: 0,
+                                          height: 22,
+                                          fontSize: 11,
+                                          fontWeight: 600,
+                                          bgcolor: "#EEF0F4",
+                                        }}
+                                      />
+                                    )}
+                                  </Stack>
+                                }
+                              />
+                            </Grid>
+                          );
+                        })}
+                      </Grid>
+                    </RadioGroup>
+                  )}
+                </Section>
 
-                                  {isDefaultTheme(theme) && (
-                                    <Chip
-                                      size="small"
-                                      label="Default"
-                                      variant="outlined"
-                                      sx={{ flexShrink: 0 }}
-                                    />
-                                  )}
-                                </Stack>
-                              }
-                            />
-                          </Grid>
+                <Section
+                  number={2}
+                  title="Add more pages"
+                  hint="Optional. Each extra page is added to your total."
+                  last
+                >
+                  {templateLoading && selectableExtraPages.length === 0 ? (
+                    <CircularProgress size={20} />
+                  ) : selectableExtraPages.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary">
+                      No additional pages are available for this template.
+                    </Typography>
+                  ) : (
+                    <Stack spacing={1.25}>
+                      {selectableExtraPages.map((page) => {
+                        const checked = additionalPageIds.includes(page.pageKey);
+                        return (
+                          <FormControlLabel
+                            key={page.pageKey}
+                            control={
+                              <Checkbox
+                                checked={checked}
+                                onChange={() => toggleExtraPage(page.pageKey)}
+                              />
+                            }
+                            sx={{
+                              m: 0,
+                              width: "100%",
+                              boxSizing: "border-box",
+                              pr: 2,
+                              py: 0.5,
+                              border: "1.5px solid",
+                              borderColor: checked ? "primary.main" : "#E3E6EB",
+                              borderRadius: 1.5,
+                              bgcolor: checked
+                                ? (t) => alpha(t.palette.primary.main, 0.05)
+                                : "#fff",
+                              transition: "border-color .15s, background-color .15s",
+                              "&:hover": {
+                                borderColor: checked ? "primary.main" : "#C5CAD3",
+                              },
+                              "& .MuiFormControlLabel-label": {
+                                flex: 1,
+                                minWidth: 0,
+                              },
+                            }}
+                            label={
+                              <Stack
+                                direction="row"
+                                justifyContent="space-between"
+                                alignItems="center"
+                                spacing={2}
+                              >
+                                <Typography variant="body2" fontWeight={600}>
+                                  {pageTitle(page)}
+                                </Typography>
+                                <Typography
+                                  variant="body2"
+                                  fontWeight={600}
+                                  color="text.secondary"
+                                  sx={{ whiteSpace: "nowrap", ...numeric }}
+                                >
+                                  + {formatPrice(page.pagePrice, currency)}
+                                </Typography>
+                              </Stack>
+                            }
+                          />
                         );
                       })}
-                    </Grid>
-                  </RadioGroup>
-                )}
-              </Step>
+                    </Stack>
+                  )}
+                </Section>
+              </Paper>
+            </Grid>
 
-              <Divider />
-
-              {/* @. Additional pages: the only selectable ones */}
-              <Step
-                number={2}
-                title="Add more pages"
-                hint="Optional. Each extra page is added to the price."
+            {/* ---------------------- RIGHT: order summary ---------------------- */}
+            <Grid size={{ xs: 12, md: 4.5 }}>
+              <Paper
+                variant="outlined"
+                sx={{
+                  ...cardSx,
+                  overflow: "hidden",
+                  position: { md: "sticky" },
+                  top: { md: 24 },
+                }}
               >
-                {templateLoading && selectableExtraPages.length === 0 ? (
-                  <CircularProgress size={20} />
-                ) : selectableExtraPages.length === 0 ? (
-                  <Typography variant="body2" color="text.secondary">
-                    No additional pages are available for this template.
+                {template.thumbnailUrl && (
+                  <Box
+                    component="img"
+                    src={template.thumbnailUrl}
+                    alt={template.name || "Template preview"}
+                    sx={{
+                      display: "block",
+                      width: "100%",
+                      height: 170,
+                      objectFit: "cover",
+                      borderBottom: "1px solid #E3E6EB",
+                    }}
+                  />
+                )}
+
+                <Box sx={{ p: 3 }}>
+                  <Typography variant="overline" color="text.secondary" sx={{ lineHeight: 1.5 }}>
+                    Order summary
                   </Typography>
-                ) : (
-                  <Stack spacing={1}>
-                    {selectableExtraPages.map((page) => {
-                      const checked = additionalPageIds.includes(page.pageKey);
-                      return (
-                        <FormControlLabel
-                          key={page.pageKey}
-                          control={
-                            <Checkbox
-                              checked={checked}
-                              onChange={() => toggleExtraPage(page.pageKey)}
-                            />
-                          }
-                          sx={{
-                            m: 0,
-                            width: "60%",
-                            pr: 2,
-                            py: 0.25,
-                            border: "1px solid",
-                            borderColor: checked ? "primary.main" : "divider",
-                            borderRadius: 1.5,
-                            bgcolor: checked
-                              ? (t) => alpha(t.palette.primary.main, 0.06)
-                              : "transparent",
-                            "& .MuiFormControlLabel-label": {
-                              flex: 1,
-                              minWidth: 0,
-                            },
-                          }}
-                          label={
-                            <Stack
-                              direction="row"
-                              justifyContent="space-between"
-                              alignItems="center"
-                              spacing={2}
-                            >
-                              <Typography variant="body2" fontWeight={600}>
-                                {pageTitle(page)}
-                              </Typography>
-                              <Typography
-                                variant="body2"
-                                fontWeight={600}
-                                sx={{ whiteSpace: "nowrap", ...numeric }}
-                              >
-                                + {formatPrice(page.pagePrice, currency)}
-                              </Typography>
-                            </Stack>
-                          }
-                        />
-                      );
-                    })}
+
+                  <Typography variant="h6" fontWeight={700} lineHeight={1.3}>
+                    {template.name || "Website template"}
+                  </Typography>
+
+                  <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
+                    {template.language && (
+                      <Chip size="small" label={template.language} sx={{ bgcolor: "#EEF0F4", fontWeight: 500 }} />
+                    )}
+                    {template.validityDays && (
+                      <Chip
+                        size="small"
+                        label={`Valid for ${template.validityDays} days`}
+                        sx={{ bgcolor: "#EEF0F4", fontWeight: 500 }}
+                      />
+                    )}
                   </Stack>
-                )}
-              </Step>
-            </Paper>
+
+                  {template.shortDescription && (
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
+                      {template.shortDescription}
+                    </Typography>
+                  )}
+
+                  <Divider sx={{ my: 2.5 }} />
+
+                  <Stack spacing={1.5}>
+                    <SummaryRow
+                      label="Template"
+                      caption={
+                        defaultPages.length > 0
+                          ? `Includes ${defaultPages.length} default page${defaultPages.length > 1 ? "s" : ""}`
+                          : undefined
+                      }
+                      value={formatPrice(templatePrice, currency)}
+                    />
+
+                    {selectedTheme && (
+                      <SummaryRow
+                        label="Theme"
+                        caption={selectedTheme.name || undefined}
+                        value="Included"
+                        muted
+                      />
+                    )}
+
+                    {selectedExtras.map((page) => (
+                      <SummaryRow
+                        key={page.pageKey}
+                        label={pageTitle(page)}
+                        value={formatPrice(page.pagePrice, currency)}
+                      />
+                    ))}
+
+                    {selectedExtras.length === 0 && (
+                      <SummaryRow label="Additional pages" value="None" muted />
+                    )}
+                  </Stack>
+
+                  <Divider sx={{ my: 2.5 }} />
+
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography fontWeight={700}>Total</Typography>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      {quoteLoading && <CircularProgress size={14} />}
+                      <Typography
+                        variant="h5"
+                        fontWeight={800}
+                        letterSpacing="-0.01em"
+                        sx={numeric}
+                      >
+                        {formatPrice(total, currency)}
+                      </Typography>
+                    </Stack>
+                  </Stack>
+
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    size="large"
+                    disableElevation
+                    onClick={handlePay}
+                    disabled={!canPay}
+                    startIcon={
+                      paying ? (
+                        <CircularProgress size={18} color="inherit" />
+                      ) : (
+                        <LockOutlinedIcon sx={{ fontSize: 18 }} />
+                      )
+                    }
+                    sx={{
+                      mt: 3,
+                      py: 1.5,
+                      fontWeight: 700,
+                      fontSize: 16,
+                      textTransform: "none",
+                      borderRadius: 1.5,
+                    }}
+                  >
+                    {paying
+                      ? "Processing…"
+                      : quoteLoading || templateLoading
+                        ? "Calculating price…"
+                        : canPay
+                          ? `Pay ${formatPrice(total, currency)}`
+                          : "Select a theme to continue"}
+                  </Button>
+
+                  <Stack spacing={1} sx={{ mt: 2.5 }}>
+                    <TrustItem icon={<BoltOutlinedIcon sx={{ fontSize: 16 }} />}>
+                      Your website is created as soon as the order is placed.
+                    </TrustItem>
+                    <TrustItem icon={<VerifiedUserOutlinedIcon sx={{ fontSize: 16 }} />}>
+                      The final price is calculated and verified on the server.
+                    </TrustItem>
+                  </Stack>
+                </Box>
+              </Paper>
+            </Grid>
           </Grid>
-
-          {/* ---------------------- RIGHT: order summary ---------------------- */}
-          <Grid size={{ xs: 12, md: 5 }}>
-            <Paper
-              variant="outlined"
-              sx={{
-                borderRadius: 2,
-                p: 3,
-                position: { md: "sticky" },
-                top: { md: 24 },
-              }}
-            >
-              <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 2 }}>
-                Order summary
-              </Typography>
-
-              {template.thumbnailUrl && (
-                <Box
-                  component="img"
-                  src={template.thumbnailUrl}
-                  alt={template.name || "Template preview"}
-                  sx={{
-                    width: "100%",
-                    height: 150,
-                    objectFit: "cover",
-                    borderRadius: 1.5,
-                    border: "1px solid",
-                    borderColor: "divider",
-                    mb: 2,
-                  }}
-                />
-              )}
-
-              <Typography variant="h6" fontWeight={700} lineHeight={1.3}>
-                {template.name || "Website template"}
-              </Typography>
-
-              <Stack
-                direction="row"
-                spacing={1}
-                flexWrap="wrap"
-                useFlexGap
-                sx={{ mt: 1 }}
-              >
-                {template.language && (
-                  <Chip size="small" label={template.language} />
-                )}
-                {template.validityDays && (
-                  <Chip
-                    size="small"
-                    label={`Valid for ${template.validityDays} days`}
-                  />
-                )}
-              </Stack>
-
-              {template.shortDescription && (
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mt: 1.5 }}
-                >
-                  {template.shortDescription}
-                </Typography>
-              )}
-
-              <Divider sx={{ my: 2 }} />
-
-              <Stack spacing={1.25}>
-                <Typography variant="subtitle2" fontWeight={700}>
-                  Pages
-                </Typography>
-
-                {selectedExtras.map((page) => (
-                  <SummaryRow
-                    key={page.pageKey}
-                    label={pageTitle(page)}
-                    value={formatPrice(page.pagePrice, currency)}
-                  />
-                ))}
-
-                {selectedExtras.length === 0 && (
-                  <SummaryRow label="Additional pages" value="None" />
-                )}
-              </Stack>
-
-              <Divider sx={{ my: 2 }} />
-
-              <Stack
-                direction="row"
-                justifyContent="space-between"
-                alignItems="baseline"
-              >
-                <Typography fontWeight={700}>Total : </Typography>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  {quoteLoading && <CircularProgress size={14} />}
-                  <Typography variant="body1" fontWeight={500} sx={numeric}>
-                    {formatPrice(total, currency)}
-                  </Typography>
-                </Stack>
-              </Stack>
-
-              <Button
-                fullWidth
-                variant="contained"
-                size="large"
-                onClick={handlePay}
-                disabled={!canPay}
-                startIcon={
-                  paying ? <CircularProgress size={18} color="inherit" /> : null
-                }
-                sx={{ mt: 2.5, py: 1.4, fontWeight: 700 }}
-              >
-                {paying
-                  ? "Processing…"
-                  : quoteLoading || templateLoading
-                    ? "Calculating price…"
-                    : canPay
-                      ? `Pay ${formatPrice(total, currency)}`
-                      : "Select a theme to continue"}
-              </Button>
-
-              <Stack
-                direction="row"
-                spacing={0.75}
-                alignItems="center"
-                justifyContent="center"
-                sx={{ mt: 1.5, color: "text.secondary" }}
-              >
-                <LockOutlinedIcon sx={{ fontSize: 14 }} />
-                <Typography variant="caption">
-                  Your website is created as soon as the order is placed.
-                </Typography>
-              </Stack>
-            </Paper>
-          </Grid>
-        </Grid>
-      )}
-    </Container>
+        )}
+      </Container>
+    </Box>
   );
 }

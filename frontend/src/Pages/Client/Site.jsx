@@ -54,13 +54,31 @@ const CloseIcon = (props) => (
 );
 
 const FacebookIcon = (props) => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    aria-hidden="true"
+    {...props}
+  >
     <path d="M13.5 21v-7.5h2.5l.4-3H13.5V8.6c0-.9.3-1.5 1.6-1.5h1.5V4.4c-.3 0-1.2-.1-2.3-.1-2.3 0-3.8 1.4-3.8 3.9v2.3H8v3h2.5V21h3z" />
   </svg>
 );
 
 const InstagramIcon = (props) => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    {...props}
+  >
     <rect x="3" y="3" width="18" height="18" rx="5" />
     <circle cx="12" cy="12" r="4" />
     <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
@@ -68,38 +86,92 @@ const InstagramIcon = (props) => (
 );
 
 const YouTubeIcon = (props) => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    aria-hidden="true"
+    {...props}
+  >
     <path d="M21.6 7.2a2.6 2.6 0 0 0-1.8-1.8C18.2 5 12 5 12 5s-6.2 0-7.8.4A2.6 2.6 0 0 0 2.4 7.2 27 27 0 0 0 2 12a27 27 0 0 0 .4 4.8 2.6 2.6 0 0 0 1.8 1.8C5.8 19 12 19 12 19s6.2 0 7.8-.4a2.6 2.6 0 0 0 1.8-1.8A27 27 0 0 0 22 12a27 27 0 0 0-.4-4.8zM10 15V9l5.2 3L10 15z" />
   </svg>
 );
 
 const TwitterIcon = (props) => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    aria-hidden="true"
+    {...props}
+  >
     <path d="M17.5 3h3l-6.6 7.6L21.8 21h-6.1l-4.8-6.2L5.4 21H2.4l7-8L2.6 3h6.2l4.3 5.7L17.5 3zm-1.1 16.1h1.7L7.7 4.8H5.9l10.5 14.3z" />
   </svg>
 );
 
 const LinkedInIcon = (props) => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    aria-hidden="true"
+    {...props}
+  >
     <path d="M4.98 3.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM3 9h4v12H3V9zm7 0h3.8v1.7h.1c.5-.9 1.8-1.9 3.7-1.9 4 0 4.7 2.6 4.7 6V21h-4v-5.3c0-1.3 0-2.9-1.8-2.9s-2.1 1.4-2.1 2.8V21h-4V9z" />
   </svg>
 );
 
 const PlaceIcon = (props) => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    {...props}
+  >
     <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z" />
     <circle cx="12" cy="10" r="3" />
   </svg>
 );
 
 const PhoneOutlineIcon = (props) => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    {...props}
+  >
     <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.7 2.6a2 2 0 0 1-.5 2.1L8.1 9.6a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.8.4 1.7.6 2.6.7a2 2 0 0 1 1.7 2z" />
   </svg>
 );
 
 const EmailIcon = (props) => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    {...props}
+  >
     <rect x="3" y="5" width="18" height="14" rx="2" />
     <path d="m3 7 9 6 9-6" />
   </svg>
@@ -223,77 +295,325 @@ const SLIDER_MARKER = /<!--\s*SITE_SLIDER\s*-->/i;
 /* ------------------------------------------------------------------ */
 /* Hydrate [data-entity] tables with site data                         */
 /* ------------------------------------------------------------------ */
-const hydrateSiteData = (html, siteData = {}) => {
-  if (!html || !html.includes("data-entity")) return html;
+const HYDRATION_RELATIONSHIPS = {
+  students: {
+    classId: {
+      entity: "classes",
+      fields: {
+        className: (record) =>
+          `${record.name || ""}${
+            record.section ? ` - ${record.section}` : ""
+          }`,
+      },
+    },
+  },
 
-  const doc = new DOMParser().parseFromString(
-    `<div id="root">${html}</div>`,
-    "text/html",
-  );
-  const root = doc.getElementById("root");
+  classes: {
+    classTeacherId: {
+      entity: "teachers",
+      fields: {
+        classTeacherName: "name",
+      },
+    },
+  },
 
-  const classMap = new Map(
-    (siteData.classes || []).map((c) => [String(c.id), c]),
-  );
-  const teacherMap = new Map(
-    (siteData.teachers || []).map((t) => [String(t.id), t]),
-  );
+  products: {
+    categoryId: {
+      entity: "productcategories",
+      fields: {
+        categoryName: "name",
+      },
+      fallback: {
+        categoryName: "Uncategorized",
+      },
+    },
+  },
+};
 
-  const enrich = (entity, item) => {
-    if (entity === "students") {
-      const cls = classMap.get(String(item.classId));
-      return {
-        ...item,
-        className:
-          item.className ||
-          (cls ? `${cls.name}${cls.section ? ` - ${cls.section}` : ""}` : ""),
-      };
-    }
-    if (entity === "classes") {
-      return {
-        ...item,
-        classTeacherName:
-          item.classTeacherName ||
-          teacherMap.get(String(item.classTeacherId))?.name ||
-          "",
-      };
-    }
-    return item;
+
+/* --------------------------------
+   Utility functions
+--------------------------------- */
+
+const isEmpty = (value) =>
+  value === null ||
+  value === undefined ||
+  value === "";
+
+const getNestedValue = (object, path) => {
+  if (!object || !path) return undefined;
+
+  return String(path)
+    .split(".")
+    .reduce((current, key) => current?.[key], object);
+};
+
+const resolveEntity = (entity, siteData) => {
+  const aliases = {
+    categories: "productcategories",
   };
 
-  root.querySelectorAll("[data-entity]").forEach((container) => {
-    const entity = container.getAttribute("data-entity");
-    const template = container.querySelector("[data-row]");
-    const source = siteData[entity];
-    if (!template || !Array.isArray(source)) return;
+  return siteData[entity] ??
+    siteData[aliases[entity] || entity];
+};
 
-    const holder = template.parentElement;
-    const rows = source.filter((r) => !r.status || r.status === "active");
-    holder.innerHTML = "";
 
-    if (!rows.length) {
-      container.insertAdjacentHTML(
-        "afterend",
-        '<p style="text-align:center;opacity:.7;padding:16px;">No records added yet.</p>',
+/* --------------------------------
+   Relationship maps
+--------------------------------- */
+
+const createEntityMaps = (siteData) => {
+  const maps = {};
+
+  Object.entries(siteData).forEach(([entity, records]) => {
+    if (!Array.isArray(records)) return;
+
+    maps[entity] = new Map(
+      records.map((record) => [
+        String(record.id),
+        record,
+      ])
+    );
+  });
+
+  if (!maps.productcategories && maps.categories) {
+    maps.productcategories = maps.categories;
+  }
+
+  return maps;
+};
+
+
+/* --------------------------------
+   Entity enrichment
+--------------------------------- */
+
+const enrichEntity = (entity, item, maps) => {
+  const result = { ...item };
+
+  const relationships =
+    HYDRATION_RELATIONSHIPS[entity] || {};
+
+  Object.entries(relationships).forEach(
+    ([foreignKey, config]) => {
+      const related = maps[config.entity]?.get(
+        String(item[foreignKey])
       );
-      return;
-    }
 
-    rows.forEach((raw) => {
-      const item = enrich(entity, raw);
-      const row = template.cloneNode(true);
-      row.querySelectorAll("[data-field]").forEach((el) => {
-        const value = item[el.getAttribute("data-field")];
-        const attr = el.getAttribute("data-attr");
-        if (attr) {
-          const safe = attr === "src" ? resolveMediaImage(value) : value;
-          if (safe) el.setAttribute(attr, safe);
-        } else {
-          el.textContent = value || "—";
+      if (related) {
+        Object.entries(config.fields || {}).forEach(
+          ([targetField, sourceField]) => {
+            if (!isEmpty(result[targetField])) return;
+
+            result[targetField] =
+              typeof sourceField === "function"
+                ? sourceField(related)
+                : getNestedValue(related, sourceField);
+          }
+        );
+      }
+
+      Object.entries(config.fallback || {}).forEach(
+        ([field, fallback]) => {
+          if (isEmpty(result[field])) {
+            result[field] = fallback;
+          }
         }
-      });
-      holder.appendChild(row);
-    });
+      );
+    }
+  );
+
+  return result;
+};
+
+
+/* --------------------------------
+   Safe attribute rendering
+--------------------------------- */
+
+const renderField = (element, item) => {
+  const field = element.getAttribute("data-field");
+
+  if (!field) return;
+
+  const value = getNestedValue(item, field);
+  const attr = element.getAttribute("data-attr");
+
+  if (!attr) {
+    const fallback = element.getAttribute("data-fallback");
+
+    element.textContent = isEmpty(value)
+      ? fallback ?? "—"
+      : String(value);
+
+    return;
+  }
+
+  const allowedAttributes = [
+    "src",
+    "href",
+    "alt",
+    "title",
+    "target",
+    "rel",
+    "loading",
+  ];
+
+  if (!allowedAttributes.includes(attr)) return;
+
+  let output = value;
+
+  if (attr === "src" && !isEmpty(value)) {
+    output =
+      typeof resolveMediaImage === "function"
+        ? resolveMediaImage(value)
+        : value;
+  }
+
+  if (attr === "src" || attr === "href") {
+    if (!isEmpty(output)) {
+      try {
+        const url = new URL(
+          String(output),
+          "https://hydration.invalid"
+        );
+
+        const relative =
+          !/^[a-z][a-z0-9+.-]*:/i.test(String(output));
+
+        if (
+          !relative &&
+          !["http:", "https:"].includes(url.protocol)
+        ) {
+          output = "";
+        }
+      } catch {
+        output = "";
+      }
+    }
+  }
+
+  if (isEmpty(output)) {
+    element.removeAttribute(attr);
+  } else {
+    element.setAttribute(attr, String(output));
+  }
+
+  if (
+    attr === "target" &&
+    output === "_blank"
+  ) {
+    element.setAttribute(
+      "rel",
+      "noopener noreferrer"
+    );
+  }
+};
+
+
+/* --------------------------------
+   Recursive hydration
+--------------------------------- */
+
+const hydrateContainer = (container, siteData, maps) => {
+  const entity = container.getAttribute("data-entity");
+
+  const source = resolveEntity(entity, siteData);
+
+  const template = Array.from(container.children)
+    .flatMap((child) => [
+      child,
+      ...child.querySelectorAll("[data-row]"),
+    ])
+    .find((element) => element.hasAttribute("data-row"));
+
+  if (!template || !Array.isArray(source)) return;
+
+  // Clone before clearing the original holder.
+  const holder = template.parentElement;
+  const rowTemplate = template.cloneNode(true);
+
+  const rows = source.filter((record) => {
+    return !record.status || record.status === "active";
+  });
+
+  holder.replaceChildren();
+
+  if (!rows.length) {
+    const empty = container.ownerDocument.createElement("p");
+
+    empty.className = "hydration-empty-state";
+
+    empty.textContent =
+      container.getAttribute("data-empty-text") ||
+      "No records added yet.";
+
+    empty.style.cssText =
+      "text-align:center;opacity:.7;padding:16px;";
+
+    holder.appendChild(empty);
+
+    return;
+  }
+
+  rows.forEach((raw) => {
+    const item = enrichEntity(entity, raw, maps);
+
+    const row = rowTemplate.cloneNode(true);
+
+    // Hydrate fields belonging to this row.
+    row.querySelectorAll("[data-field]").forEach(
+      (element) => renderField(element, item)
+    );
+
+    // Hydrate nested entity containers independently.
+    row.querySelectorAll("[data-entity]").forEach(
+      (nestedContainer) => {
+        hydrateContainer(
+          nestedContainer,
+          siteData,
+          maps
+        );
+      }
+    );
+
+    holder.appendChild(row);
+  });
+};
+
+
+/* --------------------------------
+   Main function
+--------------------------------- */
+
+const hydrateSiteData = (html, siteData = {}) => {
+  if (
+    typeof html !== "string" ||
+    !html.includes("data-entity")
+  ) {
+    return html;
+  }
+
+  const doc = new DOMParser().parseFromString(
+    `<div id="hydration-root">${html}</div>`,
+    "text/html"
+  );
+
+  const root = doc.getElementById("hydration-root");
+
+  if (!root) return html;
+
+  const maps = createEntityMaps(siteData);
+
+  // Process only top-level entity containers.
+  const containers = Array.from(
+    root.querySelectorAll("[data-entity]")
+  ).filter((container) => {
+    return !container.parentElement.closest("[data-entity]");
+  });
+
+  containers.forEach((container) => {
+    hydrateContainer(container, siteData, maps);
   });
 
   return root.innerHTML;
@@ -318,8 +638,7 @@ const buildSrcDoc = ({
 
   // Hydrate the page's [data-entity] tables BEFORE injecting into iframe
   const pageHtml =
-    hydrateSiteData(html, siteData) ||
-    "<p>This page has no content yet.</p>";
+    hydrateSiteData(html, siteData) || "<p>This page has no content yet.</p>";
 
   const bodyHtml = SLIDER_MARKER.test(pageHtml)
     ? pageHtml.replace(SLIDER_MARKER, () => sliderHtml)
@@ -615,24 +934,49 @@ function SiteFooter({ header, siteName, pages, activeId, onNavigate, theme }) {
           {hasLinks && (
             <Box component="nav" aria-label="Footer navigation">
               <FooterHeading>Quick links</FooterHeading>
-              <Box sx={{ display: "grid", gap: 1 }}>
-                {pages.map((p) => (
-                  <Link
-                    key={pageKey(p)}
-                    component="button"
-                    type="button"
-                    onClick={() => onNavigate(pageKey(p))}
-                    sx={{
-                      ...linkSx,
-                      textAlign: "left",
-                      font: "inherit",
-                      fontWeight: pageKey(p) === activeId ? 700 : 400,
-                      justifySelf: "start",
-                    }}
-                  >
-                    {p.title}
-                  </Link>
-                ))}
+              <Box
+                sx={{
+                  display: "grid",
+                  // Flow into as many columns as fit, cap at 3 on desktop
+                  gridTemplateColumns: {
+                    xs: "1fr",
+                    sm: "repeat(2, minmax(0, 1fr))",
+                    md: "repeat(3, minmax(0, 1fr))",
+                  },
+                  columnGap: 2,
+                  rowGap: 1,
+                  // Optional: keep very long lists from stretching the footer
+                  maxHeight: pages.length > 12 ? 240 : "none",
+                  overflowY: pages.length > 12 ? "auto" : "visible",
+                  pr: pages.length > 12 ? 1 : 0,
+                }}
+              >
+                {pages.map((p) => {
+                  const isActive = pageKey(p) === activeId;
+                  return (
+                    <Link
+                      key={pageKey(p)}
+                      component="button"
+                      type="button"
+                      onClick={() => onNavigate(pageKey(p))}
+                      aria-current={isActive ? "page" : undefined}
+                      sx={{
+                        ...linkSx,
+                        display: "block",
+                        textAlign: "left",
+                        font: "inherit",
+                        fontWeight: isActive ? 700 : 400,
+                        justifySelf: "stretch",
+                        minWidth: 0,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {p.title}
+                    </Link>
+                  );
+                })}
               </Box>
             </Box>
           )}
@@ -650,7 +994,9 @@ function SiteFooter({ header, siteName, pages, activeId, onNavigate, theme }) {
                       alignItems: "flex-start",
                     }}
                   >
-                    <Icon style={{ marginTop: 2, opacity: 0.8, flexShrink: 0 }} />
+                    <Icon
+                      style={{ marginTop: 2, opacity: 0.8, flexShrink: 0 }}
+                    />
                     {href ? (
                       <Link href={href} sx={linkSx}>
                         {text}
@@ -768,10 +1114,9 @@ export default function MySiteView() {
               const previewPath = window.location.pathname.endsWith("/preview")
                 ? "/preview"
                 : "";
-              navigate(
-                `/mysite/${createSiteSlug(legacySite)}${previewPath}`,
-                { replace: true },
-              );
+              navigate(`/mysite/${createSiteSlug(legacySite)}${previewPath}`, {
+                replace: true,
+              });
               return;
             }
             setError("Site not found in your account.");
@@ -909,10 +1254,7 @@ export default function MySiteView() {
   );
 
   // Include data length so tables re-hydrate if data changes
-  const dataVersion = useMemo(
-    () => Object.keys(siteData).length,
-    [siteData],
-  );
+  const dataVersion = useMemo(() => Object.keys(siteData).length, [siteData]);
 
   const srcDoc = useMemo(
     () =>

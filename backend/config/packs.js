@@ -793,21 +793,1151 @@ const lawfirm = () => [
     ) ENGINE=InnoDB`,
   ],
 ];
+/* ------------------------------------------------------------------
+   NEW PACKS — paste these above `module.exports` in pack.js.
+   Same conventions as the existing packs: parent tables come first,
+   camelCase columns, status ENUMs, createdAt/updatedAt, InnoDB.
+   Table names are unique across every pack (and common), so nothing
+   collides if a site ever loads more than one pack.
+------------------------------------------------------------------ */
+
+const marketing = () => [
+  [
+    "marketingservices",
+    `CREATE TABLE marketingservices (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(150) NOT NULL,
+      description TEXT NULL,
+      startingPrice DECIMAL(10,2) NULL,
+      imageUrl VARCHAR(500) NULL,
+      sortOrder INT UNSIGNED NOT NULL DEFAULT 0,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uqMarketingServicesName (name),
+      INDEX idxMarketingServicesOrder (status, sortOrder)
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "casestudies",
+    `CREATE TABLE casestudies (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      serviceId BIGINT UNSIGNED NULL,
+      title VARCHAR(190) NOT NULL,
+      clientName VARCHAR(150) NULL,
+      challenge TEXT NULL,
+      solution TEXT NULL,
+      results TEXT NULL,
+      metrics JSON NULL,
+      imageUrl VARCHAR(500) NULL,
+      featured TINYINT(1) NOT NULL DEFAULT 0,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxCaseStudiesServiceStatus (serviceId, status),
+      INDEX idxCaseStudiesFeatured (status, featured),
+      CONSTRAINT fkCaseStudiesService FOREIGN KEY (serviceId)
+        REFERENCES marketingservices(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "leads",
+    `CREATE TABLE leads (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      serviceId BIGINT UNSIGNED NULL,
+      name VARCHAR(150) NOT NULL,
+      email VARCHAR(190) NOT NULL,
+      phone VARCHAR(30) NULL,
+      company VARCHAR(150) NULL,
+      websiteUrl VARCHAR(500) NULL,
+      budgetRange VARCHAR(60) NULL,
+      message TEXT NULL,
+      status ENUM('new','contacted','qualified','won','lost') NOT NULL DEFAULT 'new',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxLeadsStatusDate (status, createdAt),
+      CONSTRAINT fkLeadsService FOREIGN KEY (serviceId)
+        REFERENCES marketingservices(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB`,
+  ],
+];
+
+const salon = () => [
+  [
+    "salonservices",
+    `CREATE TABLE salonservices (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(150) NOT NULL,
+      serviceGroup VARCHAR(100) NULL COMMENT 'e.g. Hair, Skin, Nails, Makeup',
+      description TEXT NULL,
+      duration INT UNSIGNED NOT NULL COMMENT 'Duration in minutes',
+      price DECIMAL(10,2) NOT NULL,
+      imageUrl VARCHAR(500) NULL,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxSalonServicesGroupStatus (serviceGroup, status)
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "stylists",
+    `CREATE TABLE stylists (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(150) NOT NULL,
+      specialization VARCHAR(150) NULL,
+      experienceYears TINYINT UNSIGNED NULL,
+      bio TEXT NULL,
+      photoUrl VARCHAR(500) NULL,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxStylistsStatus (status)
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "salonbookings",
+    `CREATE TABLE salonbookings (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      serviceId BIGINT UNSIGNED NOT NULL,
+      stylistId BIGINT UNSIGNED NULL,
+      customerName VARCHAR(150) NOT NULL,
+      customerEmail VARCHAR(190) NULL,
+      customerPhone VARCHAR(30) NOT NULL,
+      bookingDate DATE NOT NULL,
+      bookingTime TIME NOT NULL,
+      notes TEXT NULL,
+      status ENUM('pending','confirmed','completed','cancelled') NOT NULL DEFAULT 'pending',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxSalonBookingsDateStatus (bookingDate, status),
+      INDEX idxSalonBookingsStylistDate (stylistId, bookingDate),
+      CONSTRAINT fkSalonBookingsService FOREIGN KEY (serviceId)
+        REFERENCES salonservices(id) ON DELETE RESTRICT,
+      CONSTRAINT fkSalonBookingsStylist FOREIGN KEY (stylistId)
+        REFERENCES stylists(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB`,
+  ],
+];
+
+const news = () => [
+  [
+    "newscategories",
+    `CREATE TABLE newscategories (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(150) NOT NULL,
+      slug VARCHAR(190) NOT NULL,
+      sortOrder INT UNSIGNED NOT NULL DEFAULT 0,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uqNewsCategoriesSlug (slug),
+      INDEX idxNewsCategoriesOrder (status, sortOrder)
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "articles",
+    `CREATE TABLE articles (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      categoryId BIGINT UNSIGNED NULL,
+      title VARCHAR(190) NOT NULL,
+      slug VARCHAR(190) NOT NULL,
+      summary TEXT NULL,
+      content LONGTEXT NOT NULL,
+      imageUrl VARCHAR(500) NULL,
+      authorName VARCHAR(150) NULL,
+      isBreaking TINYINT(1) NOT NULL DEFAULT 0,
+      isFeatured TINYINT(1) NOT NULL DEFAULT 0,
+      viewCount INT UNSIGNED NOT NULL DEFAULT 0,
+      status ENUM('draft','published','archived') NOT NULL DEFAULT 'draft',
+      publishedAt DATETIME NULL,
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uqArticlesSlug (slug),
+      INDEX idxArticlesCategoryStatus (categoryId, status, publishedAt),
+      INDEX idxArticlesFlags (status, isBreaking, isFeatured),
+      CONSTRAINT fkArticlesCategory FOREIGN KEY (categoryId)
+        REFERENCES newscategories(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "subscribers",
+    `CREATE TABLE subscribers (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(150) NULL,
+      email VARCHAR(190) NOT NULL,
+      status ENUM('active','unsubscribed') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uqSubscribersEmail (email),
+      INDEX idxSubscribersStatus (status)
+    ) ENGINE=InnoDB`,
+  ],
+];
+
+const finance = () => [
+  [
+    "financeproducts",
+    `CREATE TABLE financeproducts (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(150) NOT NULL,
+      productType ENUM('loan','deposit','investment','insurance','card','other') NOT NULL DEFAULT 'loan',
+      description TEXT NULL,
+      interestRate DECIMAL(5,2) NULL,
+      minAmount DECIMAL(14,2) NULL,
+      maxAmount DECIMAL(14,2) NULL,
+      tenureMonths SMALLINT UNSIGNED NULL,
+      features JSON NULL,
+      imageUrl VARCHAR(500) NULL,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxFinanceProductsTypeStatus (productType, status)
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "financeapplications",
+    `CREATE TABLE financeapplications (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      productId BIGINT UNSIGNED NOT NULL,
+      applicantName VARCHAR(150) NOT NULL,
+      applicantEmail VARCHAR(190) NULL,
+      applicantPhone VARCHAR(30) NOT NULL,
+      amountRequested DECIMAL(14,2) NULL,
+      tenureMonths SMALLINT UNSIGNED NULL,
+      purpose VARCHAR(255) NULL,
+      message TEXT NULL,
+      status ENUM('new','in_review','approved','rejected','closed') NOT NULL DEFAULT 'new',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxFinanceApplicationsStatus (status, createdAt),
+      INDEX idxFinanceApplicationsProduct (productId, status),
+      CONSTRAINT fkFinanceApplicationsProduct FOREIGN KEY (productId)
+        REFERENCES financeproducts(id) ON DELETE RESTRICT
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "branches",
+    `CREATE TABLE branches (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(150) NOT NULL,
+      address VARCHAR(300) NOT NULL,
+      city VARCHAR(100) NOT NULL,
+      state VARCHAR(100) NULL,
+      zipCode VARCHAR(20) NULL,
+      phone VARCHAR(30) NULL,
+      email VARCHAR(190) NULL,
+      workingHours VARCHAR(255) NULL,
+      mapUrl VARCHAR(500) NULL,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxBranchesCityStatus (city, status)
+    ) ENGINE=InnoDB`,
+  ],
+];
+
+const agriculture = () => [
+  [
+    "cropcategories",
+    `CREATE TABLE cropcategories (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(150) NOT NULL,
+      description TEXT NULL,
+      imageUrl VARCHAR(500) NULL,
+      sortOrder INT UNSIGNED NOT NULL DEFAULT 0,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uqCropCategoriesName (name),
+      INDEX idxCropCategoriesOrder (status, sortOrder)
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "farmproducts",
+    `CREATE TABLE farmproducts (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      categoryId BIGINT UNSIGNED NULL,
+      name VARCHAR(190) NOT NULL,
+      description TEXT NULL,
+      price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      unit VARCHAR(30) NOT NULL DEFAULT 'kg',
+      stockQuantity DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      isOrganic TINYINT(1) NOT NULL DEFAULT 0,
+      harvestSeason VARCHAR(100) NULL,
+      origin VARCHAR(150) NULL,
+      imageUrl VARCHAR(500) NULL,
+      status ENUM('active','inactive','out_of_stock') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxFarmProductsCategoryStatus (categoryId, status),
+      CONSTRAINT fkFarmProductsCategory FOREIGN KEY (categoryId)
+        REFERENCES cropcategories(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "farminquiries",
+    `CREATE TABLE farminquiries (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      productId BIGINT UNSIGNED NULL,
+      customerName VARCHAR(150) NOT NULL,
+      customerEmail VARCHAR(190) NULL,
+      customerPhone VARCHAR(30) NOT NULL,
+      quantity DECIMAL(10,2) NULL,
+      deliveryAddress TEXT NULL,
+      message TEXT NULL,
+      status ENUM('new','contacted','confirmed','delivered','cancelled') NOT NULL DEFAULT 'new',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxFarmInquiriesStatus (status, createdAt),
+      CONSTRAINT fkFarmInquiriesProduct FOREIGN KEY (productId)
+        REFERENCES farmproducts(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB`,
+  ],
+];
+
+const consulting = () => [
+  [
+    "consultingservices",
+    `CREATE TABLE consultingservices (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(150) NOT NULL,
+      description TEXT NULL,
+      deliverables JSON NULL,
+      imageUrl VARCHAR(500) NULL,
+      sortOrder INT UNSIGNED NOT NULL DEFAULT 0,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uqConsultingServicesName (name),
+      INDEX idxConsultingServicesOrder (status, sortOrder)
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "consultants",
+    `CREATE TABLE consultants (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(150) NOT NULL,
+      designation VARCHAR(150) NULL,
+      expertise VARCHAR(255) NULL,
+      experienceYears TINYINT UNSIGNED NULL,
+      bio TEXT NULL,
+      photoUrl VARCHAR(500) NULL,
+      linkedinUrl VARCHAR(500) NULL,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxConsultantsStatus (status)
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "consultationrequests",
+    `CREATE TABLE consultationrequests (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      serviceId BIGINT UNSIGNED NULL,
+      consultantId BIGINT UNSIGNED NULL,
+      name VARCHAR(150) NOT NULL,
+      email VARCHAR(190) NOT NULL,
+      phone VARCHAR(30) NULL,
+      company VARCHAR(150) NULL,
+      preferredDate DATE NULL,
+      message TEXT NULL,
+      status ENUM('new','scheduled','completed','cancelled') NOT NULL DEFAULT 'new',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxConsultationRequestsStatus (status, createdAt),
+      CONSTRAINT fkConsultationRequestsService FOREIGN KEY (serviceId)
+        REFERENCES consultingservices(id) ON DELETE SET NULL,
+      CONSTRAINT fkConsultationRequestsConsultant FOREIGN KEY (consultantId)
+        REFERENCES consultants(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB`,
+  ],
+];
+
+const petcare = () => [
+  [
+    "petservices",
+    `CREATE TABLE petservices (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(150) NOT NULL,
+      petType VARCHAR(60) NULL COMMENT 'e.g. Dog, Cat, Bird, All',
+      description TEXT NULL,
+      duration INT UNSIGNED NULL COMMENT 'Duration in minutes',
+      price DECIMAL(10,2) NOT NULL,
+      imageUrl VARCHAR(500) NULL,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxPetServicesStatus (status, name)
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "veterinarians",
+    `CREATE TABLE veterinarians (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(150) NOT NULL,
+      qualification VARCHAR(255) NULL,
+      specialization VARCHAR(150) NULL,
+      experienceYears TINYINT UNSIGNED NULL,
+      bio TEXT NULL,
+      photoUrl VARCHAR(500) NULL,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxVeterinariansStatus (status)
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "petappointments",
+    `CREATE TABLE petappointments (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      serviceId BIGINT UNSIGNED NOT NULL,
+      veterinarianId BIGINT UNSIGNED NULL,
+      ownerName VARCHAR(150) NOT NULL,
+      ownerEmail VARCHAR(190) NULL,
+      ownerPhone VARCHAR(30) NOT NULL,
+      petName VARCHAR(100) NOT NULL,
+      petType VARCHAR(60) NULL,
+      petBreed VARCHAR(100) NULL,
+      appointmentDate DATE NOT NULL,
+      appointmentTime TIME NOT NULL,
+      notes TEXT NULL,
+      status ENUM('pending','confirmed','completed','cancelled') NOT NULL DEFAULT 'pending',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxPetAppointmentsDateStatus (appointmentDate, status),
+      CONSTRAINT fkPetAppointmentsService FOREIGN KEY (serviceId)
+        REFERENCES petservices(id) ON DELETE RESTRICT,
+      CONSTRAINT fkPetAppointmentsVet FOREIGN KEY (veterinarianId)
+        REFERENCES veterinarians(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB`,
+  ],
+];
+
+const daycare = () => [
+  [
+    "daycareprograms",
+    `CREATE TABLE daycareprograms (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(150) NOT NULL,
+      ageGroup VARCHAR(60) NOT NULL COMMENT 'e.g. 1-2 years, 3-5 years',
+      description TEXT NULL,
+      schedule VARCHAR(255) NULL,
+      monthlyFee DECIMAL(10,2) NULL,
+      capacity SMALLINT UNSIGNED NULL,
+      imageUrl VARCHAR(500) NULL,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxDaycareProgramsStatus (status, ageGroup)
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "caregivers",
+    `CREATE TABLE caregivers (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(150) NOT NULL,
+      role VARCHAR(120) NULL,
+      qualification VARCHAR(255) NULL,
+      experienceYears TINYINT UNSIGNED NULL,
+      bio TEXT NULL,
+      photoUrl VARCHAR(500) NULL,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxCaregiversStatus (status)
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "admissionenquiries",
+    `CREATE TABLE admissionenquiries (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      programId BIGINT UNSIGNED NULL,
+      parentName VARCHAR(150) NOT NULL,
+      parentEmail VARCHAR(190) NULL,
+      parentPhone VARCHAR(30) NOT NULL,
+      childName VARCHAR(150) NOT NULL,
+      childDob DATE NULL,
+      message TEXT NULL,
+      status ENUM('new','contacted','visit_scheduled','enrolled','closed') NOT NULL DEFAULT 'new',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxAdmissionEnquiriesStatus (status, createdAt),
+      CONSTRAINT fkAdmissionEnquiriesProgram FOREIGN KEY (programId)
+        REFERENCES daycareprograms(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB`,
+  ],
+];
+
+const dental = () => [
+  [
+    "dentalservices",
+    `CREATE TABLE dentalservices (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(150) NOT NULL,
+      description TEXT NULL,
+      duration INT UNSIGNED NULL COMMENT 'Duration in minutes',
+      priceFrom DECIMAL(10,2) NULL,
+      imageUrl VARCHAR(500) NULL,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uqDentalServicesName (name)
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "dentists",
+    `CREATE TABLE dentists (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(150) NOT NULL,
+      qualification VARCHAR(255) NULL,
+      specialization VARCHAR(150) NULL,
+      experienceYears TINYINT UNSIGNED NULL,
+      consultationFee DECIMAL(10,2) NULL,
+      bio TEXT NULL,
+      photoUrl VARCHAR(500) NULL,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxDentistsStatus (status)
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "dentalappointments",
+    `CREATE TABLE dentalappointments (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      serviceId BIGINT UNSIGNED NULL,
+      dentistId BIGINT UNSIGNED NULL,
+      patientName VARCHAR(150) NOT NULL,
+      patientEmail VARCHAR(190) NULL,
+      patientPhone VARCHAR(30) NOT NULL,
+      appointmentDate DATE NOT NULL,
+      appointmentTime TIME NOT NULL,
+      symptoms TEXT NULL,
+      status ENUM('pending','confirmed','completed','cancelled') NOT NULL DEFAULT 'pending',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxDentalAppointmentsDateStatus (appointmentDate, status),
+      INDEX idxDentalAppointmentsDentistDate (dentistId, appointmentDate),
+      CONSTRAINT fkDentalAppointmentsService FOREIGN KEY (serviceId)
+        REFERENCES dentalservices(id) ON DELETE SET NULL,
+      CONSTRAINT fkDentalAppointmentsDentist FOREIGN KEY (dentistId)
+        REFERENCES dentists(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB`,
+  ],
+];
+/* ------------------------------------------------------------------
+   ADDITIONAL PACKS — for categories currently mapped to "generic"
+   or mis-mapped to another pack. All table names are unique.
+------------------------------------------------------------------ */
+
+const mobileapps = () => [
+  [
+    "appcategories",
+    `CREATE TABLE appcategories (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(150) NOT NULL,
+      description TEXT NULL,
+      iconUrl VARCHAR(500) NULL,
+      sortOrder INT UNSIGNED NOT NULL DEFAULT 0,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uqAppCategoriesName (name),
+      INDEX idxAppCategoriesOrder (status, sortOrder)
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "mobileapps",
+    `CREATE TABLE mobileapps (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      categoryId BIGINT UNSIGNED NULL,
+      name VARCHAR(190) NOT NULL,
+      tagline VARCHAR(255) NULL,
+      description TEXT NULL,
+      platform ENUM('android','ios','both') NOT NULL DEFAULT 'both',
+      version VARCHAR(40) NULL,
+      sizeMb DECIMAL(8,2) NULL,
+      price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      isFree TINYINT(1) NOT NULL DEFAULT 1,
+      iconUrl VARCHAR(500) NULL,
+      bannerUrl VARCHAR(500) NULL,
+      screenshots JSON NULL,
+      storeUrlAndroid VARCHAR(500) NULL,
+      storeUrlIos VARCHAR(500) NULL,
+      downloadCount INT UNSIGNED NOT NULL DEFAULT 0,
+      rating DECIMAL(3,2) NULL,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxMobileAppsCategoryStatus (categoryId, status),
+      INDEX idxMobileAppsPlatform (platform, status),
+      CONSTRAINT fkMobileAppsCategory FOREIGN KEY (categoryId)
+        REFERENCES appcategories(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "appreviews",
+    `CREATE TABLE appreviews (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      appId BIGINT UNSIGNED NOT NULL,
+      reviewerName VARCHAR(150) NOT NULL,
+      rating TINYINT UNSIGNED NOT NULL,
+      comment TEXT NULL,
+      status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxAppReviewsAppStatus (appId, status, createdAt),
+      CONSTRAINT fkAppReviewsApp FOREIGN KEY (appId)
+        REFERENCES mobileapps(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB`,
+  ],
+];
+
+const interiordesign = () => [
+  [
+    "designservices",
+    `CREATE TABLE designservices (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(150) NOT NULL,
+      description TEXT NULL,
+      startingPrice DECIMAL(10,2) NULL,
+      imageUrl VARCHAR(500) NULL,
+      sortOrder INT UNSIGNED NOT NULL DEFAULT 0,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uqDesignServicesName (name),
+      INDEX idxDesignServicesOrder (status, sortOrder)
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "designprojects",
+    `CREATE TABLE designprojects (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      serviceId BIGINT UNSIGNED NULL,
+      title VARCHAR(190) NOT NULL,
+      description TEXT NULL,
+      clientName VARCHAR(150) NULL,
+      location VARCHAR(255) NULL,
+      style VARCHAR(100) NULL,
+      budget DECIMAL(12,2) NULL,
+      completionDate DATE NULL,
+      thumbnailUrl VARCHAR(500) NULL,
+      images JSON NULL,
+      featured TINYINT(1) NOT NULL DEFAULT 0,
+      sortOrder INT UNSIGNED NOT NULL DEFAULT 0,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxDesignProjectsServiceStatus (serviceId, status, sortOrder),
+      CONSTRAINT fkDesignProjectsService FOREIGN KEY (serviceId)
+        REFERENCES designservices(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "designinquiries",
+    `CREATE TABLE designinquiries (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      serviceId BIGINT UNSIGNED NULL,
+      name VARCHAR(150) NOT NULL,
+      email VARCHAR(190) NOT NULL,
+      phone VARCHAR(30) NULL,
+      projectType VARCHAR(120) NULL,
+      location VARCHAR(255) NULL,
+      budgetRange VARCHAR(60) NULL,
+      message TEXT NULL,
+      status ENUM('new','contacted','quoted','won','lost') NOT NULL DEFAULT 'new',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxDesignInquiriesStatus (status, createdAt),
+      CONSTRAINT fkDesignInquiriesService FOREIGN KEY (serviceId)
+        REFERENCES designservices(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB`,
+  ],
+];
+
+const music = () => [
+  [
+    "artists",
+    `CREATE TABLE artists (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(150) NOT NULL,
+      genre VARCHAR(100) NULL,
+      bio TEXT NULL,
+      photoUrl VARCHAR(500) NULL,
+      country VARCHAR(100) NULL,
+      websiteUrl VARCHAR(500) NULL,
+      spotifyUrl VARCHAR(500) NULL,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxArtistsStatusGenre (status, genre)
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "albums",
+    `CREATE TABLE albums (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      artistId BIGINT UNSIGNED NULL,
+      title VARCHAR(190) NOT NULL,
+      releaseDate DATE NULL,
+      coverUrl VARCHAR(500) NULL,
+      trackCount SMALLINT UNSIGNED NULL,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxAlbumsArtistStatus (artistId, status),
+      CONSTRAINT fkAlbumsArtist FOREIGN KEY (artistId)
+        REFERENCES artists(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "tracks",
+    `CREATE TABLE tracks (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      albumId BIGINT UNSIGNED NULL,
+      artistId BIGINT UNSIGNED NULL,
+      title VARCHAR(190) NOT NULL,
+      duration INT UNSIGNED NULL COMMENT 'Duration in seconds',
+      audioUrl VARCHAR(500) NULL,
+      lyrics TEXT NULL,
+      isExplicit TINYINT(1) NOT NULL DEFAULT 0,
+      playCount INT UNSIGNED NOT NULL DEFAULT 0,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxTracksAlbumStatus (albumId, status),
+      INDEX idxTracksArtistStatus (artistId, status),
+      CONSTRAINT fkTracksAlbum FOREIGN KEY (albumId)
+        REFERENCES albums(id) ON DELETE SET NULL,
+      CONSTRAINT fkTracksArtist FOREIGN KEY (artistId)
+        REFERENCES artists(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "eventshows",
+    `CREATE TABLE eventshows (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      artistId BIGINT UNSIGNED NULL,
+      title VARCHAR(190) NOT NULL,
+      venue VARCHAR(255) NOT NULL,
+      city VARCHAR(100) NULL,
+      showDateTime DATETIME NOT NULL,
+      ticketUrl VARCHAR(500) NULL,
+      priceFrom DECIMAL(10,2) NULL,
+      imageUrl VARCHAR(500) NULL,
+      status ENUM('upcoming','sold_out','completed','cancelled') NOT NULL DEFAULT 'upcoming',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxEventShowsArtistDate (artistId, showDateTime),
+      INDEX idxEventShowsStatusDate (status, showDateTime),
+      CONSTRAINT fkEventShowsArtist FOREIGN KEY (artistId)
+        REFERENCES artists(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB`,
+  ],
+];
+
+const streaming = () => [
+  [
+    "genres",
+    `CREATE TABLE genres (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(100) NOT NULL,
+      description TEXT NULL,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uqGenresName (name)
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "movies",
+    `CREATE TABLE movies (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      genreId BIGINT UNSIGNED NULL,
+      title VARCHAR(190) NOT NULL,
+      synopsis TEXT NULL,
+      releaseYear SMALLINT UNSIGNED NULL,
+      duration INT UNSIGNED NULL COMMENT 'Duration in minutes',
+      language VARCHAR(60) NULL,
+      director VARCHAR(150) NULL,
+      castList JSON NULL,
+      posterUrl VARCHAR(500) NULL,
+      bannerUrl VARCHAR(500) NULL,
+      trailerUrl VARCHAR(500) NULL,
+      streamUrl VARCHAR(500) NULL,
+      rating DECIMAL(3,1) NULL,
+      ageRating VARCHAR(20) NULL,
+      status ENUM('active','inactive','coming_soon') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxMoviesGenreStatus (genreId, status),
+      INDEX idxMoviesReleaseYear (status, releaseYear),
+      CONSTRAINT fkMoviesGenre FOREIGN KEY (genreId)
+        REFERENCES genres(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "subscriptionplans",
+    `CREATE TABLE subscriptionplans (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(150) NOT NULL,
+      description TEXT NULL,
+      price DECIMAL(10,2) NOT NULL,
+      billingPeriod ENUM('monthly','quarterly','yearly') NOT NULL DEFAULT 'monthly',
+      maxStreams TINYINT UNSIGNED NOT NULL DEFAULT 1,
+      videoQuality VARCHAR(20) NULL COMMENT 'e.g. SD, HD, 4K',
+      features JSON NULL,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uqSubscriptionPlansName (name)
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "watchlist",
+    `CREATE TABLE watchlist (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      movieId BIGINT UNSIGNED NOT NULL,
+      userEmail VARCHAR(190) NOT NULL,
+      addedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uqWatchlistMovieUser (movieId, userEmail),
+      CONSTRAINT fkWatchlistMovie FOREIGN KEY (movieId)
+        REFERENCES movies(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB`,
+  ],
+];
+
+const gaming = () => [
+  [
+    "gamecategories",
+    `CREATE TABLE gamecategories (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(150) NOT NULL,
+      description TEXT NULL,
+      iconUrl VARCHAR(500) NULL,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uqGameCategoriesName (name)
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "games",
+    `CREATE TABLE games (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      categoryId BIGINT UNSIGNED NULL,
+      title VARCHAR(190) NOT NULL,
+      description TEXT NULL,
+      platform ENUM('pc','playstation','xbox','nintendo','mobile','cross_platform') NOT NULL DEFAULT 'pc',
+      genre VARCHAR(100) NULL,
+      releaseDate DATE NULL,
+      coverUrl VARCHAR(500) NULL,
+      screenshots JSON NULL,
+      trailerUrl VARCHAR(500) NULL,
+      rating DECIMAL(3,1) NULL,
+      price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      isFree TINYINT(1) NOT NULL DEFAULT 0,
+      featured TINYINT(1) NOT NULL DEFAULT 0,
+      status ENUM('active','inactive','coming_soon') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxGamesCategoryStatus (categoryId, status),
+      INDEX idxGamesPlatformStatus (platform, status),
+      CONSTRAINT fkGamesCategory FOREIGN KEY (categoryId)
+        REFERENCES gamecategories(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "teams",
+    `CREATE TABLE teams (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(150) NOT NULL,
+      gameId BIGINT UNSIGNED NULL,
+      logoUrl VARCHAR(500) NULL,
+      region VARCHAR(100) NULL,
+      captainName VARCHAR(150) NULL,
+      foundedYear SMALLINT UNSIGNED NULL,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxTeamsGameStatus (gameId, status),
+      CONSTRAINT fkTeamsGame FOREIGN KEY (gameId)
+        REFERENCES games(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "tournaments",
+    `CREATE TABLE tournaments (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      gameId BIGINT UNSIGNED NULL,
+      title VARCHAR(190) NOT NULL,
+      description TEXT NULL,
+      format VARCHAR(100) NULL,
+      prizePool DECIMAL(12,2) NULL,
+      startDate DATE NOT NULL,
+      endDate DATE NULL,
+      registrationUrl VARCHAR(500) NULL,
+      bannerUrl VARCHAR(500) NULL,
+      maxTeams SMALLINT UNSIGNED NULL,
+      status ENUM('upcoming','ongoing','completed','cancelled') NOT NULL DEFAULT 'upcoming',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxTournamentsGameStatus (gameId, status, startDate),
+      CONSTRAINT fkTournamentsGame FOREIGN KEY (gameId)
+        REFERENCES games(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB`,
+  ],
+];
+
+const jewelry = () => [
+  [
+    "jewelrycategories",
+    `CREATE TABLE jewelrycategories (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(150) NOT NULL,
+      description TEXT NULL,
+      imageUrl VARCHAR(500) NULL,
+      sortOrder INT UNSIGNED NOT NULL DEFAULT 0,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uqJewelryCategoriesName (name),
+      INDEX idxJewelryCategoriesOrder (status, sortOrder)
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "jewelryproducts",
+    `CREATE TABLE jewelryproducts (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      categoryId BIGINT UNSIGNED NULL,
+      name VARCHAR(190) NOT NULL,
+      sku VARCHAR(100) NULL,
+      description TEXT NULL,
+      material VARCHAR(100) NULL COMMENT 'e.g. Gold, Silver, Platinum',
+      gemstone VARCHAR(100) NULL,
+      weightGrams DECIMAL(8,3) NULL,
+      purity VARCHAR(50) NULL COMMENT 'e.g. 18K, 22K, 925',
+      price DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+      salePrice DECIMAL(12,2) NULL,
+      stock INT UNSIGNED NOT NULL DEFAULT 0,
+      thumbnailUrl VARCHAR(500) NULL,
+      images JSON NULL,
+      featured TINYINT(1) NOT NULL DEFAULT 0,
+      status ENUM('active','inactive','out_of_stock') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uqJewelryProductsSku (sku),
+      INDEX idxJewelryProductsCategoryStatus (categoryId, status),
+      CONSTRAINT fkJewelryProductsCategory FOREIGN KEY (categoryId)
+        REFERENCES jewelrycategories(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "jewelryinquiries",
+    `CREATE TABLE jewelryinquiries (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      productId BIGINT UNSIGNED NULL,
+      customerName VARCHAR(150) NOT NULL,
+      customerEmail VARCHAR(190) NULL,
+      customerPhone VARCHAR(30) NOT NULL,
+      inquiryType ENUM('general','custom_design','price','availability','repair') NOT NULL DEFAULT 'general',
+      message TEXT NULL,
+      status ENUM('new','contacted','quoted','closed') NOT NULL DEFAULT 'new',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxJewelryInquiriesStatus (status, createdAt),
+      CONSTRAINT fkJewelryInquiriesProduct FOREIGN KEY (productId)
+        REFERENCES jewelryproducts(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB`,
+  ],
+];
+
+const furniture = () => [
+  [
+    "furniturecategories",
+    `CREATE TABLE furniturecategories (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(150) NOT NULL,
+      description TEXT NULL,
+      roomType VARCHAR(100) NULL COMMENT 'e.g. Living Room, Bedroom, Office',
+      imageUrl VARCHAR(500) NULL,
+      sortOrder INT UNSIGNED NOT NULL DEFAULT 0,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uqFurnitureCategoriesName (name),
+      INDEX idxFurnitureCategoriesOrder (status, sortOrder)
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "furnitureproducts",
+    `CREATE TABLE furnitureproducts (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      categoryId BIGINT UNSIGNED NULL,
+      name VARCHAR(190) NOT NULL,
+      sku VARCHAR(100) NULL,
+      description TEXT NULL,
+      material VARCHAR(150) NULL,
+      color VARCHAR(100) NULL,
+      dimensions VARCHAR(100) NULL COMMENT 'e.g. 200x90x80 cm',
+      weightKg DECIMAL(8,2) NULL,
+      price DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+      salePrice DECIMAL(12,2) NULL,
+      stock INT UNSIGNED NOT NULL DEFAULT 0,
+      thumbnailUrl VARCHAR(500) NULL,
+      images JSON NULL,
+      featured TINYINT(1) NOT NULL DEFAULT 0,
+      status ENUM('active','inactive','out_of_stock') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uqFurnitureProductsSku (sku),
+      INDEX idxFurnitureProductsCategoryStatus (categoryId, status),
+      CONSTRAINT fkFurnitureProductsCategory FOREIGN KEY (categoryId)
+        REFERENCES furniturecategories(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "customorders",
+    `CREATE TABLE customorders (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      productId BIGINT UNSIGNED NULL,
+      customerName VARCHAR(150) NOT NULL,
+      customerEmail VARCHAR(190) NULL,
+      customerPhone VARCHAR(30) NOT NULL,
+      requirements TEXT NOT NULL,
+      dimensions VARCHAR(100) NULL,
+      preferredMaterial VARCHAR(150) NULL,
+      budget DECIMAL(12,2) NULL,
+      status ENUM('new','designing','quoted','confirmed','completed','cancelled') NOT NULL DEFAULT 'new',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxCustomOrdersStatus (status, createdAt),
+      CONSTRAINT fkCustomOrdersProduct FOREIGN KEY (productId)
+        REFERENCES furnitureproducts(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB`,
+  ],
+];
+
+const grocery = () => [
+  [
+    "grocerycategories",
+    `CREATE TABLE grocerycategories (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(150) NOT NULL,
+      description TEXT NULL,
+      iconUrl VARCHAR(500) NULL,
+      sortOrder INT UNSIGNED NOT NULL DEFAULT 0,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uqGroceryCategoriesName (name),
+      INDEX idxGroceryCategoriesOrder (status, sortOrder)
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "groceryproducts",
+    `CREATE TABLE groceryproducts (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      categoryId BIGINT UNSIGNED NULL,
+      name VARCHAR(190) NOT NULL,
+      sku VARCHAR(100) NULL,
+      description TEXT NULL,
+      brand VARCHAR(150) NULL,
+      unit VARCHAR(30) NOT NULL DEFAULT 'pcs' COMMENT 'e.g. kg, g, L, ml, pcs',
+      price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      salePrice DECIMAL(10,2) NULL,
+      stockQuantity DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      isOrganic TINYINT(1) NOT NULL DEFAULT 0,
+      expiryDate DATE NULL,
+      thumbnailUrl VARCHAR(500) NULL,
+      images JSON NULL,
+      status ENUM('active','inactive','out_of_stock') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uqGroceryProductsSku (sku),
+      INDEX idxGroceryProductsCategoryStatus (categoryId, status),
+      CONSTRAINT fkGroceryProductsCategory FOREIGN KEY (categoryId)
+        REFERENCES grocerycategories(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "deliveryslots",
+    `CREATE TABLE deliveryslots (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      slotLabel VARCHAR(100) NOT NULL COMMENT 'e.g. 9AM-12PM',
+      startTime TIME NOT NULL,
+      endTime TIME NOT NULL,
+      maxOrders SMALLINT UNSIGNED NOT NULL DEFAULT 50,
+      daysOfWeek VARCHAR(100) NULL,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxDeliverySlotsStatus (status, startTime)
+    ) ENGINE=InnoDB`,
+  ],
+];
+
+const cafe = () => [
+  [
+    "cafecategories",
+    `CREATE TABLE cafecategories (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(150) NOT NULL,
+      description TEXT NULL,
+      sortOrder INT UNSIGNED NOT NULL DEFAULT 0,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uqCafeCategoriesName (name),
+      INDEX idxCafeCategoriesOrder (status, sortOrder)
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "cafeitems",
+    `CREATE TABLE cafeitems (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      categoryId BIGINT UNSIGNED NULL,
+      name VARCHAR(190) NOT NULL,
+      description TEXT NULL,
+      price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      sizeOptions JSON NULL COMMENT 'e.g. Small, Medium, Large with prices',
+      imageUrl VARCHAR(500) NULL,
+      isVeg TINYINT(1) NOT NULL DEFAULT 0,
+      isSignature TINYINT(1) NOT NULL DEFAULT 0,
+      calories SMALLINT UNSIGNED NULL,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxCafeItemsCategoryStatus (categoryId, status),
+      CONSTRAINT fkCafeItemsCategory FOREIGN KEY (categoryId)
+        REFERENCES cafecategories(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "tablebookings",
+    `CREATE TABLE tablebookings (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      customerName VARCHAR(150) NOT NULL,
+      customerEmail VARCHAR(190) NULL,
+      customerPhone VARCHAR(30) NOT NULL,
+      bookingDate DATE NOT NULL,
+      bookingTime TIME NOT NULL,
+      partySize TINYINT UNSIGNED NOT NULL,
+      seatingPreference ENUM('indoor','outdoor','window','any') NOT NULL DEFAULT 'any',
+      specialRequests TEXT NULL,
+      status ENUM('pending','confirmed','seated','cancelled','no_show') NOT NULL DEFAULT 'pending',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxTableBookingsDateStatus (bookingDate, status)
+    ) ENGINE=InnoDB`,
+  ],
+];
 
 module.exports = {
-  common,
-  generic: () => [],
-  school,
-  medical,
-  ecommerce,
-  restaurant,
-  hotel,
-  realestate,
-  gym,
-  blog,
-  portfolio,
-  eventmanagement,
-  ngo,
-  spa,
-  lawfirm,
+  common, school, medical, ecommerce, restaurant, hotel, realestate, gym,
+  blog, portfolio, eventmanagement, ngo, spa, lawfirm,
+  marketing, salon, news, finance, agriculture, consulting, petcare, daycare, dental,
+  mobileapps, interiordesign, music, streaming, gaming,
+  jewelry, furniture, grocery, cafe,
 };

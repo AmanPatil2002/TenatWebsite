@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Box,
@@ -8,6 +8,8 @@ import {
   Divider,
   Grid,
   IconButton,
+  ListSubheader,
+  MenuItem,
   Paper,
   Snackbar,
   Stack,
@@ -36,6 +38,95 @@ const BRAND = {
   muted: "#64748b",
 };
 
+/* ------------------------------------------------------------------ *
+ * PACK CATALOG — single source of truth.
+ *  - `key`   : the raw value stored in categories.packKey (API contract)
+ *  - `label` : human-friendly label shown in the dropdown and chips
+ *  - `group` : subheader used to group the dropdown into sections
+ * Ordered by domain so the dropdown reads naturally.
+ * ------------------------------------------------------------------ */
+const PACK_CATALOG = [
+  // --- Education -------------------------------------------------
+  { key: "school",         label: "School / Education",     group: "Education" },
+  { key: "daycare",        label: "Daycare / Preschool",    group: "Education" },
+
+  // --- Health & Medical ------------------------------------------
+  { key: "medical",        label: "Medical / Clinic",       group: "Health & Medical" },
+  { key: "dental",         label: "Dental Clinic",          group: "Health & Medical" },
+  { key: "petcare",        label: "Pet Care / Veterinary",  group: "Health & Medical" },
+
+  // --- Commerce & Retail -----------------------------------------
+  { key: "ecommerce",      label: "E-commerce / Shopping",  group: "Commerce & Retail" },
+  { key: "grocery",        label: "Grocery & Supermarket",  group: "Commerce & Retail" },
+  { key: "jewelry",        label: "Jewelry & Accessories",  group: "Commerce & Retail" },
+  { key: "furniture",      label: "Furniture & Home Decor", group: "Commerce & Retail" },
+  { key: "agriculture",    label: "Agriculture & Farming",  group: "Commerce & Retail" },
+
+  // --- Food & Hospitality ----------------------------------------
+  { key: "restaurant",     label: "Restaurant & Food",      group: "Food & Hospitality" },
+  { key: "cafe",           label: "Café & Coffee Shop",     group: "Food & Hospitality" },
+  { key: "hotel",          label: "Hotel & Resort",         group: "Food & Hospitality" },
+  { key: "spa",            label: "Spa & Massage",          group: "Food & Hospitality" },
+  { key: "salon",          label: "Beauty & Salon",         group: "Food & Hospitality" },
+  { key: "gym",            label: "Fitness & Gym",          group: "Food & Hospitality" },
+
+  // --- Professional Services -------------------------------------
+  { key: "lawfirm",        label: "Legal / Law Firm",       group: "Professional Services" },
+  { key: "consulting",     label: "Consulting & Business",  group: "Professional Services" },
+  { key: "finance",        label: "Finance & Banking",      group: "Professional Services" },
+  { key: "marketing",      label: "Digital Marketing",      group: "Professional Services" },
+  { key: "realestate",     label: "Real Estate & Property", group: "Professional Services" },
+  { key: "interiordesign", label: "Interior Design",        group: "Professional Services" },
+
+  // --- Events & Media --------------------------------------------
+  { key: "eventmanagement",label: "Wedding & Events",       group: "Events & Media" },
+  { key: "news",           label: "News & Magazine",        group: "Events & Media" },
+  { key: "blog",           label: "Blog & Personal",        group: "Events & Media" },
+  { key: "portfolio",      label: "Portfolio & Creative",   group: "Events & Media" },
+  { key: "music",          label: "Music & Entertainment",  group: "Events & Media" },
+  { key: "streaming",      label: "Movies & Streaming",     group: "Events & Media" },
+  { key: "gaming",         label: "Gaming & Esports",       group: "Events & Media" },
+
+  // --- Apps & Technology -----------------------------------------
+  { key: "mobileapps",     label: "Mobile Applications",    group: "Apps & Technology" },
+
+  // --- Community -------------------------------------------------
+  { key: "ngo",            label: "Non-profit & Charity",   group: "Community" },
+];
+
+/* Fast lookups derived once from the catalog. */
+const PACK_BY_KEY = new Map(PACK_CATALOG.map((p) => [p.key, p]));
+const PACK_GROUPS = (() => {
+  const order = [];
+  const map = new Map();
+  for (const p of PACK_CATALOG) {
+    if (!map.has(p.group)) {
+      map.set(p.group, []);
+      order.push(p.group);
+    }
+    map.get(p.group).push(p);
+  }
+  return order.map((group) => ({ group, items: map.get(group) }));
+})();
+
+/* Turn a raw key into a display label. Falls back to a prettified
+ * version of the key so legacy values (e.g. "generic") still render. */
+const titleCase = (s) =>
+  s
+    .replace(/[-_]+/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
+    .join(" ");
+
+const packLabel = (key) => {
+  if (!key) return null;
+  const hit = PACK_BY_KEY.get(key);
+  return hit ? hit.label : titleCase(key);
+};
+
 // Limits mirror the controller and the categories table columns.
 const NAME_MAX = 190; // name    VARCHAR(190)
 const PACK_KEY_MAX = 30; // packKey VARCHAR(30)
@@ -49,12 +140,6 @@ const headCellSx = {
   fontWeight: 700,
   bgcolor: alpha(BRAND.indigo, 0.04),
   color: BRAND.ink,
-};
-
-const formatDate = (value) => {
-  if (!value) return "—";
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString();
 };
 
 const errorMessage = (error, fallback) => {
@@ -82,6 +167,39 @@ function SectionLabel({ children }) {
     >
       {children}
     </Typography>
+  );
+}
+
+/* Pretty chip that renders a pack key using its label. */
+function PackChip({ packKey }) {
+  if (!packKey) {
+    return (
+      <Typography variant="caption" sx={{ color: BRAND.muted }}>
+        No pack key
+      </Typography>
+    );
+  }
+  return (
+    <Chip
+      size="small"
+      variant="outlined"
+      label={packLabel(packKey)}
+      title={packKey} /* hover shows the raw key */
+      sx={{
+        mt: 0.5,
+        maxWidth: "100%",
+        borderColor: alpha(BRAND.indigo, 0.35),
+        color: BRAND.indigoDeep,
+        fontWeight: 600,
+        fontSize: "0.72rem",
+        "& .MuiChip-label": {
+          display: "block",
+          whiteSpace: "normal",
+          overflowWrap: "anywhere",
+          py: 0.25,
+        },
+      }}
+    />
   );
 }
 
@@ -133,6 +251,13 @@ function CategoryForm({
     });
   };
 
+  /* If the current value isn't in the catalog (legacy row), surface it
+   * under a "Legacy" group so admins can see/fix it. */
+  const legacyValue =
+    formData.packKey && !PACK_BY_KEY.has(formData.packKey)
+      ? formData.packKey
+      : null;
+
   return (
     <Box component="form" onSubmit={handleSubmit} noValidate>
       <Stack spacing={2}>
@@ -150,21 +275,67 @@ function CategoryForm({
           autoFocus
           sx={fieldSx}
         />
+
         <TextField
+          select
           fullWidth
           size="small"
           name="packKey"
-          label="Pack key (optional)"
+          label="Pack key"
           value={formData.packKey}
           onChange={handleChange}
           error={!!errors.packKey}
           helperText={
-            errors.packKey ||
-            "Template pack, e.g. school, restaurant, ecommerce, medical, generic"
+            errors.packKey || "Template pack used to build this category's site"
           }
-          slotProps={{ htmlInput: { maxLength: PACK_KEY_MAX } }}
           sx={fieldSx}
-        />
+          slotProps={{
+            select: {
+              displayEmpty: true,
+              renderValue: (v) =>
+                v ? packLabel(v) : <em style={{ color: BRAND.muted }}>None</em>,
+              MenuProps: { PaperProps: { sx: { maxHeight: 320 } } },
+            },
+            inputLabel: { shrink: true },
+          }}
+        >
+          <MenuItem value="">
+            <em>None</em>
+          </MenuItem>
+
+          {legacyValue && (
+            <ListSubheader sx={{ bgcolor: "background.paper" }}>
+              Legacy
+            </ListSubheader>
+          )}
+          {legacyValue && (
+            <MenuItem value={legacyValue}>
+              {titleCase(legacyValue)}{" "}
+              <Typography
+                component="span"
+                variant="caption"
+                sx={{ ml: 1, color: BRAND.muted }}
+              >
+                ({legacyValue})
+              </Typography>
+            </MenuItem>
+          )}
+
+          {PACK_GROUPS.map(({ group, items }) => [
+            <ListSubheader
+              key={`grp-${group}`}
+              sx={{ bgcolor: "background.paper", fontWeight: 700 }}
+            >
+              {group}
+            </ListSubheader>,
+            ...items.map((p) => (
+              <MenuItem key={p.key} value={p.key}>
+                {p.label}
+              </MenuItem>
+            )),
+          ])}
+        </TextField>
+
         <TextField
           fullWidth
           size="small"
@@ -177,6 +348,7 @@ function CategoryForm({
           slotProps={{ htmlInput: { maxLength: TAG_MAX } }}
           sx={fieldSx}
         />
+
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={1.5}
@@ -341,10 +513,13 @@ export default function AddCategory() {
     }
   };
 
-  const editingCategory =
-    editingId != null
-      ? categories.find((c) => c.categoryId === editingId)
-      : null;
+  const editingCategory = useMemo(
+    () =>
+      editingId != null
+        ? categories.find((c) => c.categoryId === editingId)
+        : null,
+    [categories, editingId],
+  );
 
   return (
     <Box
@@ -429,7 +604,11 @@ export default function AddCategory() {
                 <Box sx={{ minWidth: 0 }}>
                   <Typography
                     variant="h6"
-                    sx={{ fontWeight: 700, color: BRAND.ink, lineHeight: 1.25 }}
+                    sx={{
+                      fontWeight: 700,
+                      color: BRAND.ink,
+                      lineHeight: 1.25,
+                    }}
                   >
                     {editingCategory ? "Edit category" : "New category"}
                   </Typography>
@@ -602,26 +781,7 @@ export default function AddCategory() {
                             >
                               {c.name}
                             </Typography>
-                            {c.packKey ? (
-                              <Chip
-                                size="small"
-                                variant="outlined"
-                                label={c.packKey}
-                                sx={{
-                                  borderColor: alpha(BRAND.indigo, 0.35),
-                                  color: BRAND.indigoDeep,
-                                  fontWeight: 600,
-                                  fontSize: "0.72rem",
-                                }}
-                              />
-                            ) : (
-                              <Typography
-                                variant="caption"
-                                sx={{ color: BRAND.muted }}
-                              >
-                                No pack key
-                              </Typography>
-                            )}
+                            <PackChip packKey={c.packKey} />
                           </TableCell>
 
                           <TableCell sx={{ verticalAlign: "middle", py: 1.5 }}>
