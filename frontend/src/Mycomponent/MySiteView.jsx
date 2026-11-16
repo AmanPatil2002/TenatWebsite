@@ -22,144 +22,118 @@ import { createSiteSlug } from "../utils/siteSlug";
 /* ------------------------------------------------------------------ */
 /* Inline SVG icons (no @mui/icons-material dependency)                */
 /* ------------------------------------------------------------------ */
-const LaptopIcon = (props) => (
-  <svg
-    width="20"
-    height="20"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-    {...props}
-  >
+const strokeIcon = (size, children) => {
+  const Icon = (props) => (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      {...props}
+    >
+      {children}
+    </svg>
+  );
+  return Icon;
+};
+
+const fillIcon = (size, children) => {
+  const Icon = (props) => (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+      {...props}
+    >
+      {children}
+    </svg>
+  );
+  return Icon;
+};
+
+const LaptopIcon = strokeIcon(
+  20,
+  <>
     <rect x="3" y="4" width="18" height="12" rx="1.5" />
     <path d="M2 20h20" />
-  </svg>
+  </>,
 );
 
-const TabletIcon = (props) => (
-  <svg
-    width="20"
-    height="20"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-    {...props}
-  >
+const TabletIcon = strokeIcon(
+  20,
+  <>
     <rect x="4" y="2" width="16" height="20" rx="2" />
     <path d="M12 18h.01" />
-  </svg>
+  </>,
 );
 
-const PhoneIcon = (props) => (
-  <svg
-    width="20"
-    height="20"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-    {...props}
-  >
+const PhoneIcon = strokeIcon(
+  20,
+  <>
     <rect x="6" y="2" width="12" height="20" rx="2.5" />
     <path d="M11 18h2" />
-  </svg>
+  </>,
 );
 
-const CloseIcon = (props) => (
-  <svg
-    width="20"
-    height="20"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-    {...props}
-  >
-    <path d="M18 6 6 18M6 6l12 12" />
-  </svg>
+const CloseIcon = strokeIcon(20, <path d="M18 6 6 18M6 6l12 12" />);
+
+const ArrowLeftIcon = strokeIcon(18, <path d="M19 12H5M12 19l-7-7 7-7" />);
+
+const FacebookIcon = fillIcon(
+  18,
+  <path d="M13.5 21v-7.5h2.5l.4-3H13.5V8.6c0-.9.3-1.5 1.6-1.5h1.5V4.4c-.3 0-1.2-.1-2.3-.1-2.3 0-3.8 1.4-3.8 3.9v2.3H8v3h2.5V21h3z" />,
 );
 
-const ArrowLeftIcon = (props) => (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-    {...props}
-  >
-    <path d="M19 12H5M12 19l-7-7 7-7" />
-  </svg>
-);
-
-const FacebookIcon = (props) => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
-    <path d="M13.5 21v-7.5h2.5l.4-3H13.5V8.6c0-.9.3-1.5 1.6-1.5h1.5V4.4c-.3 0-1.2-.1-2.3-.1-2.3 0-3.8 1.4-3.8 3.9v2.3H8v3h2.5V21h3z" />
-  </svg>
-);
-
-const InstagramIcon = (props) => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+const InstagramIcon = strokeIcon(
+  18,
+  <>
     <rect x="3" y="3" width="18" height="18" rx="5" />
     <circle cx="12" cy="12" r="4" />
     <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
-  </svg>
+  </>,
 );
 
-const YouTubeIcon = (props) => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
-    <path d="M21.6 7.2a2.6 2.6 0 0 0-1.8-1.8C18.2 5 12 5 12 5s-6.2 0-7.8.4A2.6 2.6 0 0 0 2.4 7.2 27 27 0 0 0 2 12a27 27 0 0 0 .4 4.8 2.6 2.6 0 0 0 1.8 1.8C5.8 19 12 19 12 19s6.2 0 7.8-.4a2.6 2.6 0 0 0 1.8-1.8A27 27 0 0 0 22 12a27 27 0 0 0-.4-4.8zM10 15V9l5.2 3L10 15z" />
-  </svg>
+const YouTubeIcon = fillIcon(
+  18,
+  <path d="M21.6 7.2a2.6 2.6 0 0 0-1.8-1.8C18.2 5 12 5 12 5s-6.2 0-7.8.4A2.6 2.6 0 0 0 2.4 7.2 27 27 0 0 0 2 12a27 27 0 0 0 .4 4.8 2.6 2.6 0 0 0 1.8 1.8C5.8 19 12 19 12 19s6.2 0 7.8-.4a2.6 2.6 0 0 0 1.8-1.8A27 27 0 0 0 22 12a27 27 0 0 0-.4-4.8zM10 15V9l5.2 3L10 15z" />,
 );
 
-const TwitterIcon = (props) => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
-    <path d="M17.5 3h3l-6.6 7.6L21.8 21h-6.1l-4.8-6.2L5.4 21H2.4l7-8L2.6 3h6.2l4.3 5.7L17.5 3zm-1.1 16.1h1.7L7.7 4.8H5.9l10.5 14.3z" />
-  </svg>
+const TwitterIcon = fillIcon(
+  18,
+  <path d="M17.5 3h3l-6.6 7.6L21.8 21h-6.1l-4.8-6.2L5.4 21H2.4l7-8L2.6 3h6.2l4.3 5.7L17.5 3zm-1.1 16.1h1.7L7.7 4.8H5.9l10.5 14.3z" />,
 );
 
-const LinkedInIcon = (props) => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
-    <path d="M4.98 3.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM3 9h4v12H3V9zm7 0h3.8v1.7h.1c.5-.9 1.8-1.9 3.7-1.9 4 0 4.7 2.6 4.7 6V21h-4v-5.3c0-1.3 0-2.9-1.8-2.9s-2.1 1.4-2.1 2.8V21h-4V9z" />
-  </svg>
+const LinkedInIcon = fillIcon(
+  18,
+  <path d="M4.98 3.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM3 9h4v12H3V9zm7 0h3.8v1.7h.1c.5-.9 1.8-1.9 3.7-1.9 4 0 4.7 2.6 4.7 6V21h-4v-5.3c0-1.3 0-2.9-1.8-2.9s-2.1 1.4-2.1 2.8V21h-4V9z" />,
 );
 
-const PlaceIcon = (props) => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+const PlaceIcon = strokeIcon(
+  18,
+  <>
     <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z" />
     <circle cx="12" cy="10" r="3" />
-  </svg>
+  </>,
 );
 
-const PhoneOutlineIcon = (props) => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
-    <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.7 2.6a2 2 0 0 1-.5 2.1L8.1 9.6a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.8.4 1.7.6 2.6.7a2 2 0 0 1 1.7 2z" />
-  </svg>
+const PhoneOutlineIcon = strokeIcon(
+  18,
+  <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.7 2.6a2 2 0 0 1-.5 2.1L8.1 9.6a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.8.4 1.7.6 2.6.7a2 2 0 0 1 1.7 2z" />,
 );
 
-const EmailIcon = (props) => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+const EmailIcon = strokeIcon(
+  18,
+  <>
     <rect x="3" y="5" width="18" height="14" rx="2" />
     <path d="m3 7 9 6 9-6" />
-  </svg>
+  </>,
 );
 
 /* ------------------------------------------------------------------ */
@@ -285,51 +259,160 @@ const renderSlider = (items) => {
 
 const SLIDER_MARKER = /<!--\s*SITE_SLIDER\s*-->/i;
 
+/* ------------------------------------------------------------------ */
+/* Hydration: relationships                                            */
+/* ------------------------------------------------------------------ */
+
+// Helper: describe "this foreign key points at <entity>; copy <source> into <field>".
+const rel = (entity, field, source = "name", fallback) => ({
+  entity,
+  fields: { [field]: source },
+  ...(fallback ? { fallback: { [field]: fallback } } : {}),
+});
 
 const HYDRATION_RELATIONSHIPS = {
+  /* school */
   students: {
     classId: {
       entity: "classes",
       fields: {
         className: (record) =>
-          `${record.name || ""}${
-            record.section ? ` - ${record.section}` : ""
-          }`,
+          `${record.name || ""}${record.section ? ` - ${record.section}` : ""}`,
       },
     },
   },
 
   classes: {
-    classTeacherId: {
-      entity: "teachers",
-      fields: {
-        classTeacherName: "name",
-      },
-    },
+    classTeacherId: rel("teachers", "classTeacherName"),
   },
 
+  /* ecommerce */
   products: {
-    categoryId: {
-      entity: "productcategories",
-      fields: {
-        categoryName: "name",
-      },
-      fallback: {
-        categoryName: "Uncategorized",
-      },
-    },
+    categoryId: rel(
+      "productcategories",
+      "categoryName",
+      "name",
+      "Uncategorized",
+    ),
   },
+
+  /* medical */
+  doctors: {
+    departmentId: rel(
+      "departments",
+      "departmentName",
+      "name",
+      "General Department",
+    ),
+  },
+
+  /* restaurant */
+  menuitems: { categoryId: rel("menucategories", "categoryName") },
+
+  /* hotel */
+  rooms: { roomTypeId: rel("roomtypes", "roomTypeName") },
+
+  /* real estate */
+  properties: { propertyTypeId: rel("propertytypes", "propertyTypeName") },
+
+  /* gym */
+  members: { planId: rel("membershipplans", "planName") },
+
+  /* blog */
+  blogposts: { categoryId: rel("blogcategories", "categoryName") },
+
+  /* portfolio */
+  projects: { categoryId: rel("projectcategories", "categoryName") },
+
+  /* events */
+  events: { eventTypeId: rel("eventtypes", "eventTypeName") },
+
+  /* spa */
+  services: { categoryId: rel("servicecategories", "categoryName") },
+
+  /* law firm */
+  attorneys: { practiceAreaId: rel("practiceareas", "practiceAreaName") },
+  caseinquiries: { practiceAreaId: rel("practiceareas", "practiceAreaName") },
+
+  /* marketing */
+  casestudies: { serviceId: rel("marketingservices", "serviceName") },
+  leads: { serviceId: rel("marketingservices", "serviceName") },
+
+  /* news */
+  articles: { categoryId: rel("newscategories", "categoryName") },
+
+  /* agriculture */
+  farmproducts: { categoryId: rel("cropcategories", "categoryName") },
+
+  /* mobile apps */
+  mobileapps: { categoryId: rel("appcategories", "categoryName") },
+
+  /* streaming */
+  movies: { genreId: rel("genres", "genreName") },
+
+  /* gaming */
+  games: { categoryId: rel("gamecategories", "categoryName") },
+  teams: { gameId: rel("games", "gameTitle", "title") },
+  tournaments: { gameId: rel("games", "gameTitle", "title") },
+
+  /* jewelry / furniture / grocery / cafe */
+  jewelryproducts: { categoryId: rel("jewelrycategories", "categoryName") },
+  furnitureproducts: { categoryId: rel("furniturecategories", "categoryName") },
+  groceryproducts: { categoryId: rel("grocerycategories", "categoryName") },
+  cafeitems: { categoryId: rel("cafecategories", "categoryName") },
+
+  /* interior design */
+  designprojects: { serviceId: rel("designservices", "serviceName") },
+
+  /* music */
+  albums: { artistId: rel("artists", "artistName") },
+  tracks: {
+    artistId: rel("artists", "artistName"),
+    albumId: rel("albums", "albumTitle", "title"),
+  },
+  eventshows: { artistId: rel("artists", "artistName") },
+
+  /* dental / pet care / salon / consulting / daycare */
+  dentalappointments: {
+    serviceId: rel("dentalservices", "serviceName"),
+    dentistId: rel("dentists", "dentistName"),
+  },
+  petappointments: {
+    serviceId: rel("petservices", "serviceName"),
+    veterinarianId: rel("veterinarians", "veterinarianName"),
+  },
+  salonbookings: {
+    serviceId: rel("salonservices", "serviceName"),
+    stylistId: rel("stylists", "stylistName"),
+  },
+  consultationrequests: {
+    serviceId: rel("consultingservices", "serviceName"),
+    consultantId: rel("consultants", "consultantName"),
+  },
+  admissionenquiries: { programId: rel("daycareprograms", "programName") },
 };
 
+/* Statuses that should never be shown on a public page.
+   Everything else (active, available, upcoming, published, ...) is shown. */
+const HIDDEN_STATUSES = new Set([
+  "inactive",
+  "draft",
+  "archived",
+  "unsubscribed",
+  "spam",
+  "rejected",
+  "cancelled",
+  "expired",
+  "suspended",
+  "paused",
+]);
 
 /* --------------------------------
    Utility functions
 --------------------------------- */
 
 const isEmpty = (value) =>
-  value === null ||
-  value === undefined ||
-  value === "";
+  value === null || value === undefined || value === "";
 
 const getNestedValue = (object, path) => {
   if (!object || !path) return undefined;
@@ -344,10 +427,70 @@ const resolveEntity = (entity, siteData) => {
     categories: "productcategories",
   };
 
-  return siteData[entity] ??
-    siteData[aliases[entity] || entity];
+  return siteData[entity] ?? siteData[aliases[entity] || entity];
 };
 
+/* --------------------------------
+   Value formatting
+   <span data-field="price" data-format="currency" data-currency="INR">
+--------------------------------- */
+
+const formatValue = (value, format, element) => {
+  if (isEmpty(value)) return value;
+
+  // JSON columns (features, amenities, tags...) arrive as arrays.
+  if (Array.isArray(value)) return value.join(", ");
+
+  if (!format) return value;
+
+  if (format === "currency") {
+    const number = Number(value);
+    if (Number.isNaN(number)) return value;
+    try {
+      return new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: element.getAttribute("data-currency") || "INR",
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+      }).format(number);
+    } catch {
+      return value;
+    }
+  }
+
+  if (format === "number") {
+    const number = Number(value);
+    return Number.isNaN(number) ? value : number.toLocaleString("en-IN");
+  }
+
+  if (format === "date") {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime())
+      ? value
+      : date.toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        });
+  }
+
+  if (format === "datetime") {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime())
+      ? value
+      : date.toLocaleString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        });
+  }
+
+  if (format === "time") return String(value).slice(0, 5);
+
+  return value;
+};
 
 /* --------------------------------
    Relationship maps
@@ -360,10 +503,7 @@ const createEntityMaps = (siteData) => {
     if (!Array.isArray(records)) return;
 
     maps[entity] = new Map(
-      records.map((record) => [
-        String(record.id),
-        record,
-      ])
+      records.map((record) => [String(record.id), record]),
     );
   });
 
@@ -374,7 +514,6 @@ const createEntityMaps = (siteData) => {
   return maps;
 };
 
-
 /* --------------------------------
    Entity enrichment
 --------------------------------- */
@@ -382,41 +521,33 @@ const createEntityMaps = (siteData) => {
 const enrichEntity = (entity, item, maps) => {
   const result = { ...item };
 
-  const relationships =
-    HYDRATION_RELATIONSHIPS[entity] || {};
+  const relationships = HYDRATION_RELATIONSHIPS[entity] || {};
 
-  Object.entries(relationships).forEach(
-    ([foreignKey, config]) => {
-      const related = maps[config.entity]?.get(
-        String(item[foreignKey])
-      );
+  Object.entries(relationships).forEach(([foreignKey, config]) => {
+    const related = maps[config.entity]?.get(String(item[foreignKey]));
 
-      if (related) {
-        Object.entries(config.fields || {}).forEach(
-          ([targetField, sourceField]) => {
-            if (!isEmpty(result[targetField])) return;
+    if (related) {
+      Object.entries(config.fields || {}).forEach(
+        ([targetField, sourceField]) => {
+          if (!isEmpty(result[targetField])) return;
 
-            result[targetField] =
-              typeof sourceField === "function"
-                ? sourceField(related)
-                : getNestedValue(related, sourceField);
-          }
-        );
-      }
-
-      Object.entries(config.fallback || {}).forEach(
-        ([field, fallback]) => {
-          if (isEmpty(result[field])) {
-            result[field] = fallback;
-          }
-        }
+          result[targetField] =
+            typeof sourceField === "function"
+              ? sourceField(related)
+              : getNestedValue(related, sourceField);
+        },
       );
     }
-  );
+
+    Object.entries(config.fallback || {}).forEach(([field, fallback]) => {
+      if (isEmpty(result[field])) {
+        result[field] = fallback;
+      }
+    });
+  });
 
   return result;
 };
-
 
 /* --------------------------------
    Safe attribute rendering
@@ -429,13 +560,16 @@ const renderField = (element, item) => {
 
   const value = getNestedValue(item, field);
   const attr = element.getAttribute("data-attr");
+  const fallback = element.getAttribute("data-fallback");
 
   if (!attr) {
-    const fallback = element.getAttribute("data-fallback");
+    const shown = formatValue(
+      value,
+      element.getAttribute("data-format"),
+      element,
+    );
 
-    element.textContent = isEmpty(value)
-      ? fallback ?? "—"
-      : String(value);
+    element.textContent = isEmpty(shown) ? (fallback ?? "—") : String(shown);
 
     return;
   }
@@ -452,29 +586,29 @@ const renderField = (element, item) => {
 
   if (!allowedAttributes.includes(attr)) return;
 
-  let output = value;
+    let output = value;
 
   if (attr === "src" && !isEmpty(value)) {
-    output =
-      typeof resolveMediaImage === "function"
-        ? resolveMediaImage(value)
-        : value;
+    output = resolveMediaImage(value);
+  }
+
+  // data-prefix="tel:" / "mailto:" builds the link from a raw value
+  const prefix = element.getAttribute("data-prefix");
+  if (attr === "href" && prefix && !isEmpty(value)) {
+    const clean =
+      prefix === "tel:" ? String(value).replace(/[^\d+]/g, "") : String(value).trim();
+    output = `${prefix}${clean}`;
   }
 
   if (attr === "src" || attr === "href") {
     if (!isEmpty(output)) {
       try {
-        const url = new URL(
-          String(output),
-          "https://hydration.invalid"
-        );
-
-        const relative =
-          !/^[a-z][a-z0-9+.-]*:/i.test(String(output));
+        const url = new URL(String(output), "https://hydration.invalid");
+        const relative = !/^[a-z][a-z0-9+.-]*:/i.test(String(output));
 
         if (
           !relative &&
-          !["http:", "https:"].includes(url.protocol)
+          !["http:", "https:", "mailto:", "tel:"].includes(url.protocol)
         ) {
           output = "";
         }
@@ -484,23 +618,21 @@ const renderField = (element, item) => {
     }
   }
 
+  // Attributes honour data-fallback too (e.g. placeholder images).
+  if (isEmpty(output) && !isEmpty(fallback)) {
+    output = fallback;
+  }
+
   if (isEmpty(output)) {
     element.removeAttribute(attr);
   } else {
     element.setAttribute(attr, String(output));
   }
 
-  if (
-    attr === "target" &&
-    output === "_blank"
-  ) {
-    element.setAttribute(
-      "rel",
-      "noopener noreferrer"
-    );
+  if (attr === "target" && output === "_blank") {
+    element.setAttribute("rel", "noopener noreferrer");
   }
 };
-
 
 /* --------------------------------
    Recursive hydration
@@ -512,10 +644,7 @@ const hydrateContainer = (container, siteData, maps) => {
   const source = resolveEntity(entity, siteData);
 
   const template = Array.from(container.children)
-    .flatMap((child) => [
-      child,
-      ...child.querySelectorAll("[data-row]"),
-    ])
+    .flatMap((child) => [child, ...child.querySelectorAll("[data-row]")])
     .find((element) => element.hasAttribute("data-row"));
 
   if (!template || !Array.isArray(source)) return;
@@ -524,9 +653,10 @@ const hydrateContainer = (container, siteData, maps) => {
   const holder = template.parentElement;
   const rowTemplate = template.cloneNode(true);
 
-  const rows = source.filter((record) => {
-    return !record.status || record.status === "active";
-  });
+  // Hide only unwanted statuses; available / upcoming / published etc. are shown.
+  const rows = source.filter(
+    (record) => !HIDDEN_STATUSES.has(String(record.status ?? "").toLowerCase()),
+  );
 
   holder.replaceChildren();
 
@@ -536,11 +666,9 @@ const hydrateContainer = (container, siteData, maps) => {
     empty.className = "hydration-empty-state";
 
     empty.textContent =
-      container.getAttribute("data-empty-text") ||
-      "No records added yet.";
+      container.getAttribute("data-empty-text") || "No records added yet.";
 
-    empty.style.cssText =
-      "text-align:center;opacity:.7;padding:16px;";
+    empty.style.cssText = "text-align:center;opacity:.7;padding:16px;";
 
     holder.appendChild(empty);
 
@@ -552,42 +680,35 @@ const hydrateContainer = (container, siteData, maps) => {
 
     const row = rowTemplate.cloneNode(true);
 
+    // The row element itself may carry data-field.
+    if (row.hasAttribute?.("data-field")) renderField(row, item);
+
     // Hydrate fields belonging to this row.
-    row.querySelectorAll("[data-field]").forEach(
-      (element) => renderField(element, item)
-    );
+    row
+      .querySelectorAll("[data-field]")
+      .forEach((element) => renderField(element, item));
 
     // Hydrate nested entity containers independently.
-    row.querySelectorAll("[data-entity]").forEach(
-      (nestedContainer) => {
-        hydrateContainer(
-          nestedContainer,
-          siteData,
-          maps
-        );
-      }
-    );
+    row.querySelectorAll("[data-entity]").forEach((nestedContainer) => {
+      hydrateContainer(nestedContainer, siteData, maps);
+    });
 
     holder.appendChild(row);
   });
 };
-
 
 /* --------------------------------
    Main function
 --------------------------------- */
 
 const hydrateSiteData = (html, siteData = {}) => {
-  if (
-    typeof html !== "string" ||
-    !html.includes("data-entity")
-  ) {
+  if (typeof html !== "string" || !html.includes("data-entity")) {
     return html;
   }
 
   const doc = new DOMParser().parseFromString(
     `<div id="hydration-root">${html}</div>`,
-    "text/html"
+    "text/html",
   );
 
   const root = doc.getElementById("hydration-root");
@@ -597,11 +718,11 @@ const hydrateSiteData = (html, siteData = {}) => {
   const maps = createEntityMaps(siteData);
 
   // Process only top-level entity containers.
-  const containers = Array.from(
-    root.querySelectorAll("[data-entity]")
-  ).filter((container) => {
-    return !container.parentElement.closest("[data-entity]");
-  });
+  const containers = Array.from(root.querySelectorAll("[data-entity]")).filter(
+    (container) => {
+      return !container.parentElement.closest("[data-entity]");
+    },
+  );
 
   containers.forEach((container) => {
     hydrateContainer(container, siteData, maps);
@@ -609,7 +730,6 @@ const hydrateSiteData = (html, siteData = {}) => {
 
   return root.innerHTML;
 };
-
 
 const buildSrcDoc = ({
   html,
@@ -625,8 +745,7 @@ const buildSrcDoc = ({
 
   const sliderHtml = isHome ? renderSlider(slides) : "";
   const pageHtml =
-    hydrateSiteData(html, siteData) ||
-    "<p>This page has no content yet.</p>";
+    hydrateSiteData(html, siteData) || "<p>This page has no content yet.</p>";
 
   const bodyHtml = SLIDER_MARKER.test(pageHtml)
     ? pageHtml.replace(SLIDER_MARKER, () => sliderHtml)
@@ -1202,10 +1321,9 @@ export default function MySiteView() {
               const previewPath = window.location.pathname.endsWith("/preview")
                 ? "/preview"
                 : "";
-              navigate(
-                `/mysite/${createSiteSlug(legacySite)}${previewPath}`,
-                { replace: true },
-              );
+              navigate(`/mysite/${createSiteSlug(legacySite)}${previewPath}`, {
+                replace: true,
+              });
               return;
             }
             setError("Site not found in your account.");
@@ -1247,28 +1365,36 @@ export default function MySiteView() {
             : [],
         });
 
-        // Fetch site data resources
+        // Fetch site data resources.
+        // Each resource is loaded independently so one failing table
+        // (e.g. not whitelisted on the backend) does not blank the others.
         try {
-          const dataRes = await axios.get(
-            siteAdminMode
-              ? `${API_URL}/sites/client-admin/${targetSiteId}/data`
-              : `${API_URL}/sites/${targetSiteId}/data`,
-            { headers }
-          );
+          const base = siteAdminMode
+            ? `${API_URL}/sites/client-admin/${targetSiteId}/data`
+            : `${API_URL}/sites/${targetSiteId}/data`;
+          const dataRes = await axios.get(base, { headers });
           if (cancelled) return;
           const resources = Array.isArray(dataRes.data) ? dataRes.data : [];
           const dataMap = {};
           await Promise.all(
             resources.map(async (resource) => {
-              const res = await axios.get(
-                siteAdminMode
-                  ? `${API_URL}/sites/client-admin/${targetSiteId}/data/${resource}`
-                  : `${API_URL}/sites/${targetSiteId}/data/${resource}`,
-                { headers }
-              );
-              dataMap[resource] = res.data;
-            })
+              try {
+                const res = await axios.get(`${base}/${resource}`, {
+                  headers,
+                });
+                dataMap[resource] = Array.isArray(res.data)
+                  ? res.data
+                  : Array.isArray(res.data?.rows)
+                    ? res.data.rows
+                    : Array.isArray(res.data?.data)
+                      ? res.data.data
+                      : [];
+              } catch (e) {
+                console.warn(`Could not load site data "${resource}"`, e);
+              }
+            }),
           );
+          if (cancelled) return;
           setSiteData(dataMap);
         } catch (e) {
           console.warn("Could not load site data resources", e);
@@ -1330,18 +1456,24 @@ export default function MySiteView() {
   );
 
   const srcDoc = useMemo(
-    () =>
-      buildSrcDoc({
-        html: activePage?.page,
-        background: theme.background,
-        color: theme.color,
-        pageTitle: activePage?.title || "Site",
-        galleries: media.galleries,
-        slides: media.slider,
-        siteData,
-      }),
-    [activePage, theme, media.galleries, media.slider, siteData],
-  );
+  () =>
+    buildSrcDoc({
+      html: activePage?.page,
+      background: theme.background,
+      color: theme.color,
+      pageTitle: activePage?.title || "Site",
+      galleries: media.galleries,
+      slides: media.slider,
+      siteData: {
+        ...siteData,
+        headers:
+          site.header && Object.keys(site.header).length
+            ? [site.header]
+            : siteData.headers || [],
+      },
+    }),
+  [activePage, theme, media.galleries, media.slider, siteData, site.header],
+);
 
   const handleNavigate = (id) => {
     setActiveId(String(id));
@@ -1413,9 +1545,7 @@ export default function MySiteView() {
           <Button
             onClick={() =>
               navigate(
-                siteAdminMode
-                  ? `/site-admin/${adminSiteId}/panel`
-                  : "/mysite",
+                siteAdminMode ? `/site-admin/${adminSiteId}/panel` : "/mysite",
               )
             }
             startIcon={<ArrowLeftIcon />}
@@ -1556,9 +1686,7 @@ export default function MySiteView() {
               borderColor: "divider",
               borderRadius: framed ? 3 : 0,
               bgcolor: theme.background,
-              boxShadow: framed
-                ? "0 10px 30px rgba(15,23,42,0.12)"
-                : "none",
+              boxShadow: framed ? "0 10px 30px rgba(15,23,42,0.12)" : "none",
             }}
           >
             <Box

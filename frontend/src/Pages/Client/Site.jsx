@@ -4,7 +4,6 @@ import axios from "axios";
 import {
   Alert,
   Box,
-  Button,
   CircularProgress,
   Dialog,
   DialogContent,
@@ -17,164 +16,94 @@ import {
 import { createSiteSlug } from "../../utils/siteSlug";
 
 /* ------------------------------------------------------------------ */
-/* Inline SVG icons (no @mui/icons-material)                           */
+/* Inline SVG icons (no @mui/icons-material dependency)                */
 /* ------------------------------------------------------------------ */
-const ArrowLeftIcon = (props) => (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-    {...props}
-  >
-    <path d="M19 12H5M12 19l-7-7 7-7" />
-  </svg>
+const strokeIcon = (size, children) => {
+  const Icon = (props) => (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      {...props}
+    >
+      {children}
+    </svg>
+  );
+  return Icon;
+};
+
+const fillIcon = (size, children) => {
+  const Icon = (props) => (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+      {...props}
+    >
+      {children}
+    </svg>
+  );
+  return Icon;
+};
+
+const CloseIcon = strokeIcon(20, <path d="M18 6 6 18M6 6l12 12" />);
+
+const FacebookIcon = fillIcon(
+  18,
+  <path d="M13.5 21v-7.5h2.5l.4-3H13.5V8.6c0-.9.3-1.5 1.6-1.5h1.5V4.4c-.3 0-1.2-.1-2.3-.1-2.3 0-3.8 1.4-3.8 3.9v2.3H8v3h2.5V21h3z" />,
 );
 
-const CloseIcon = (props) => (
-  <svg
-    width="20"
-    height="20"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-    {...props}
-  >
-    <path d="M18 6 6 18M6 6l12 12" />
-  </svg>
-);
-
-const FacebookIcon = (props) => (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="currentColor"
-    aria-hidden="true"
-    {...props}
-  >
-    <path d="M13.5 21v-7.5h2.5l.4-3H13.5V8.6c0-.9.3-1.5 1.6-1.5h1.5V4.4c-.3 0-1.2-.1-2.3-.1-2.3 0-3.8 1.4-3.8 3.9v2.3H8v3h2.5V21h3z" />
-  </svg>
-);
-
-const InstagramIcon = (props) => (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-    {...props}
-  >
+const InstagramIcon = strokeIcon(
+  18,
+  <>
     <rect x="3" y="3" width="18" height="18" rx="5" />
     <circle cx="12" cy="12" r="4" />
     <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
-  </svg>
+  </>,
 );
 
-const YouTubeIcon = (props) => (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="currentColor"
-    aria-hidden="true"
-    {...props}
-  >
-    <path d="M21.6 7.2a2.6 2.6 0 0 0-1.8-1.8C18.2 5 12 5 12 5s-6.2 0-7.8.4A2.6 2.6 0 0 0 2.4 7.2 27 27 0 0 0 2 12a27 27 0 0 0 .4 4.8 2.6 2.6 0 0 0 1.8 1.8C5.8 19 12 19 12 19s6.2 0 7.8-.4a2.6 2.6 0 0 0 1.8-1.8A27 27 0 0 0 22 12a27 27 0 0 0-.4-4.8zM10 15V9l5.2 3L10 15z" />
-  </svg>
+const YouTubeIcon = fillIcon(
+  18,
+  <path d="M21.6 7.2a2.6 2.6 0 0 0-1.8-1.8C18.2 5 12 5 12 5s-6.2 0-7.8.4A2.6 2.6 0 0 0 2.4 7.2 27 27 0 0 0 2 12a27 27 0 0 0 .4 4.8 2.6 2.6 0 0 0 1.8 1.8C5.8 19 12 19 12 19s6.2 0 7.8-.4a2.6 2.6 0 0 0 1.8-1.8A27 27 0 0 0 22 12a27 27 0 0 0-.4-4.8zM10 15V9l5.2 3L10 15z" />,
 );
 
-const TwitterIcon = (props) => (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="currentColor"
-    aria-hidden="true"
-    {...props}
-  >
-    <path d="M17.5 3h3l-6.6 7.6L21.8 21h-6.1l-4.8-6.2L5.4 21H2.4l7-8L2.6 3h6.2l4.3 5.7L17.5 3zm-1.1 16.1h1.7L7.7 4.8H5.9l10.5 14.3z" />
-  </svg>
+const TwitterIcon = fillIcon(
+  18,
+  <path d="M17.5 3h3l-6.6 7.6L21.8 21h-6.1l-4.8-6.2L5.4 21H2.4l7-8L2.6 3h6.2l4.3 5.7L17.5 3zm-1.1 16.1h1.7L7.7 4.8H5.9l10.5 14.3z" />,
 );
 
-const LinkedInIcon = (props) => (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="currentColor"
-    aria-hidden="true"
-    {...props}
-  >
-    <path d="M4.98 3.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM3 9h4v12H3V9zm7 0h3.8v1.7h.1c.5-.9 1.8-1.9 3.7-1.9 4 0 4.7 2.6 4.7 6V21h-4v-5.3c0-1.3 0-2.9-1.8-2.9s-2.1 1.4-2.1 2.8V21h-4V9z" />
-  </svg>
+const LinkedInIcon = fillIcon(
+  18,
+  <path d="M4.98 3.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM3 9h4v12H3V9zm7 0h3.8v1.7h.1c.5-.9 1.8-1.9 3.7-1.9 4 0 4.7 2.6 4.7 6V21h-4v-5.3c0-1.3 0-2.9-1.8-2.9s-2.1 1.4-2.1 2.8V21h-4V9z" />,
 );
 
-const PlaceIcon = (props) => (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-    {...props}
-  >
+const PlaceIcon = strokeIcon(
+  18,
+  <>
     <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z" />
     <circle cx="12" cy="10" r="3" />
-  </svg>
+  </>,
 );
 
-const PhoneOutlineIcon = (props) => (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-    {...props}
-  >
-    <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.7 2.6a2 2 0 0 1-.5 2.1L8.1 9.6a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.8.4 1.7.6 2.6.7a2 2 0 0 1 1.7 2z" />
-  </svg>
+const PhoneOutlineIcon = strokeIcon(
+  18,
+  <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.7 2.6a2 2 0 0 1-.5 2.1L8.1 9.6a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.8.4 1.7.6 2.6.7a2 2 0 0 1 1.7 2z" />,
 );
 
-const EmailIcon = (props) => (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-    {...props}
-  >
+const EmailIcon = strokeIcon(
+  18,
+  <>
     <rect x="3" y="5" width="18" height="14" rx="2" />
     <path d="m3 7 9 6 9-6" />
-  </svg>
+  </>,
 );
 
 /* ------------------------------------------------------------------ */
@@ -293,52 +222,159 @@ const renderSlider = (items) => {
 const SLIDER_MARKER = /<!--\s*SITE_SLIDER\s*-->/i;
 
 /* ------------------------------------------------------------------ */
-/* Hydrate [data-entity] tables with site data                         */
+/* Hydration: relationships                                            */
 /* ------------------------------------------------------------------ */
+
+// "this foreign key points at <entity>; copy <source> into <field>".
+const rel = (entity, field, source = "name", fallback) => ({
+  entity,
+  fields: { [field]: source },
+  ...(fallback ? { fallback: { [field]: fallback } } : {}),
+});
+
 const HYDRATION_RELATIONSHIPS = {
+  /* school */
   students: {
     classId: {
       entity: "classes",
       fields: {
         className: (record) =>
-          `${record.name || ""}${
-            record.section ? ` - ${record.section}` : ""
-          }`,
+          `${record.name || ""}${record.section ? ` - ${record.section}` : ""}`,
       },
     },
   },
 
   classes: {
-    classTeacherId: {
-      entity: "teachers",
-      fields: {
-        classTeacherName: "name",
-      },
-    },
+    classTeacherId: rel("teachers", "classTeacherName"),
   },
 
+  /* ecommerce */
   products: {
-    categoryId: {
-      entity: "productcategories",
-      fields: {
-        categoryName: "name",
-      },
-      fallback: {
-        categoryName: "Uncategorized",
-      },
-    },
+    categoryId: rel(
+      "productcategories",
+      "categoryName",
+      "name",
+      "Uncategorized",
+    ),
   },
+
+  /* medical */
+  doctors: {
+    departmentId: rel(
+      "departments",
+      "departmentName",
+      "name",
+      "General Department",
+    ),
+  },
+
+  /* restaurant */
+  menuitems: { categoryId: rel("menucategories", "categoryName") },
+
+  /* hotel */
+  rooms: { roomTypeId: rel("roomtypes", "roomTypeName") },
+
+  /* real estate */
+  properties: { propertyTypeId: rel("propertytypes", "propertyTypeName") },
+
+  /* gym */
+  members: { planId: rel("membershipplans", "planName") },
+
+  /* blog */
+  blogposts: { categoryId: rel("blogcategories", "categoryName") },
+
+  /* portfolio */
+  projects: { categoryId: rel("projectcategories", "categoryName") },
+
+  /* events */
+  events: { eventTypeId: rel("eventtypes", "eventTypeName") },
+
+  /* spa */
+  services: { categoryId: rel("servicecategories", "categoryName") },
+
+  /* law firm */
+  attorneys: { practiceAreaId: rel("practiceareas", "practiceAreaName") },
+  caseinquiries: { practiceAreaId: rel("practiceareas", "practiceAreaName") },
+
+  /* marketing */
+  casestudies: { serviceId: rel("marketingservices", "serviceName") },
+  leads: { serviceId: rel("marketingservices", "serviceName") },
+
+  /* news */
+  articles: { categoryId: rel("newscategories", "categoryName") },
+
+  /* agriculture */
+  farmproducts: { categoryId: rel("cropcategories", "categoryName") },
+
+  /* mobile apps */
+  mobileapps: { categoryId: rel("appcategories", "categoryName") },
+
+  /* streaming */
+  movies: { genreId: rel("genres", "genreName") },
+
+  /* gaming */
+  games: { categoryId: rel("gamecategories", "categoryName") },
+  teams: { gameId: rel("games", "gameTitle", "title") },
+  tournaments: { gameId: rel("games", "gameTitle", "title") },
+
+  /* jewelry / furniture / grocery / cafe */
+  jewelryproducts: { categoryId: rel("jewelrycategories", "categoryName") },
+  furnitureproducts: { categoryId: rel("furniturecategories", "categoryName") },
+  groceryproducts: { categoryId: rel("grocerycategories", "categoryName") },
+  cafeitems: { categoryId: rel("cafecategories", "categoryName") },
+
+  /* interior design */
+  designprojects: { serviceId: rel("designservices", "serviceName") },
+
+  /* music */
+  albums: { artistId: rel("artists", "artistName") },
+  tracks: {
+    artistId: rel("artists", "artistName"),
+    albumId: rel("albums", "albumTitle", "title"),
+  },
+  eventshows: { artistId: rel("artists", "artistName") },
+
+  /* dental / pet care / salon / consulting / daycare */
+  dentalappointments: {
+    serviceId: rel("dentalservices", "serviceName"),
+    dentistId: rel("dentists", "dentistName"),
+  },
+  petappointments: {
+    serviceId: rel("petservices", "serviceName"),
+    veterinarianId: rel("veterinarians", "veterinarianName"),
+  },
+  salonbookings: {
+    serviceId: rel("salonservices", "serviceName"),
+    stylistId: rel("stylists", "stylistName"),
+  },
+  consultationrequests: {
+    serviceId: rel("consultingservices", "serviceName"),
+    consultantId: rel("consultants", "consultantName"),
+  },
+  admissionenquiries: { programId: rel("daycareprograms", "programName") },
 };
 
+/* Statuses that should never be shown on a public page.
+   Everything else (active, available, upcoming, published, ...) is shown. */
+const HIDDEN_STATUSES = new Set([
+  "inactive",
+  "draft",
+  "archived",
+  "unsubscribed",
+  "spam",
+  "rejected",
+  "cancelled",
+  "expired",
+  "suspended",
+  "paused",
+]);
 
 /* --------------------------------
    Utility functions
 --------------------------------- */
 
 const isEmpty = (value) =>
-  value === null ||
-  value === undefined ||
-  value === "";
+  value === null || value === undefined || value === "";
 
 const getNestedValue = (object, path) => {
   if (!object || !path) return undefined;
@@ -353,10 +389,70 @@ const resolveEntity = (entity, siteData) => {
     categories: "productcategories",
   };
 
-  return siteData[entity] ??
-    siteData[aliases[entity] || entity];
+  return siteData[entity] ?? siteData[aliases[entity] || entity];
 };
 
+/* --------------------------------
+   Value formatting
+   <span data-field="price" data-format="currency" data-currency="INR">
+--------------------------------- */
+
+const formatValue = (value, format, element) => {
+  if (isEmpty(value)) return value;
+
+  // JSON columns (features, amenities, tags...) arrive as arrays.
+  if (Array.isArray(value)) return value.join(", ");
+
+  if (!format) return value;
+
+  if (format === "currency") {
+    const number = Number(value);
+    if (Number.isNaN(number)) return value;
+    try {
+      return new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: element.getAttribute("data-currency") || "INR",
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+      }).format(number);
+    } catch {
+      return value;
+    }
+  }
+
+  if (format === "number") {
+    const number = Number(value);
+    return Number.isNaN(number) ? value : number.toLocaleString("en-IN");
+  }
+
+  if (format === "date") {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime())
+      ? value
+      : date.toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        });
+  }
+
+  if (format === "datetime") {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime())
+      ? value
+      : date.toLocaleString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        });
+  }
+
+  if (format === "time") return String(value).slice(0, 5);
+
+  return value;
+};
 
 /* --------------------------------
    Relationship maps
@@ -369,10 +465,7 @@ const createEntityMaps = (siteData) => {
     if (!Array.isArray(records)) return;
 
     maps[entity] = new Map(
-      records.map((record) => [
-        String(record.id),
-        record,
-      ])
+      records.map((record) => [String(record.id), record]),
     );
   });
 
@@ -383,7 +476,6 @@ const createEntityMaps = (siteData) => {
   return maps;
 };
 
-
 /* --------------------------------
    Entity enrichment
 --------------------------------- */
@@ -391,41 +483,33 @@ const createEntityMaps = (siteData) => {
 const enrichEntity = (entity, item, maps) => {
   const result = { ...item };
 
-  const relationships =
-    HYDRATION_RELATIONSHIPS[entity] || {};
+  const relationships = HYDRATION_RELATIONSHIPS[entity] || {};
 
-  Object.entries(relationships).forEach(
-    ([foreignKey, config]) => {
-      const related = maps[config.entity]?.get(
-        String(item[foreignKey])
-      );
+  Object.entries(relationships).forEach(([foreignKey, config]) => {
+    const related = maps[config.entity]?.get(String(item[foreignKey]));
 
-      if (related) {
-        Object.entries(config.fields || {}).forEach(
-          ([targetField, sourceField]) => {
-            if (!isEmpty(result[targetField])) return;
+    if (related) {
+      Object.entries(config.fields || {}).forEach(
+        ([targetField, sourceField]) => {
+          if (!isEmpty(result[targetField])) return;
 
-            result[targetField] =
-              typeof sourceField === "function"
-                ? sourceField(related)
-                : getNestedValue(related, sourceField);
-          }
-        );
-      }
-
-      Object.entries(config.fallback || {}).forEach(
-        ([field, fallback]) => {
-          if (isEmpty(result[field])) {
-            result[field] = fallback;
-          }
-        }
+          result[targetField] =
+            typeof sourceField === "function"
+              ? sourceField(related)
+              : getNestedValue(related, sourceField);
+        },
       );
     }
-  );
+
+    Object.entries(config.fallback || {}).forEach(([field, fallback]) => {
+      if (isEmpty(result[field])) {
+        result[field] = fallback;
+      }
+    });
+  });
 
   return result;
 };
-
 
 /* --------------------------------
    Safe attribute rendering
@@ -438,13 +522,16 @@ const renderField = (element, item) => {
 
   const value = getNestedValue(item, field);
   const attr = element.getAttribute("data-attr");
+  const fallback = element.getAttribute("data-fallback");
 
   if (!attr) {
-    const fallback = element.getAttribute("data-fallback");
+    const shown = formatValue(
+      value,
+      element.getAttribute("data-format"),
+      element,
+    );
 
-    element.textContent = isEmpty(value)
-      ? fallback ?? "—"
-      : String(value);
+    element.textContent = isEmpty(shown) ? (fallback ?? "—") : String(shown);
 
     return;
   }
@@ -464,26 +551,28 @@ const renderField = (element, item) => {
   let output = value;
 
   if (attr === "src" && !isEmpty(value)) {
-    output =
-      typeof resolveMediaImage === "function"
-        ? resolveMediaImage(value)
-        : value;
+    output = resolveMediaImage(value);
+  }
+
+  // data-prefix="tel:" / "mailto:" builds the link from a raw value
+  const prefix = element.getAttribute("data-prefix");
+  if (attr === "href" && prefix && !isEmpty(value)) {
+    const clean =
+      prefix === "tel:"
+        ? String(value).replace(/[^\d+]/g, "")
+        : String(value).trim();
+    output = `${prefix}${clean}`;
   }
 
   if (attr === "src" || attr === "href") {
     if (!isEmpty(output)) {
       try {
-        const url = new URL(
-          String(output),
-          "https://hydration.invalid"
-        );
-
-        const relative =
-          !/^[a-z][a-z0-9+.-]*:/i.test(String(output));
+        const url = new URL(String(output), "https://hydration.invalid");
+        const relative = !/^[a-z][a-z0-9+.-]*:/i.test(String(output));
 
         if (
           !relative &&
-          !["http:", "https:"].includes(url.protocol)
+          !["http:", "https:", "mailto:", "tel:"].includes(url.protocol)
         ) {
           output = "";
         }
@@ -493,23 +582,21 @@ const renderField = (element, item) => {
     }
   }
 
+  // Attributes honour data-fallback too (e.g. placeholder images).
+  if (isEmpty(output) && !isEmpty(fallback)) {
+    output = fallback;
+  }
+
   if (isEmpty(output)) {
     element.removeAttribute(attr);
   } else {
     element.setAttribute(attr, String(output));
   }
 
-  if (
-    attr === "target" &&
-    output === "_blank"
-  ) {
-    element.setAttribute(
-      "rel",
-      "noopener noreferrer"
-    );
+  if (attr === "target" && output === "_blank") {
+    element.setAttribute("rel", "noopener noreferrer");
   }
 };
-
 
 /* --------------------------------
    Recursive hydration
@@ -521,10 +608,7 @@ const hydrateContainer = (container, siteData, maps) => {
   const source = resolveEntity(entity, siteData);
 
   const template = Array.from(container.children)
-    .flatMap((child) => [
-      child,
-      ...child.querySelectorAll("[data-row]"),
-    ])
+    .flatMap((child) => [child, ...child.querySelectorAll("[data-row]")])
     .find((element) => element.hasAttribute("data-row"));
 
   if (!template || !Array.isArray(source)) return;
@@ -533,9 +617,10 @@ const hydrateContainer = (container, siteData, maps) => {
   const holder = template.parentElement;
   const rowTemplate = template.cloneNode(true);
 
-  const rows = source.filter((record) => {
-    return !record.status || record.status === "active";
-  });
+  // Hide only unwanted statuses; available / upcoming / published etc. are shown.
+  const rows = source.filter(
+    (record) => !HIDDEN_STATUSES.has(String(record.status ?? "").toLowerCase()),
+  );
 
   holder.replaceChildren();
 
@@ -545,11 +630,9 @@ const hydrateContainer = (container, siteData, maps) => {
     empty.className = "hydration-empty-state";
 
     empty.textContent =
-      container.getAttribute("data-empty-text") ||
-      "No records added yet.";
+      container.getAttribute("data-empty-text") || "No records added yet.";
 
-    empty.style.cssText =
-      "text-align:center;opacity:.7;padding:16px;";
+    empty.style.cssText = "text-align:center;opacity:.7;padding:16px;";
 
     holder.appendChild(empty);
 
@@ -561,42 +644,35 @@ const hydrateContainer = (container, siteData, maps) => {
 
     const row = rowTemplate.cloneNode(true);
 
+    // The row element itself may carry data-field.
+    if (row.hasAttribute?.("data-field")) renderField(row, item);
+
     // Hydrate fields belonging to this row.
-    row.querySelectorAll("[data-field]").forEach(
-      (element) => renderField(element, item)
-    );
+    row
+      .querySelectorAll("[data-field]")
+      .forEach((element) => renderField(element, item));
 
     // Hydrate nested entity containers independently.
-    row.querySelectorAll("[data-entity]").forEach(
-      (nestedContainer) => {
-        hydrateContainer(
-          nestedContainer,
-          siteData,
-          maps
-        );
-      }
-    );
+    row.querySelectorAll("[data-entity]").forEach((nestedContainer) => {
+      hydrateContainer(nestedContainer, siteData, maps);
+    });
 
     holder.appendChild(row);
   });
 };
-
 
 /* --------------------------------
    Main function
 --------------------------------- */
 
 const hydrateSiteData = (html, siteData = {}) => {
-  if (
-    typeof html !== "string" ||
-    !html.includes("data-entity")
-  ) {
+  if (typeof html !== "string" || !html.includes("data-entity")) {
     return html;
   }
 
   const doc = new DOMParser().parseFromString(
     `<div id="hydration-root">${html}</div>`,
-    "text/html"
+    "text/html",
   );
 
   const root = doc.getElementById("hydration-root");
@@ -606,11 +682,11 @@ const hydrateSiteData = (html, siteData = {}) => {
   const maps = createEntityMaps(siteData);
 
   // Process only top-level entity containers.
-  const containers = Array.from(
-    root.querySelectorAll("[data-entity]")
-  ).filter((container) => {
-    return !container.parentElement.closest("[data-entity]");
-  });
+  const containers = Array.from(root.querySelectorAll("[data-entity]")).filter(
+    (container) => {
+      return !container.parentElement.closest("[data-entity]");
+    },
+  );
 
   containers.forEach((container) => {
     hydrateContainer(container, siteData, maps);
@@ -656,8 +732,10 @@ const buildSrcDoc = ({
       * { box-sizing: border-box; }
       html { scroll-behavior: smooth; }
       body {
+        width: 100%;
         margin: 0;
         padding: 0;
+        overflow-x: hidden;
         background: ${background};
         color: ${color};
         font-family: Arial, Helvetica, sans-serif;
@@ -696,25 +774,25 @@ function SiteHeader({ header, siteName, pages, activeId, onNavigate, theme }) {
         position: "sticky",
         top: 0,
         zIndex: 1100,
-        bgcolor: theme.headerBg,
         color: theme.color,
         borderBottom: `1px solid ${theme.border}`,
-        backgroundImage: `linear-gradient(${theme.headerBg}, ${theme.headerBg})`,
         backgroundColor: theme.background,
+        backgroundImage: `linear-gradient(${theme.headerBg}, ${theme.headerBg})`,
       }}
     >
       <Box
         sx={{
-          width: "100%",
-          m: 0,
-          px: 0,
+          maxWidth: 1200,
+          mx: "auto",
+          px: { xs: 2, md: 3 },
           display: "flex",
           flexDirection: { xs: "column", md: "row" },
           alignItems: { xs: "stretch", md: "center" },
           justifyContent: "space-between",
-          gap: 0,
+          gap: { xs: 1, md: 4 },
         }}
       >
+        {/* Logo + title */}
         {(logo || title) && (
           <Box
             component="a"
@@ -726,25 +804,27 @@ function SiteHeader({ header, siteName, pages, activeId, onNavigate, theme }) {
             sx={{
               display: "flex",
               alignItems: "center",
-              gap: 1,
-              p: 0,
+              gap: 1.25,
+              py: 1,
+              minHeight: { xs: 56, md: 64 },
               color: "inherit",
               textDecoration: "none",
               minWidth: 0,
+              flexShrink: 0,
+              maxWidth: { xs: "100%", md: "40%" },
             }}
           >
             {logo && (
               <Box
                 sx={{
-                  width: 48,
-                  height: 48,
+                  width: { xs: 36, md: 44 },
+                  height: { xs: 36, md: 44 },
                   borderRadius: "50%",
                   overflow: "hidden",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   flexShrink: 0,
-                  m: 0,
                 }}
               >
                 <Box
@@ -763,12 +843,15 @@ function SiteHeader({ header, siteName, pages, activeId, onNavigate, theme }) {
             {title && (
               <Typography
                 component="span"
+                noWrap
                 sx={{
-                  fontSize: { xs: "1.15rem", md: "1.4rem" },
+                  fontSize: { xs: "1.05rem", md: "1.3rem" },
                   fontWeight: 700,
-                  lineHeight: 1,
-                  m: 0,
-                  overflowWrap: "anywhere",
+                  lineHeight: 1.2,
+                  letterSpacing: "-0.01em",
+                  minWidth: 0,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
                 }}
               >
                 {title}
@@ -777,42 +860,69 @@ function SiteHeader({ header, siteName, pages, activeId, onNavigate, theme }) {
           </Box>
         )}
 
-        <Tabs
-          component="nav"
-          aria-label="Site navigation"
-          value={activeId}
-          onChange={(_, value) => onNavigate(value)}
-          variant="scrollable"
-          scrollButtons="auto"
-          allowScrollButtonsMobile
+        {/* Navigation: scrollable so many pages stay usable */}
+        <Box
           sx={{
-            minHeight: 48,
             minWidth: 0,
-            color: theme.color,
-            "& .MuiTabs-indicator": {
-              backgroundColor: theme.color,
-              height: 3,
-              borderRadius: "3px 3px 0 0",
-            },
-            "& .MuiTabScrollButton-root": { color: theme.color },
-            "& .MuiTab-root": {
-              minHeight: 48,
-              px: 2,
-              textTransform: "none",
-              fontWeight: 600,
-              fontSize: "0.95rem",
-              color: theme.color,
-              opacity: 0.7,
-              transition: "opacity .2s, background-color .2s",
-              "&:hover": { opacity: 1, bgcolor: theme.hover },
-            },
-            "& .MuiTab-root.Mui-selected": { color: theme.color, opacity: 1 },
+            maxWidth: "100%",
+            borderTop: { xs: `1px solid ${theme.border}`, md: "none" },
           }}
         >
-          {pages.map((p) => (
-            <Tab key={pageKey(p)} value={pageKey(p)} label={p.title} />
-          ))}
-        </Tabs>
+          <Tabs
+            component="nav"
+            aria-label="Site navigation"
+            value={activeId}
+            onChange={(_, value) => onNavigate(value)}
+            variant="scrollable"
+            scrollButtons="auto"
+            allowScrollButtonsMobile
+            sx={{
+              minHeight: 48,
+              minWidth: 0,
+              color: theme.color,
+              "& .MuiTabs-flexContainer": { gap: 0.5 },
+              "& .MuiTabs-indicator": {
+                backgroundColor: theme.color,
+                height: 3,
+                borderRadius: "3px 3px 0 0",
+              },
+              "& .MuiTabScrollButton-root": {
+                color: theme.color,
+                width: 32,
+              },
+              "& .MuiTab-root": {
+                minHeight: 48,
+                minWidth: "auto",
+                maxWidth: 220,
+                px: 2,
+                textTransform: "none",
+                fontWeight: 600,
+                fontSize: "0.95rem",
+                color: theme.color,
+                opacity: 0.7,
+                borderRadius: 1,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                transition: "opacity .2s, background-color .2s",
+                "&:hover": { opacity: 1, bgcolor: theme.hover },
+              },
+              "& .MuiTab-root.Mui-selected": {
+                color: theme.color,
+                opacity: 1,
+              },
+            }}
+          >
+            {pages.map((p) => (
+              <Tab
+                key={pageKey(p)}
+                value={pageKey(p)}
+                label={p.title}
+                title={p.title}
+              />
+            ))}
+          </Tabs>
+        </Box>
       </Box>
     </Box>
   );
@@ -874,6 +984,9 @@ function SiteFooter({ header, siteName, pages, activeId, onNavigate, theme }) {
     header?.copyrightText ||
     (title ? `© ${new Date().getFullYear()} ${title}` : "");
 
+  // Cap the height of very long link lists so the footer stays balanced.
+  const linkCap = pages.length > 12;
+
   const linkSx = {
     color: "inherit",
     textDecoration: "none",
@@ -895,7 +1008,7 @@ function SiteFooter({ header, siteName, pages, activeId, onNavigate, theme }) {
     <Box
       component="footer"
       sx={{
-        bgcolor: theme.background,
+        backgroundColor: theme.background,
         backgroundImage: `linear-gradient(${theme.footerBg}, ${theme.footerBg})`,
         color: theme.color,
         borderTop: `1px solid ${theme.border}`,
@@ -911,9 +1024,17 @@ function SiteFooter({ header, siteName, pages, activeId, onNavigate, theme }) {
           }}
         >
           {hasAbout && (
-            <Box>
+            <Box sx={{ minWidth: 0 }}>
               {title && (
-                <Typography sx={{ fontSize: "1.2rem", fontWeight: 700, mb: 1 }}>
+                <Typography
+                  sx={{
+                    fontSize: "1.2rem",
+                    fontWeight: 700,
+                    mb: 1,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
                   {title}
                 </Typography>
               )}
@@ -931,13 +1052,17 @@ function SiteFooter({ header, siteName, pages, activeId, onNavigate, theme }) {
             </Box>
           )}
 
+          {/* ---- Quick links: responsive multi-column grid ---- */}
           {hasLinks && (
-            <Box component="nav" aria-label="Footer navigation">
+            <Box
+              component="nav"
+              aria-label="Footer navigation"
+              sx={{ minWidth: 0 }}
+            >
               <FooterHeading>Quick links</FooterHeading>
               <Box
                 sx={{
                   display: "grid",
-                  // Flow into as many columns as fit, cap at 3 on desktop
                   gridTemplateColumns: {
                     xs: "1fr",
                     sm: "repeat(2, minmax(0, 1fr))",
@@ -945,10 +1070,9 @@ function SiteFooter({ header, siteName, pages, activeId, onNavigate, theme }) {
                   },
                   columnGap: 2,
                   rowGap: 1,
-                  // Optional: keep very long lists from stretching the footer
-                  maxHeight: pages.length > 12 ? 240 : "none",
-                  overflowY: pages.length > 12 ? "auto" : "visible",
-                  pr: pages.length > 12 ? 1 : 0,
+                  maxHeight: linkCap ? 240 : "none",
+                  overflowY: linkCap ? "auto" : "visible",
+                  pr: linkCap ? 1 : 0,
                 }}
               >
                 {pages.map((p) => {
@@ -960,6 +1084,7 @@ function SiteFooter({ header, siteName, pages, activeId, onNavigate, theme }) {
                       type="button"
                       onClick={() => onNavigate(pageKey(p))}
                       aria-current={isActive ? "page" : undefined}
+                      title={p.title}
                       sx={{
                         ...linkSx,
                         display: "block",
@@ -982,7 +1107,7 @@ function SiteFooter({ header, siteName, pages, activeId, onNavigate, theme }) {
           )}
 
           {contacts.length > 0 && (
-            <Box>
+            <Box sx={{ minWidth: 0 }}>
               <FooterHeading>Contact</FooterHeading>
               <Box sx={{ display: "grid", gap: 1.25 }}>
                 {contacts.map(({ key, Icon, text, href }) => (
@@ -992,17 +1117,29 @@ function SiteFooter({ header, siteName, pages, activeId, onNavigate, theme }) {
                       display: "flex",
                       gap: 1.25,
                       alignItems: "flex-start",
+                      minWidth: 0,
                     }}
                   >
                     <Icon
                       style={{ marginTop: 2, opacity: 0.8, flexShrink: 0 }}
                     />
                     {href ? (
-                      <Link href={href} sx={linkSx}>
+                      <Link
+                        href={href}
+                        sx={{
+                          ...linkSx,
+                          minWidth: 0,
+                          overflowWrap: "anywhere",
+                        }}
+                      >
                         {text}
                       </Link>
                     ) : (
-                      <Typography sx={{ opacity: 0.85 }}>{text}</Typography>
+                      <Typography
+                        sx={{ opacity: 0.85, overflowWrap: "anywhere" }}
+                      >
+                        {text}
+                      </Typography>
                     )}
                   </Box>
                 ))}
@@ -1011,7 +1148,7 @@ function SiteFooter({ header, siteName, pages, activeId, onNavigate, theme }) {
           )}
 
           {socials.length > 0 && (
-            <Box>
+            <Box sx={{ minWidth: 0 }}>
               <FooterHeading>Follow us</FooterHeading>
               <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
                 {socials.map(({ key, label, Icon }) => (
@@ -1025,8 +1162,8 @@ function SiteFooter({ header, siteName, pages, activeId, onNavigate, theme }) {
                     sx={{
                       color: theme.color,
                       border: `1px solid ${theme.border}`,
-                      width: 38,
-                      height: 38,
+                      width: 40,
+                      height: 40,
                       "&:hover": { bgcolor: theme.hover },
                     }}
                   >
@@ -1063,7 +1200,7 @@ function SiteFooter({ header, siteName, pages, activeId, onNavigate, theme }) {
 /* ------------------------------------------------------------------ */
 /* Main view                                                           */
 /* ------------------------------------------------------------------ */
-export default function MySiteView() {
+export default function Site() {
   const { siteId: adminSiteId, siteSlug } = useParams();
   const navigate = useNavigate();
   const siteAdminMode = window.location.pathname.startsWith("/site-admin/");
@@ -1137,46 +1274,6 @@ export default function MySiteView() {
         ]);
         if (cancelled) return;
 
-        // Fetch site data resources (students, classes, teachers, ...)
-        try {
-          const dataRes = await axios.get(
-            siteAdminMode
-              ? `${API_URL}/sites/client-admin/${targetSiteId}/data`
-              : `${API_URL}/sites/${targetSiteId}/data`,
-            { headers },
-          );
-
-          // Handle both response shapes:
-          //  - { sections: [{ resource: "students" }, ...] }
-          //  - ["students", "classes", ...]
-          const resources = Array.isArray(dataRes.data?.sections)
-            ? dataRes.data.sections.map((s) => s.resource)
-            : Array.isArray(dataRes.data)
-              ? dataRes.data
-              : [];
-
-          const siteDataMap = {};
-          await Promise.all(
-            resources.map(async (resource) => {
-              try {
-                const res = await axios.get(
-                  siteAdminMode
-                    ? `${API_URL}/sites/client-admin/${targetSiteId}/data/${resource}`
-                    : `${API_URL}/sites/${targetSiteId}/data/${resource}`,
-                  { headers },
-                );
-                siteDataMap[resource] = res.data;
-              } catch (e) {
-                console.error(`Error loading resource ${resource}`, e);
-              }
-            }),
-          );
-          if (cancelled) return;
-          setSiteData(siteDataMap);
-        } catch (e) {
-          console.warn("Could not load site data resources", e);
-        }
-
         const list = Array.isArray(pagesRes.data?.pages)
           ? pagesRes.data.pages
           : [];
@@ -1197,6 +1294,50 @@ export default function MySiteView() {
             ? mediaRes.data.slider
             : [],
         });
+
+        // Fetch site data resources.
+        // Each resource is loaded independently so one failing table
+        // (e.g. not whitelisted on the backend) does not blank the others.
+        try {
+          const base = siteAdminMode
+            ? `${API_URL}/sites/client-admin/${targetSiteId}/data`
+            : `${API_URL}/sites/${targetSiteId}/data`;
+          const dataRes = await axios.get(base, { headers });
+          if (cancelled) return;
+
+          // Handle both response shapes:
+          //  - { sections: [{ resource: "students" }, ...] }
+          //  - ["students", "classes", ...]
+          const resources = Array.isArray(dataRes.data?.sections)
+            ? dataRes.data.sections.map((s) => s.resource)
+            : Array.isArray(dataRes.data)
+              ? dataRes.data
+              : [];
+
+          const dataMap = {};
+          await Promise.all(
+            resources.map(async (resource) => {
+              try {
+                const res = await axios.get(`${base}/${resource}`, {
+                  headers,
+                });
+                dataMap[resource] = Array.isArray(res.data)
+                  ? res.data
+                  : Array.isArray(res.data?.rows)
+                    ? res.data.rows
+                    : Array.isArray(res.data?.data)
+                      ? res.data.data
+                      : [];
+              } catch (e) {
+                console.warn(`Could not load site data "${resource}"`, e);
+              }
+            }),
+          );
+          if (cancelled) return;
+          setSiteData(dataMap);
+        } catch (e) {
+          console.warn("Could not load site data resources", e);
+        }
 
         setActiveId(list[0] ? pageKey(list[0]) : "");
         setSite({
@@ -1253,7 +1394,7 @@ export default function MySiteView() {
     [site.background, site.color],
   );
 
-  // Include data length so tables re-hydrate if data changes
+  // Re-mount the iframe when the data set changes so tables re-hydrate.
   const dataVersion = useMemo(() => Object.keys(siteData).length, [siteData]);
 
   const srcDoc = useMemo(
@@ -1265,9 +1406,16 @@ export default function MySiteView() {
         pageTitle: activePage?.title || "Site",
         galleries: media.galleries,
         slides: media.slider,
-        siteData,
+        siteData: {
+          ...siteData,
+          // Lets pages hydrate header/footer details via data-entity="headers"
+          headers:
+            site.header && Object.keys(site.header).length
+              ? [site.header]
+              : siteData.headers || [],
+        },
       }),
-    [activePage, theme, media.galleries, media.slider, siteData],
+    [activePage, theme, media.galleries, media.slider, siteData, site.header],
   );
 
   const handleNavigate = (id) => {
@@ -1282,12 +1430,17 @@ export default function MySiteView() {
 
     observerRef.current?.disconnect();
     const resize = () => {
-      frame.style.height = `${doc.documentElement.scrollHeight}px`;
+      const height = Math.max(
+        doc.documentElement.scrollHeight,
+        doc.body.scrollHeight,
+      );
+      frame.style.height = `${height}px`;
     };
     resize();
 
     if (typeof ResizeObserver !== "undefined") {
       observerRef.current = new ResizeObserver(resize);
+      observerRef.current.observe(doc.documentElement);
       observerRef.current.observe(doc.body);
     }
   };
@@ -1376,6 +1529,7 @@ export default function MySiteView() {
         </Box>
       )}
 
+      {/* ---------- News dialog ---------- */}
       {media.news[newsIndex] && (
         <Dialog
           open={newsOpen}

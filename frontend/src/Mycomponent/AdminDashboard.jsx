@@ -532,26 +532,66 @@ function Panel({
   );
 }
 
-function DonutChart({ data, centerLabel = "Total" }) {
-  const total = data.reduce((sum, d) => sum + d.value, 0);
+function DonutChart({ data, centerLabel = "Total", maxItems = 6 }) {
+  const SIZE = 200;
+
+  const { items, total } = useMemo(() => {
+    // 1. sort biggest -> smallest
+    const sorted = [...data].sort((a, b) => b.value - a.value);
+
+    // 2. keep top N, group the rest into "Others"
+    let list = sorted;
+    if (sorted.length > maxItems) {
+      const top = sorted.slice(0, maxItems - 1);
+      const rest = sorted.slice(maxItems - 1);
+      list = [
+        ...top,
+        {
+          id: "others",
+          label: `Others (${rest.length})`,
+          value: rest.reduce((s, d) => s + d.value, 0),
+        },
+      ];
+    }
+
+    // 3. one color per item, used by both the chart and the list
+    const colored = list.map((d, i) => ({
+      ...d,
+      color: d.id === "others" ? "#94a3b8" : PALETTE[i % PALETTE.length],
+    }));
+
+    return {
+      items: colored,
+      total: colored.reduce((s, d) => s + d.value, 0),
+    };
+  }, [data, maxItems]);
+
   return (
     <Box>
-      <Box sx={{ position: "relative", height: 220 }}>
+      {/* Fixed-size box, so the center label is always on the donut hole */}
+      <Box
+        sx={{
+          position: "relative",
+          width: SIZE,
+          height: SIZE,
+          mx: "auto",
+        }}
+      >
         <PieChart
-          height={220}
-          colors={PALETTE}
+          width={SIZE}
+          height={SIZE}
+          hideLegend
+          margin={{ top: 4, bottom: 4, left: 4, right: 4 }}
           series={[
             {
-              data,
+              data: items,
               innerRadius: 66,
-              outerRadius: 100,
-              paddingAngle: 2,
+              outerRadius: 96,
+              paddingAngle: items.length > 1 ? 2 : 0,
               cornerRadius: 6,
               highlightScope: { fade: "global", highlight: "item" },
             },
           ]}
-          slotProps={{ legend: { hidden: true } }}
-          margin={{ top: 8, bottom: 8, left: 8, right: 8 }}
         />
         <Box
           sx={{
@@ -573,26 +613,32 @@ function DonutChart({ data, centerLabel = "Total" }) {
         </Box>
       </Box>
 
-      <Stack spacing={0.85} sx={{ mt: 1.5 }}>
-        {data.map((d, i) => (
+      {/* The only list */}
+      <Stack spacing={0.85} sx={{ mt: 2 }}>
+        {items.map((d) => (
           <Stack key={d.id} direction="row" alignItems="center" spacing={1}>
             <Box
               sx={{
                 width: 10,
                 height: 10,
                 borderRadius: 0.75,
-                bgcolor: PALETTE[i % PALETTE.length],
+                bgcolor: d.color,
                 flexShrink: 0,
               }}
             />
             <Typography
               variant="body2"
               noWrap
+              title={d.label}
               sx={{ flex: 1, minWidth: 0 }}
             >
               {d.label}
             </Typography>
-            <Typography variant="body2" fontWeight={700}>
+            <Typography
+              variant="body2"
+              fontWeight={700}
+              sx={{ minWidth: 24, textAlign: "right" }}
+            >
               {d.value}
             </Typography>
             <Typography
@@ -600,7 +646,7 @@ function DonutChart({ data, centerLabel = "Total" }) {
               color="text.secondary"
               sx={{ width: 42, textAlign: "right" }}
             >
-              {total ? `${((d.value / total) * 100).toFixed(0)}%` : "0%"}
+              {total ? `${Math.round((d.value / total) * 100)}%` : "0%"}
             </Typography>
           </Stack>
         ))}
@@ -1390,7 +1436,7 @@ export default function AdminDashboard() {
         >
           <Grid size={{ xs: 12, md: 6, lg: 4 }} sx={{ display: "flex" }}>
             <Panel
-              title="Purchases by template"
+              title="Purchases Sites"
               subtitle="Share of total purchases"
               accent={PALETTE[0]}
               loading={loading}
