@@ -965,10 +965,10 @@ export default function AddTemplate() {
                     {filteredPages.map((page) => (
                       <MenuItem key={getId(page)} value={String(getId(page))}>
                         {getName(page)}
-                        {getPagePrice(page) > 0
-                          ? ` — ${form.currency} ${getPagePrice(page).toFixed(
-                              2,
-                            )}`
+                        {page.createdAt || page.created_at
+                          ? ` — Created: ${new Date(
+                              page.createdAt || page.created_at,
+                            ).toLocaleDateString("en-IN")}`
                           : ""}
                       </MenuItem>
                     ))}

@@ -61,7 +61,9 @@ const FooterInfoRow = ({ icon, label, value, href, external }) => (
       {href ? (
         <Link
           href={href}
-          {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+          {...(external
+            ? { target: "_blank", rel: "noopener noreferrer" }
+            : {})}
           underline="hover"
           sx={{
             color: "#e2e8f0",
@@ -77,7 +79,12 @@ const FooterInfoRow = ({ icon, label, value, href, external }) => (
       ) : (
         <Typography
           variant="body2"
-          sx={{ fontWeight: 500, color: "#e2e8f0", wordBreak: "break-word", fontSize: "0.875rem" }}
+          sx={{
+            fontWeight: 500,
+            color: "#e2e8f0",
+            wordBreak: "break-word",
+            fontSize: "0.875rem",
+          }}
         >
           {value}
         </Typography>
@@ -120,7 +127,8 @@ export default function Footer() {
         const data = await res.json().catch(() => null);
         if (res.ok) setContacts(Array.isArray(data) ? data : []);
       } catch (err) {
-        if (err.name !== "AbortError") console.error("Footer contact fetch failed:", err);
+        if (err.name !== "AbortError")
+          console.error("Footer contact fetch failed:", err);
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -190,10 +198,19 @@ export default function Footer() {
       }}
     >
       <Container maxWidth="lg">
-        <Grid container spacing={{ xs: 4, md: 5 }} sx={{ py: { xs: 5, md: 7 } }}>
+        <Grid
+          container
+          spacing={{ xs: 4, md: 5 }}
+          sx={{ py: { xs: 5, md: 7 } }}
+        >
           {/* Brand + description + socials */}
           <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-            <Stack direction="row" alignItems="center" spacing={1.25} sx={{ mb: 2 }}>
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={1.25}
+              sx={{ mb: 2 }}
+            >
               <Box
                 sx={{
                   display: "flex",
@@ -202,11 +219,16 @@ export default function Footer() {
                   width: 36,
                   height: 36,
                   borderRadius: 2,
-                  background: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+                  background:
+                    "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
                   boxShadow: "0 4px 14px rgba(37,99,235,0.35)",
                 }}
               >
-                <Typography sx={{ color: "#fff", fontWeight: 800, fontSize: 18 }}>T</Typography>
+                <Typography
+                  sx={{ color: "#fff", fontWeight: 800, fontSize: 18 }}
+                >
+                  T
+                </Typography>
               </Box>
               <Typography
                 variant="h6"
@@ -230,16 +252,33 @@ export default function Footer() {
                 fontSize: "0.875rem",
               }}
             >
-              Lorem ipsum dolor sit amet consectetur, adipisicing elit. Possimus nulla fugiat et
-              veniam dicta? Reiciendis magnam dolores maiores repellendus molestiae!
+              Lorem ipsum dolor sit amet consectetur, adipisicing elit. Possimus
+              nulla fugiat et veniam dicta? Reiciendis magnam dolores maiores
+              repellendus molestiae!
             </Typography>
 
             <Stack direction="row" spacing={0.75} sx={{ mt: 3 }}>
               {[
-                { icon: <LinkedInIcon fontSize="small" />, href: "https://www.linkedin.com", hover: "#0A66C2" },
-                { icon: <YouTubeIcon fontSize="small" />, href: "https://www.youtube.com", hover: "#FF0000" },
-                { icon: <InstagramIcon fontSize="small" />, href: "https://www.instagram.com", hover: "#E4405F" },
-                { icon: <FacebookIcon fontSize="small" />, href: "https://www.facebook.com", hover: "#1877F2" },
+                {
+                  icon: <LinkedInIcon fontSize="small" />,
+                  href: "https://www.linkedin.com",
+                  hover: "#0A66C2",
+                },
+                {
+                  icon: <YouTubeIcon fontSize="small" />,
+                  href: "https://www.youtube.com",
+                  hover: "#FF0000",
+                },
+                {
+                  icon: <InstagramIcon fontSize="small" />,
+                  href: "https://www.instagram.com",
+                  hover: "#E4405F",
+                },
+                {
+                  icon: <FacebookIcon fontSize="small" />,
+                  href: "https://www.facebook.com",
+                  hover: "#1877F2",
+                },
               ].map((s, i) => (
                 <IconButton
                   key={i}
@@ -326,11 +365,22 @@ export default function Footer() {
             {loading ? (
               <FooterInfoSkeleton />
             ) : hasContactInfo ? (
-              <Stack spacing={2} divider={<Divider flexItem sx={{ borderColor: "rgba(255,255,255,0.08)" }} />}>
+              <Stack
+                spacing={2}
+                divider={
+                  <Divider
+                    flexItem
+                    sx={{ borderColor: "rgba(255,255,255,0.08)" }}
+                  />
+                }
+              >
                 {rows}
               </Stack>
             ) : (
-              <Typography variant="body2" sx={{ color: "#64748b", fontSize: "0.8rem" }}>
+              <Typography
+                variant="body2"
+                sx={{ color: "#64748b", fontSize: "0.8rem" }}
+              >
                 Contact information is not available at the moment.
               </Typography>
             )}
@@ -360,23 +410,6 @@ export default function Footer() {
           >
             © {new Date().getFullYear()} Tenant Website. All Rights Reserved.
           </Typography>
-
-          <Stack direction="row" spacing={2}>
-            <Link
-              href="/privacy"
-              underline="none"
-              sx={{ color: "#64748b", fontSize: "0.8rem", "&:hover": { color: "#94a3b8" } }}
-            >
-              Privacy Policy
-            </Link>
-            <Link
-              href="/terms"
-              underline="none"
-              sx={{ color: "#64748b", fontSize: "0.8rem", "&:hover": { color: "#94a3b8" } }}
-            >
-              Terms of Service
-            </Link>
-          </Stack>
         </Box>
       </Container>
     </Box>

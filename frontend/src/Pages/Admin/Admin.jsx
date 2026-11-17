@@ -73,14 +73,14 @@ const menuGroups = [
       { text: "Add Theme", icon: <ViewQuiltIcon />, path: "/admin/theme" },
       { text: "Add Pages", icon: <NoteAddIcon />, path: "/admin/page" },
       {
-        text: "Arrange Pages",
-        icon: <ReorderIcon />,
-        path: "/admin/template-pages",
-      },
-      {
         text: "Add Templates",
         icon: <DevicesOtherIcon />,
         path: "/admin/templates",
+      },
+      {
+        text: "Arrange Pages",
+        icon: <ReorderIcon />,
+        path: "/admin/template-pages",
       },
       {
         text: "View Templates",
