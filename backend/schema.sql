@@ -4,6 +4,9 @@ CREATE DATABASE IF NOT EXISTS tenant
   CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 USE tenant;
 
+-- ---------------------------------------------------------------------
+-- 1. review
+-- ---------------------------------------------------------------------
 CREATE TABLE users (
   userId        BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name          VARCHAR(120) NOT NULL,
@@ -17,19 +20,6 @@ CREATE TABLE users (
   updatedAt     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uqUsersEmail (email),
   INDEX idxUsersRoleStatus (role, status)
-) ENGINE=InnoDB;
-
-CREATE TABLE passwordResets (
-  id        BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  userId    BIGINT UNSIGNED NOT NULL,
-  codeHash  VARCHAR(255) NOT NULL,
-  expiresAt DATETIME NOT NULL,
-  attempts  TINYINT UNSIGNED NOT NULL DEFAULT 0,
-  usedAt    DATETIME NULL,
-  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  INDEX idxPasswordResetsUserCreated (userId, createdAt),
-  CONSTRAINT fkPasswordResetsUser FOREIGN KEY (userId)
-    REFERENCES users(userId) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
@@ -52,6 +42,7 @@ CREATE TABLE review (
 CREATE TABLE categories (
   categoryId  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name        VARCHAR(190) NOT NULL,
+  packKey     VARCHAR(30) NULL,
   tag         VARCHAR(500) NULL,
   content     JSON NULL,
   createdBy   BIGINT UNSIGNED NOT NULL,
@@ -221,13 +212,17 @@ CREATE TABLE sites (
   themeId       BIGINT UNSIGNED NOT NULL,             -- copied from payments.themeId
   paymentId     BIGINT UNSIGNED NOT NULL,
   name          VARCHAR(150) NOT NULL,
+  dbName        VARCHAR(64) NULL,
   status        ENUM('active','expired','suspended') NOT NULL DEFAULT 'active',
+  provisionStatus ENUM('pending','ready','failed') NOT NULL DEFAULT 'pending',
+  provisionError  VARCHAR(500) NULL,
   startsAt      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   expiresAt     DATETIME NOT NULL,
   createdAt     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updatedAt     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT chkSiteDates CHECK (expiresAt > startsAt),
   UNIQUE KEY uqSitePayment (paymentId),
+  UNIQUE KEY uqSitesDbName (dbName),
   INDEX idxSitesUserStatus (userId, status),
   INDEX idxSitesExpiry (status, expiresAt),
   INDEX idxSitesTemplate (templateId),
@@ -235,21 +230,6 @@ CREATE TABLE sites (
   CONSTRAINT fkSiteTemplate FOREIGN KEY (templateId) REFERENCES template(templateId),
   CONSTRAINT fkSiteTheme    FOREIGN KEY (themeId)    REFERENCES theme(themeId),
   CONSTRAINT fkSitePayment  FOREIGN KEY (paymentId)  REFERENCES payments(id)
-) ENGINE=InnoDB;
-
--- A separate page-manager login is granted by the platform admin per site.
--- These credentials never provide access to purchased theme settings.
-CREATE TABLE `admin` (
-  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  siteId        BIGINT UNSIGNED NOT NULL,
-  userId        BIGINT UNSIGNED NOT NULL,
-  email         VARCHAR(190) NOT NULL,
-  passwordHash  VARCHAR(255) NOT NULL,
-  createdAt     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY uqSiteAdminSite (siteId),
-  INDEX idxSiteAdminUser (userId),
-  CONSTRAINT fkSiteAdminSite FOREIGN KEY (siteId) REFERENCES sites(id) ON DELETE CASCADE,
-  CONSTRAINT fkSiteAdminUser FOREIGN KEY (userId) REFERENCES users(userId) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
@@ -271,49 +251,6 @@ CREATE TABLE IF NOT EXISTS sitepages (
   CONSTRAINT fkSitePagesSite FOREIGN KEY (siteId) REFERENCES sites(id) ON DELETE CASCADE,
   CONSTRAINT fkSitePagesSource FOREIGN KEY (sourcePagesId) REFERENCES pages(pagesId) ON DELETE SET NULL
 ) ENGINE=InnoDB;
-
-CREATE TABLE IF NOT EXISTS siteEntries (
-  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  siteId        BIGINT UNSIGNED NOT NULL,
-  sitePageId    BIGINT UNSIGNED NOT NULL,
-  name          VARCHAR(190) NOT NULL,
-  description   TEXT NULL,
-  price         DECIMAL(10,2) NULL,
-  imageUrl      VARCHAR(1000) NULL,
-  category      ENUM('student','restaurant','product','menu') NOT NULL,
-  status        ENUM('active','inactive') NOT NULL DEFAULT 'active',
-  customFields  JSON NULL,
-  createdAt     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updatedAt     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idxSiteEntriesSitePage (siteId, sitePageId, status),
-  INDEX idxSiteEntriesCategory (category),
-  CONSTRAINT fkSiteEntryPage FOREIGN KEY (sitePageId, siteId)
-    REFERENCES sitepages(id, siteId) ON DELETE CASCADE
-) ENGINE=InnoDB;
-
-
-CREATE TABLE siteemployees (
-  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  siteId        BIGINT UNSIGNED NOT NULL,
-  name          VARCHAR(150) NOT NULL,
-  email         VARCHAR(190) NULL,
-  phone         VARCHAR(30) NULL,
-  jobTitle      VARCHAR(120) NOT NULL,
-  status        ENUM('active','inactive') NOT NULL DEFAULT 'active',
-  createdAt     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updatedAt     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idxSiteEmployees (siteId, status, name),
-  CONSTRAINT fkSiteEmployeeSite FOREIGN KEY (siteId) REFERENCES sites(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
-
-
-INSERT IGNORE INTO sitepages (siteId, sourcePagesId, title, page, sortOrder)
-SELECT s.id, p.pagesId, p.title, p.page, tp.sortOrder
-  FROM sites s
-  JOIN payments pay ON pay.id = s.paymentId AND pay.status = 'captured'
-  JOIN paymentpages pp ON pp.paymentId = pay.id
-  JOIN pages p ON p.pagesId = pp.pagesId
-  JOIN templatepages tp ON tp.templateId = pp.templateId AND tp.pagesId = pp.pagesId;
 
 -- ---------------------------------------------------------------------
 -- 14. faq  (admin CRUD)
@@ -342,6 +279,83 @@ CREATE TABLE acontact (
   INDEX idxAcontactCreatedAt (createdAt),
   CONSTRAINT fkAcontactCreator FOREIGN KEY (createdBy) REFERENCES users(userId)
 ) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
+-- 16. passwordResets  
+-- ---------------------------------------------------------------------
+CREATE TABLE passwordResets (
+  id        BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  userId    BIGINT UNSIGNED NOT NULL,
+  codeHash  VARCHAR(255) NOT NULL,
+  expiresAt DATETIME NOT NULL,
+  attempts  TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  usedAt    DATETIME NULL,
+  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idxPasswordResetsUserCreated (userId, createdAt),
+  CONSTRAINT fkPasswordResetsUser FOREIGN KEY (userId)
+    REFERENCES users(userId) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+
+-- ---------------------------------------------------------------------
+-- 17. admin  
+-- A separate page-manager login is granted by the platform admin per site.
+-- These credentials never provide access to purchased theme settings.
+-- ---------------------------------------------------------------------
+CREATE TABLE `admin` (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  siteId        BIGINT UNSIGNED NOT NULL,
+  userId        BIGINT UNSIGNED NOT NULL,
+  email         VARCHAR(190) NOT NULL,
+  passwordHash  VARCHAR(255) NOT NULL,
+  createdAt     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uqSiteAdminSite (siteId),
+  INDEX idxSiteAdminUser (userId),
+  CONSTRAINT fkSiteAdminSite FOREIGN KEY (siteId) REFERENCES sites(id) ON DELETE CASCADE,
+  CONSTRAINT fkSiteAdminUser FOREIGN KEY (userId) REFERENCES users(userId) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
+-- 18. sitetables
+-- ---------------------------------------------------------------------
+CREATE TABLE sitetables (
+  id        BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  siteId    BIGINT UNSIGNED NOT NULL,
+  baseName  VARCHAR(40) NOT NULL,
+  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uqSiteBase (siteId, baseName),
+  CONSTRAINT fkSiteTablesSite FOREIGN KEY (siteId) REFERENCES sites(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
+-- 19. bugreports : users report errors/bugs; admin triages them.
+--   siteId is optional (a bug may be about the main platform, not a site).
+--   If siteId is set, the reporter must own that site (enforced in API:
+--   WHERE sites.id = ? AND sites.userId = <JWT user>).
+-- ---------------------------------------------------------------------
+CREATE TABLE bugreports (
+  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  reportedBy      BIGINT UNSIGNED NOT NULL,
+  siteId          BIGINT UNSIGNED NULL,
+  title           VARCHAR(190) NOT NULL,
+  description     TEXT NOT NULL,
+  screenshotUrl   VARCHAR(500) NULL,
+  type            ENUM('bug','error','suggestion','other') NOT NULL DEFAULT 'bug',
+  severity        ENUM('low','medium','high','critical') NOT NULL DEFAULT 'medium',
+  status          ENUM('open','in_progress','resolved','closed','rejected') NOT NULL DEFAULT 'open',
+  adminNote       TEXT NULL,
+  resolvedBy      BIGINT UNSIGNED NULL,
+  resolvedAt      DATETIME NULL,
+  createdAt       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idxBugUser (reportedBy, createdAt),
+  INDEX idxBugStatus (status, severity, createdAt),
+  INDEX idxBugSite (siteId),
+  CONSTRAINT fkBugReporter FOREIGN KEY (reportedBy) REFERENCES users(userId),
+  CONSTRAINT fkBugSite     FOREIGN KEY (siteId)     REFERENCES sites(id) ON DELETE SET NULL,
+  CONSTRAINT fkBugResolver FOREIGN KEY (resolvedBy) REFERENCES users(userId) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
 
 -- =====================================================================
 -- VIEWS
@@ -407,144 +421,14 @@ WHERE s.status = 'active' AND s.expiresAt > NOW();
 
 
 
-CREATE TABLE sitenews (
-    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    siteId BIGINT UNSIGNED NOT NULL,
-    title VARCHAR(150) NOT NULL,
-    imageUrl VARCHAR(500) NULL,
-    content TEXT NOT NULL,
-    status ENUM('active', 'inactive')
-        NOT NULL DEFAULT 'active',
-    publishedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-        ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idxSiteNews (siteId, status, createdAt),
-    CONSTRAINT fkSiteNewsSite
-        FOREIGN KEY (siteId)
-        REFERENCES sites(id)
-        ON DELETE CASCADE
-) ENGINE=InnoDB;
+-- =====================================================================
+-- SEED DATA
+-- =====================================================================
+INSERT IGNORE INTO sitepages (siteId, sourcePagesId, title, page, sortOrder)
+SELECT s.id, p.pagesId, p.title, p.page, tp.sortOrder
+  FROM sites s
+  JOIN payments pay ON pay.id = s.paymentId AND pay.status = 'captured'
+  JOIN paymentpages pp ON pp.paymentId = pay.id
+  JOIN pages p ON p.pagesId = pp.pagesId
+  JOIN templatepages tp ON tp.templateId = pp.templateId AND tp.pagesId = pp.pagesId;
 
-CREATE TABLE sitegalleries (
-    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    siteId BIGINT UNSIGNED NOT NULL,
-    title VARCHAR(150) NULL,
-    imageUrl VARCHAR(500) NOT NULL,
-    caption VARCHAR(500) NULL,
-    altText VARCHAR(255) NULL,
-    sortOrder INT UNSIGNED NOT NULL DEFAULT 0,
-    status ENUM('active', 'inactive')
-        NOT NULL DEFAULT 'active',
-    createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-        ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idxSiteGalleries (siteId, status, sortOrder),
-    CONSTRAINT fkSiteGalleriesSite
-        FOREIGN KEY (siteId)
-        REFERENCES sites(id)
-        ON DELETE CASCADE
-) ENGINE=InnoDB;
-
-CREATE TABLE siteslider (
-    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    siteId BIGINT UNSIGNED NOT NULL,
-    title VARCHAR(150) NULL,
-    imageUrl VARCHAR(500) NOT NULL,
-    sortOrder INT UNSIGNED NOT NULL DEFAULT 0,
-    status ENUM('active', 'inactive')
-        NOT NULL DEFAULT 'active',
-    createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-        ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idxSiteSlider (siteId, status, sortOrder),
-    CONSTRAINT fkSiteSliderSite
-        FOREIGN KEY (siteId)
-        REFERENCES sites(id)
-        ON DELETE CASCADE
-) ENGINE=InnoDB;
-
-
-
-
--- ---------------------------------------------------------------------
--- bugreports : users report errors/bugs; admin triages them.
---   siteId is optional (a bug may be about the main platform, not a site).
---   If siteId is set, the reporter must own that site (enforced in API:
---   WHERE sites.id = ? AND sites.userId = <JWT user>).
--- ---------------------------------------------------------------------
-CREATE TABLE bugreports (
-  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  reportedBy      BIGINT UNSIGNED NOT NULL,
-  siteId          BIGINT UNSIGNED NULL,
-  title           VARCHAR(190) NOT NULL,
-  description     TEXT NOT NULL,
-  screenshotUrl   VARCHAR(500) NULL,
-  type            ENUM('bug','error','suggestion','other') NOT NULL DEFAULT 'bug',
-  severity        ENUM('low','medium','high','critical') NOT NULL DEFAULT 'medium',
-  status          ENUM('open','in_progress','resolved','closed','rejected') NOT NULL DEFAULT 'open',
-  adminNote       TEXT NULL,
-  resolvedBy      BIGINT UNSIGNED NULL,
-  resolvedAt      DATETIME NULL,
-  createdAt       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updatedAt       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idxBugUser (reportedBy, createdAt),
-  INDEX idxBugStatus (status, severity, createdAt),
-  INDEX idxBugSite (siteId),
-  CONSTRAINT fkBugReporter FOREIGN KEY (reportedBy) REFERENCES users(userId),
-  CONSTRAINT fkBugSite     FOREIGN KEY (siteId)     REFERENCES sites(id) ON DELETE SET NULL,
-  CONSTRAINT fkBugResolver FOREIGN KEY (resolvedBy) REFERENCES users(userId) ON DELETE SET NULL
-) ENGINE=InnoDB;
-
-
-CREATE TABLE siteheaders (
-  headerid                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  siteId            BIGINT UNSIGNED NOT NULL,
-
-  -- header
-  logoUrl           VARCHAR(500) NULL,
-  siteTitle         VARCHAR(150) NULL,
-  -- footer
-  footerText        TEXT NULL,
-  footerAddress     VARCHAR(300) NULL,
-  footerPhone       VARCHAR(30) NULL,
-  footerEmail       VARCHAR(190) NULL,
-  copyrightText     VARCHAR(255) NULL,
-  socialLinks       JSON NULL,   -- e.g. {"facebook":"...","instagram":"...","youtube":"..."}
-  createdAt         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updatedAt         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uqSiteHeaderSite (siteId),
-  CONSTRAINT fkSiteHeaderSite  FOREIGN KEY (siteId)    REFERENCES sites(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
-
-
-USE tenant;
-
-ALTER TABLE categories
-  ADD COLUMN packKey VARCHAR(30) NULL AFTER name;
-
-ALTER TABLE sites
-  ADD COLUMN dbName VARCHAR(64) NULL AFTER name,
-  ADD UNIQUE KEY uqSitesDbName (dbName),
-  ADD COLUMN provisionStatus ENUM('pending','ready','failed') NOT NULL DEFAULT 'pending' AFTER status,
-  ADD COLUMN provisionError VARCHAR(500) NULL AFTER provisionStatus;
-
-CREATE TABLE sitetables (
-  id        BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  siteId    BIGINT UNSIGNED NOT NULL,
-  baseName  VARCHAR(40) NOT NULL,
-  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY uqSiteBase (siteId, baseName),
-  CONSTRAINT fkSiteTablesSite FOREIGN KEY (siteId) REFERENCES sites(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
-
--- match your real category names; check with: SELECT categoryId, name FROM categories;
-UPDATE categories SET packKey='school'     WHERE name LIKE '%educat%' OR name LIKE '%school%';
-UPDATE categories SET packKey='medical'    WHERE name LIKE '%medic%'  OR name LIKE '%clinic%';
-UPDATE categories SET packKey='ecommerce'  WHERE name LIKE '%commerce%' OR name LIKE '%shop%';
-UPDATE categories SET packKey='restaurant' WHERE name LIKE '%restaur%' OR name LIKE '%food%';
-
-UPDATE categories SET packKey='school'
- WHERE packKey IS NULL AND (name LIKE '%learning%' OR name LIKE '%education%');
-UPDATE categories SET packKey='restaurant'
- WHERE packKey IS NULL AND (name LIKE '%bakery%' OR name LIKE '%cake%');

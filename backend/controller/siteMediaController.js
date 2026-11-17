@@ -33,8 +33,8 @@ const isHttpUrl = (value) => {
   }
 };
 
-const isImageUrl = (value, siteId) =>
-  localImageRegex(siteId).test(value) || isHttpUrl(value);
+// const isImageUrl = (value, siteId) =>
+//   localImageRegex(siteId).test(value) || isHttpUrl(value);
 
 const isImageStillUsed = async (siteId, dbName, url) => {
   const [[row]] = await db.query(
@@ -46,18 +46,18 @@ const isImageStillUsed = async (siteId, dbName, url) => {
   return Number(row.used) > 0;
 };
 
-const removeLocalImage = async (siteId, dbName, url) => {
-  try {
-    if (!url) return;
-    const match = localImageRegex(siteId).exec(url);
-    if (!match) return;
-    if (await isImageStillUsed(siteId, dbName, url)) return;
-    await fs.promises.unlink(
-      path.join(UPLOAD_ROOT, "sites", String(siteId), match[1]),
-    );
-  } catch {
-  }
-};
+// const removeLocalImage = async (siteId, dbName, url) => {
+//   try {
+//     if (!url) return;
+//     const match = localImageRegex(siteId).exec(url);
+//     if (!match) return;
+//     if (await isImageStillUsed(siteId, dbName, url)) return;
+//     await fs.promises.unlink(
+//       path.join(UPLOAD_ROOT, "sites", String(siteId), match[1]),
+//     );
+//   } catch {
+//   }
+// };
 
 const upload = multer({
   storage: multer.diskStorage({

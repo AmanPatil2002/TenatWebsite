@@ -257,7 +257,6 @@ const renderSlider = (items) => {
   return `<section class="site-home-slider" aria-label="Image slider"><div class="site-slider-track" style="${animation}">${slides.join("")}</div></section><style>${keyframes}</style>`;
 };
 
-const SLIDER_MARKER = /<!--\s*SITE_SLIDER\s*-->/i;
 
 /* ------------------------------------------------------------------ */
 /* Hydration: relationships                                            */
@@ -731,6 +730,9 @@ const hydrateSiteData = (html, siteData = {}) => {
   return root.innerHTML;
 };
 
+// Define the marker ONCE, at module scope, and use the same token in CKEditor
+const SLIDER_MARKER = /\{\{\s*SLIDER\s*\}\}/;
+
 const buildSrcDoc = ({
   html,
   background,
@@ -747,9 +749,20 @@ const buildSrcDoc = ({
   const pageHtml =
     hydrateSiteData(html, siteData) || "<p>This page has no content yet.</p>";
 
-  const bodyHtml = SLIDER_MARKER.test(pageHtml)
-    ? pageHtml.replace(SLIDER_MARKER, () => sliderHtml)
-    : `${sliderHtml}${pageHtml}`;
+  // If the marker exists, place the slider there.
+  // If not (non-home pages, or old content), DON'T prepend — just show pageHtml.
+  let bodyHtml = pageHtml;
+  if (SLIDER_MARKER.test(pageHtml)) {
+    bodyHtml = pageHtml.replace(SLIDER_MARKER, () => sliderHtml);
+  } else if (isHome && sliderHtml) {
+    // Fallback for home pages without marker: place after hero/intro if possible
+    bodyHtml = pageHtml.replace(
+      /(<section class="intro">[\s\S]*?<\/section>)/,
+      `$1${sliderHtml}`
+    );
+    // If still not inserted (no .intro), append at end rather than prepend
+    if (bodyHtml === pageHtml) bodyHtml = `${pageHtml}${sliderHtml}`;
+  }
 
   return `<!DOCTYPE html>
 <html>
@@ -792,7 +805,7 @@ const buildSrcDoc = ({
 };
 
 /* ------------------------------------------------------------------ */
-/* Site Header                                                         */
+/* Site Header                                                        */
 /* ------------------------------------------------------------------ */
 function SiteHeader({
   header,

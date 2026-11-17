@@ -7,7 +7,7 @@ const q = (sql, params = []) =>
   );
 
 const safeId = (siteId) => {
-  const id = String(siteId ?? "");
+  const id = String(siteId ?? "").trim();
   if (!/^[1-9]\d{0,19}$/.test(id) || BigInt(id) > 18446744073709551615n) {
     throw new Error("Invalid siteId");
   }
@@ -18,17 +18,18 @@ const safeId = (siteId) => {
 const toCamelCase = (str) => {
   return String(str || "")
     .trim()
-    .replace(/[^a-zA-Z0-9\s]/g, "") // Remove special characters
-    .split(/\s+/) // Split by whitespace
+    .replace(/[^a-zA-Z0-9\s]/g, "")
+    .split(/\s+/)
     .map((word, index) => {
       if (!word) return "";
-      if (index === 0) {
-        return word.toLowerCase();
-      }
+      if (index === 0) return word.toLowerCase();
       return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
     })
     .join("");
 };
+
+// Escape a value for safe use inside backtick-quoted MySQL identifiers
+const escapeIdent = (name) => String(name).replace(/`/g, "``");
 
 // Generate database name from client name and site name
 // Example: "John Doe" + "My School Site" + 15 -> "johnDoeMySchoolSite15"
@@ -36,33 +37,39 @@ const generateDbName = (userName, siteName, siteId, suffix = "") => {
   const userPart = toCamelCase(userName);
 
   // Clean siteName: remove userName if present to avoid redundancy
-  let cleanedSiteName = siteName;
-  if (userName && siteName.toLowerCase().includes(userName.toLowerCase())) {
-    cleanedSiteName = siteName
-      .replace(new RegExp(userName, "gi"), "")
+  let cleanedSiteName = String(siteName || "");
+  if (
+    userName &&
+    cleanedSiteName.toLowerCase().includes(String(userName).toLowerCase())
+  ) {
+    // Escape userName so it's treated as a literal in the RegExp
+    const escaped = String(userName).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    cleanedSiteName = cleanedSiteName
+      .replace(new RegExp(escaped, "gi"), "")
       .replace(/[^a-zA-Z0-9\s]/g, "")
       .trim();
   }
 
   const sitePart = toCamelCase(cleanedSiteName);
-
-  // Capitalize first letter of sitePart to create proper camelCase
   const sitePartCapitalized = sitePart
     ? sitePart.charAt(0).toUpperCase() + sitePart.slice(1)
     : "";
 
-  // Combine: userPart + sitePart + siteId + optional suffix
-  const dbname = `${userPart}${sitePartCapitalized}${siteId}${suffix}`;
-
-  // Ensure valid MySQL database name (max 64 chars, alphanumeric only)
-  const sanitized = dbname.replace(/[^a-zA-Z0-9]/g, "").slice(0, 64);
+  // Combine, sanitize, and truncate to MySQL's 64-char limit
+  let dbname = `${userPart}${sitePartCapitalized}${siteId}${suffix}`;
+  dbname = dbname.replace(/[^a-zA-Z0-9]/g, "").slice(0, 64);
 
   // MySQL database names can't start with a number
-  if (/^[0-9]/.test(sanitized)) {
-    return `db${sanitized}`.slice(0, 64);
+  if (/^[0-9]/.test(dbname) || !dbname) {
+    dbname = `db${dbname}`;
   }
 
-  return sanitized || `site${Date.now()}`;
+  // Final safety: still empty or only the "db" prefix
+  if (!dbname || dbname === "db") {
+    return `site${Date.now()}`;
+  }
+
+  return dbname.slice(0, 64);
 };
 
 // Check if database exists in MySQL
@@ -78,38 +85,34 @@ const databaseExists = async (dbName) => {
 const isDbNameTaken = async (dbName, excludeSiteId = null) => {
   const params = [dbName];
   let sql = "SELECT id FROM sites WHERE dbName = ?";
-
   if (excludeSiteId !== null) {
     sql += " AND id != ?";
     params.push(excludeSiteId);
   }
-
   const result = await q(sql, params);
   return result.length > 0;
 };
 
 // Generate a unique database name by checking existing databases
 const generateUniqueDbName = async (userName, siteName, siteId) => {
-  let attempt = 0;
   let dbName = generateDbName(userName, siteName, siteId);
 
-  // Try base name first
-  const baseExists = await databaseExists(dbName);
-  const baseTaken = await isDbNameTaken(dbName, siteId);
-
-  if (!baseExists && !baseTaken) {
+  if (
+    !(await databaseExists(dbName)) &&
+    !(await isDbNameTaken(dbName, siteId))
+  ) {
     return dbName;
   }
 
-  // If base name exists, try with numeric suffixes
+  let attempt = 0;
   while (attempt < 100) {
     attempt++;
     dbName = generateDbName(userName, siteName, siteId, attempt.toString());
 
-    const exists = await databaseExists(dbName);
-    const taken = await isDbNameTaken(dbName, siteId);
-
-    if (!exists && !taken) {
+    if (
+      !(await databaseExists(dbName)) &&
+      !(await isDbNameTaken(dbName, siteId))
+    ) {
       return dbName;
     }
   }
@@ -122,8 +125,8 @@ const generateUniqueDbName = async (userName, siteName, siteId) => {
 const tableExists = async (dbName, tableName) => {
   const result = await q(
     `SELECT TABLE_NAME
-     FROM information_schema.TABLES
-     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?`,
+       FROM information_schema.TABLES
+      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?`,
     [dbName, tableName],
   );
   return result.length > 0;
@@ -137,74 +140,84 @@ const dbName = (siteId, dbNameFromSite) => {
 };
 
 const tn = (siteId, base, dbNameFromSite) =>
-  `\`${dbName(siteId, dbNameFromSite)}\`.\`${base}\``;
+  `\`${escapeIdent(dbName(siteId, dbNameFromSite))}\`.\`${escapeIdent(base)}\``;
 
-const qualifyDdl = (siteId, base, ddl, dbNameFromSite) =>
-  ddl
-    .replace(
-      /^CREATE TABLE(?: IF NOT EXISTS)?\s+[a-z_]+/i,
-      `CREATE TABLE IF NOT EXISTS ${tn(siteId, base, dbNameFromSite)}`,
-    )
-    .replace(
-      /\bREFERENCES\s+([a-z_]+)\s*\(/gi,
-      (_match, referencedTable) =>
-        `REFERENCES ${tn(siteId, referencedTable, dbNameFromSite)} (`,
-    );
+// Rewrite generic pack DDL to point at the site's specific database
+const qualifyDdl = (siteId, base, ddl, dbNameFromSite) => {
+  // 1) Replace the CREATE TABLE header (tolerates leading whitespace,
+  //    digits in names, and optional backticks)
+  let out = ddl.replace(
+    /^(\s*)CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+`?[a-zA-Z0-9_]+`?/i,
+    (_m, lead) =>
+      `${lead}CREATE TABLE IF NOT EXISTS ${tn(siteId, base, dbNameFromSite)}`,
+  );
+
+  // 2) Replace foreign-key REFERENCES to other tables
+  out = out.replace(
+    /\bREFERENCES\s+`?([a-zA-Z0-9_]+)`?\s*\(/gi,
+    (_m, refTable) =>
+      `REFERENCES ${tn(siteId, refTable, dbNameFromSite)} (`,
+  );
+
+  return out;
+};
 
 async function provisionSiteDatabase(siteId) {
   const id = safeId(siteId);
   try {
-    const row = await q(
+    const rows = await q(
       `SELECT s.name AS siteName, u.name AS userName,
               c.packKey, c.name AS categoryName
-       FROM sites s
-       JOIN users u ON u.userId = s.userId
-       JOIN template t ON t.templateId = s.templateId
-       JOIN categories c ON c.categoryId = t.categoryId
-       WHERE s.id = ?`,
+         FROM sites s
+         JOIN users u      ON u.userId = s.userId
+         JOIN template t   ON t.templateId = s.templateId
+         JOIN categories c ON c.categoryId = t.categoryId
+        WHERE s.id = ?`,
       [id],
     );
-    if (!row || row.length === 0)
+    if (!rows || rows.length === 0) {
       throw new Error("Site or template category was not found");
+    }
+    const { siteName, userName, packKey } = rows[0];
 
-    const existingRows = await q("SELECT dbName FROM sites WHERE id = ?", [id]);
+    const existing = await q("SELECT dbName FROM sites WHERE id = ?", [id]);
     const generatedDbName =
-      existingRows[0]?.dbName ||
-      (await generateUniqueDbName(row[0].userName, row[0].siteName, id));
+      existing[0]?.dbName ||
+      (await generateUniqueDbName(userName, siteName, id));
 
-    // Check if database already exists (shouldn't happen with generateUniqueDbName, but safety check)
-    const dbAlreadyExists = await databaseExists(generatedDbName);
-
-    if (dbAlreadyExists) {
-      // Verify if it belongs to this site
-      const dbOwner = await q("SELECT id FROM sites WHERE dbName = ?", [
+    // Safety: if the MySQL database already exists and belongs to a
+    // different site, refuse to touch it
+    if (await databaseExists(generatedDbName)) {
+      const owners = await q("SELECT id FROM sites WHERE dbName = ?", [
         generatedDbName,
       ]);
-      if (dbOwner.length > 0 && String(dbOwner[0].id) !== String(id)) {
+      if (owners.length > 0 && String(owners[0].id) !== String(id)) {
         throw new Error(
           `Database name conflict: ${generatedDbName} is already in use by another site`,
         );
       }
     }
 
-    // Create the database
-    await q(`CREATE DATABASE IF NOT EXISTS \`${generatedDbName}\`
-             CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci`);
+    await q(
+      `CREATE DATABASE IF NOT EXISTS \`${escapeIdent(generatedDbName)}\`
+         CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci`,
+    );
 
+    // Build the table list: common + category-specific pack
     const tables = [...packs.common()];
-    if (row[0].packKey && typeof packs[row[0].packKey] === "function") {
-      tables.push(...packs[row[0].packKey]());
+    if (packKey && typeof packs[packKey] === "function") {
+      tables.push(...packs[packKey]());
     }
 
     for (const [base, ddl] of tables) {
-      if (!/^[a-z_]+$/.test(base)) throw new Error(`Bad table key: ${base}`);
-      if (!/^CREATE TABLE\b/i.test(ddl))
+      if (!/^[a-z][a-z0-9_]*$/.test(base)) {
+        throw new Error(`Bad table key: ${base}`);
+      }
+      if (!/^\s*CREATE\s+TABLE\b/i.test(ddl)) {
         throw new Error(`Invalid table definition: ${base}`);
+      }
 
-      // Check if table already exists before creating
-      const tableAlreadyExists = await tableExists(generatedDbName, base);
-
-      if (!tableAlreadyExists) {
+      if (!(await tableExists(generatedDbName, base))) {
         await q(qualifyDdl(id, base, ddl, generatedDbName));
       } else {
         console.log(
@@ -212,38 +225,44 @@ async function provisionSiteDatabase(siteId) {
         );
       }
 
-      await q("INSERT IGNORE INTO sitetables (siteId, baseName) VALUES (?,?)", [
-        id,
-        base,
-      ]);
+      await q(
+        "INSERT IGNORE INTO sitetables (siteId, baseName) VALUES (?, ?)",
+        [id, base],
+      );
     }
 
     // Verify required tables exist
-    const pagesTableExists = await tableExists(generatedDbName, "pages");
-    const headersTableExists = await tableExists(generatedDbName, "headers");
-
-    if (!pagesTableExists) {
+    if (!(await tableExists(generatedDbName, "pages"))) {
       throw new Error("Failed to create required table: pages");
     }
-    if (!headersTableExists) {
+    if (!(await tableExists(generatedDbName, "headers"))) {
       throw new Error("Failed to create required table: headers");
     }
 
-    // seed purchased pages (snapshot) and a header row
+    // Seed purchased pages (snapshot) — idempotent
     await q(
-      `INSERT IGNORE INTO ${tn(id, "pages", generatedDbName)} (sourcePagesId, title, page, sortOrder)
+      `INSERT IGNORE INTO ${tn(id, "pages", generatedDbName)}
+              (sourcePagesId, title, page, sortOrder)
        SELECT p.pagesId, p.title, p.page, tp.sortOrder
          FROM sites s
-         JOIN paymentpages pp  ON pp.paymentId = s.paymentId
-         JOIN pages p          ON p.pagesId = pp.pagesId
-         JOIN templatepages tp ON tp.templateId = pp.templateId AND tp.pagesId = pp.pagesId
+         JOIN paymentpages pp  ON pp.paymentId  = s.paymentId
+         JOIN pages p          ON p.pagesId     = pp.pagesId
+         JOIN templatepages tp ON tp.templateId = pp.templateId
+                              AND tp.pagesId    = pp.pagesId
         WHERE s.id = ?`,
       [id],
     );
+
+    // Seed default header row if the table is empty
     await q(
       `INSERT INTO ${tn(id, "headers", generatedDbName)} (siteTitle)
        SELECT s.name FROM sites s
-        WHERE s.id = ? AND NOT EXISTS (SELECT 1 FROM ${tn(id, "headers", generatedDbName)})`,
+        WHERE s.id = ?
+          AND NOT EXISTS (SELECT 1 FROM ${tn(
+            id,
+            "headers",
+            generatedDbName,
+          )})`,
       [id],
     );
 
@@ -274,11 +293,11 @@ async function provisionSiteDatabase(siteId) {
 
 async function dropSiteDatabase(siteId) {
   const id = safeId(siteId);
-  // Get the actual dbName from the site record
   const site = await q("SELECT dbName FROM sites WHERE id = ?", [id]);
-  const actualDbName = site && site[0] ? site[0].dbName : `site_${id}`;
+  const actualDbName =
+    site && site[0] && site[0].dbName ? site[0].dbName : `site_${id}`;
 
-  await q(`DROP DATABASE IF EXISTS \`${actualDbName}\``);
+  await q(`DROP DATABASE IF EXISTS \`${escapeIdent(actualDbName)}\``);
   await q("DELETE FROM sitetables WHERE siteId=?", [id]);
   await q(
     "UPDATE sites SET dbName=NULL, provisionStatus='pending', provisionError=NULL WHERE id=?",
@@ -296,4 +315,5 @@ module.exports = {
   databaseExists,
   isDbNameTaken,
   tableExists,
+  qualifyDdl,
 };

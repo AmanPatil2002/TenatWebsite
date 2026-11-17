@@ -5,7 +5,7 @@ const mysql = require("mysql2");
 const connection = mysql.createPool({
   host: process.env.db_host || "localhost",
   user: process.env.db_user || "root",
-  password: process.env.db_password || "",
+  password: process.env.db_password || "1234",
   database: process.env.db_name || "tenant",
   supportBigNumbers: true,
   bigNumberStrings: true,
@@ -14,13 +14,13 @@ const connection = mysql.createPool({
   queueLimit: 0,
 });
 
-connection.getConnection((err, connection) => {
+connection.getConnection((err, conn) => {
   if (err) {
     console.log("Connection to Database Failed");
     console.log(err.message);
     return;
   }
-  connection.release();
+  conn.release();
   console.log("Connection to Database Successful");
 });
 
