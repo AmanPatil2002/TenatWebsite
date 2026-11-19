@@ -290,10 +290,12 @@ export default function SiteAdminNews() {
       {/* Page header — same chip pattern as SiteAdminData */}
       <Stack
         direction={{ xs: "column", sm: "row" }}
-        justifyContent="space-between"
-        alignItems={{ xs: "stretch", sm: "center" }}
         spacing={2}
-        sx={{ mb: 3 }}
+        sx={{
+          justifyContent: "space-between",
+          alignItems: { xs: "stretch", sm: "center" },
+          mb: 3,
+        }}
       >
         <Box>
           <Typography variant="h4" fontWeight={800} letterSpacing="-0.02em">
@@ -303,7 +305,7 @@ export default function SiteAdminNews() {
             Publish articles and announcements on your website.
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
           {site?.categoryName && (
             <Chip
               label={site.categoryName}
@@ -359,7 +361,11 @@ export default function SiteAdminNews() {
             borderColor: alpha(theme.palette.primary.main, 0.2),
           }}
         >
-          <Stack direction="row" alignItems="center" spacing={1.25} sx={{ mb: 0.5 }}>
+          <Stack
+            direction="row"
+            spacing={1.25}
+            sx={{ alignItems: "center", mb: 0.5 }}
+          >
             <Box
               sx={{
                 width: 36,
@@ -374,7 +380,7 @@ export default function SiteAdminNews() {
               {editingId ? <EditIcon size={18} /> : <AddIcon size={18} />}
             </Box>
             <Box>
-              <Typography variant="h6" fontWeight={700} lineHeight={1.2}>
+              <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2 }}>
                 {editingId ? "Edit article" : "Add article"}
               </Typography>
               <Typography variant="caption" color="text.secondary">
@@ -392,7 +398,7 @@ export default function SiteAdminNews() {
               value={form.title}
               onChange={updateField("title")}
               required
-              inputProps={{ maxLength: 150 }}
+              slotProps={{ htmlInput: { maxLength: 150 } }}
               fullWidth
               size="small"
             />
@@ -472,7 +478,7 @@ export default function SiteAdminNews() {
                     },
                   }}
                 >
-                  <Stack direction="row" alignItems="center" spacing={1}>
+                  <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                     {uploading ? <CircularProgress size={18} /> : <UploadIcon size={18} />}
                     <span>{uploading ? "Uploading…" : "Upload cover image"}</span>
                   </Stack>
@@ -501,7 +507,7 @@ export default function SiteAdminNews() {
               onChange={updateField("publishedAt")}
               fullWidth
               size="small"
-              InputLabelProps={{ shrink: true }}
+              slotProps={{ inputLabel: { shrink: true } }}
             />
 
             <TextField
@@ -559,7 +565,14 @@ export default function SiteAdminNews() {
 
         {/* List */}
         <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, minWidth: 0 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.5 }}>
+          <Stack
+            direction="row"
+            sx={{
+              alignItems: "center",
+              justifyContent: "space-between",
+              mb: 0.5,
+            }}
+          >
             <Typography variant="h6" fontWeight={700}>
               Published articles
             </Typography>
@@ -626,7 +639,7 @@ export default function SiteAdminNews() {
                   <Stack
                     direction={{ xs: "column", sm: "row" }}
                     spacing={1.5}
-                    alignItems={{ xs: "stretch", sm: "center" }}
+                    sx={{ alignItems: { xs: "stretch", sm: "center" } }}
                   >
                     <Box
                       sx={{
@@ -656,8 +669,7 @@ export default function SiteAdminNews() {
                       <Stack
                         direction="row"
                         spacing={1}
-                        alignItems="center"
-                        sx={{ mb: 0.5, flexWrap: "wrap" }}
+                        sx={{ alignItems: "center", mb: 0.5, flexWrap: "wrap" }}
                       >
                         <Typography fontWeight={700} noWrap sx={{ minWidth: 0 }}>
                           {item.title || "Untitled"}

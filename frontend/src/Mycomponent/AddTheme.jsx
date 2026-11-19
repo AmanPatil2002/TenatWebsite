@@ -96,6 +96,8 @@ function ThemeForm({
   const [formData, setFormData] = useState(initialValues || getInitialForm());
   const [errors, setErrors] = useState({});
 
+  const isHexField = (key) => key !== "fontFamily" && key !== "borderRadius";
+
   const validate = () => {
     const nextErrors = {};
 
@@ -144,6 +146,16 @@ function ThemeForm({
       name: formData.name.trim(),
       color: formData.color.trim(),
       background: formData.background.trim(),
+      primaryColor: formData.primaryColor,
+      secondaryColor: formData.secondaryColor,
+      backgroundColor: formData.backgroundColor,
+      textColor: formData.textColor,
+      headerBackground: formData.headerBackground,
+      footerBackground: formData.footerBackground,
+      buttonBackground: formData.buttonBackground,
+      buttonTextColor: formData.buttonTextColor,
+      fontFamily: formData.fontFamily,
+      borderRadius: formData.borderRadius,
     };
 
     const success = await onSubmit(payload);
@@ -168,66 +180,68 @@ function ThemeForm({
           helperText={errors.name || "e.g. Dark, Light"}
           sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
         />
-
-        <TextField
-          fullWidth
-          size="small"
-          name="color"
-          label="Text Color"
-          value={formData.color}
-          onChange={handleChange}
-          error={!!errors.color}
-          helperText={errors.color || "e.g. #ffffff"}
-          sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-          InputProps={{
-            startAdornment: formData.color && HEX.test(formData.color.trim()) ? (
-              <Box
-                aria-hidden="true"
-                sx={{
-                  width: 20,
-                  height: 20,
-                  borderRadius: 0.75,
-                  bgcolor: formData.color.trim(),
-                  border: "1px solid",
-                  borderColor: "divider",
-                  mr: 1,
-                  flexShrink: 0,
-                }}
-              />
-            ) : null,
-          }}
-        />
-
-        <TextField
-          fullWidth
-          size="small"
-          name="background"
-          label="Background Color"
-          value={formData.background}
-          onChange={handleChange}
-          error={!!errors.background}
-          helperText={errors.background || "e.g. #121212"}
-          sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-          InputProps={{
-            startAdornment:
-              formData.background && HEX.test(formData.background.trim()) ? (
-                <Box
-                  aria-hidden="true"
-                  sx={{
-                    width: 20,
-                    height: 20,
-                    borderRadius: 0.75,
-                    bgcolor: formData.background.trim(),
-                    border: "1px solid",
-                    borderColor: "divider",
-                    mr: 1,
+        <Grid container spacing={2}>
+          {[
+            {
+              key: "color",
+              label: "Text Color",
+              helper: "e.g. #ffffff",
+            },
+            {
+              key: "background",
+              label: "Background Color",
+              helper: "e.g. #121212",
+            },
+          ].map((field) => (
+            <Grid item xs={12} sm={6} key={field.key}>
+              <Stack direction="row" alignItems="flex-start" spacing={1}>
+                <input
+                  type="color"
+                  value={
+                    HEX.test(formData[field.key]?.trim() || "")
+                      ? formData[field.key].trim()
+                      : "#000000"
+                  }
+                  onChange={(event) =>
+                    handleChange({
+                      target: {
+                        name: field.key,
+                        value: event.target.value,
+                      },
+                    })
+                  }
+                  aria-label={`${field.label} picker`}
+                  style={{
+                    width: 40,
+                    height: 40,
+                    border: "none",
+                    cursor: "pointer",
+                    background: "none",
+                    padding: 0,
                     flexShrink: 0,
+                    marginTop: 2,
                   }}
                 />
-              ) : null,
-          }}
-        />
 
+                <TextField
+                  fullWidth
+                  size="small"
+                  name={field.key}
+                  label={field.label}
+                  value={formData[field.key] || ""}
+                  onChange={handleChange}
+                  error={!!errors[field.key]}
+                  helperText={errors[field.key] || field.helper}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: 2,
+                    },
+                  }}
+                />
+              </Stack>
+            </Grid>
+          ))}
+        </Grid>
         {/* Live preview */}
         <Box
           sx={{
@@ -250,10 +264,10 @@ function ThemeForm({
           >
             PREVIEW
           </Typography>
+
           <Box
             sx={{
-              p: 2,
-              borderRadius: 1.5,
+              p: 1.5,
               bgcolor:
                 formData.background && HEX.test(formData.background.trim())
                   ? formData.background.trim()
@@ -262,14 +276,18 @@ function ThemeForm({
                 formData.color && HEX.test(formData.color.trim())
                   ? formData.color.trim()
                   : BRAND.ink,
-              border: "1px solid",
-              borderColor: "divider",
-              fontWeight: 700,
-              fontSize: "0.95rem",
-              textAlign: "center",
             }}
           >
-            Aa — The quick brown fox
+            <Typography
+              sx={{
+                textAlign: "center",
+                fontSize: "0.9rem",
+                fontWeight: 700,
+                color: "inherit",
+              }}
+            >
+              Aa — The quick brown fox
+            </Typography>
           </Box>
         </Box>
 
@@ -489,8 +507,8 @@ export default function AddTheme() {
   return (
     <Box
       sx={{
-        minHeight: "100vh",
-        py: { xs: 3, md: 5 },
+        minHeight: "80vh",
+        py: { xs: 3, md: 2 },
         background:
           "linear-gradient(160deg, #f8fafc 0%, #eef2ff 45%, #f0fdfa 100%)",
       }}
@@ -498,17 +516,6 @@ export default function AddTheme() {
       <Box sx={{ maxWidth: 1280, mx: "auto", px: { xs: 2, sm: 3 } }}>
         {/* Page header */}
         <Box sx={{ mb: { xs: 3, md: 4 }, textAlign: "center" }}>
-          <Typography
-            variant="overline"
-            sx={{
-              display: "block",
-              fontWeight: 700,
-              letterSpacing: "0.12em",
-              color: BRAND.indigo,
-            }}
-          >
-            Design system
-          </Typography>
           <Typography
             component="h1"
             variant="h4"
@@ -531,7 +538,7 @@ export default function AddTheme() {
 
         <Grid container spacing={{ xs: 2.5, md: 3 }} alignItems="flex-start">
           {/* Add / Edit Theme */}
-          <Grid size={{ xs: 12, md: 5 }}>
+          <Grid item xs={12} md={5}>
             <Paper
               elevation={0}
               variant="outlined"
@@ -542,10 +549,10 @@ export default function AddTheme() {
                 boxShadow: "0 12px 30px rgba(15,23,42,0.05)",
               }}
             >
-              <Box
+              <Stack
+                direction="row"
+                alignItems="center"
                 sx={{
-                  display: "flex",
-                  alignItems: "center",
                   gap: 1.25,
                   mb: 2,
                 }}
@@ -579,7 +586,7 @@ export default function AddTheme() {
                       : "Define colors for your storefront."}
                   </Typography>
                 </Box>
-              </Box>
+              </Stack>
 
               <Divider sx={{ mb: 2.5 }} />
 
@@ -603,7 +610,7 @@ export default function AddTheme() {
           </Grid>
 
           {/* Existing Themes */}
-          <Grid size={{ xs: 12, md: 7 }}>
+          <Grid item xs={12} md={7}>
             <Paper
               elevation={0}
               variant="outlined"
@@ -616,12 +623,11 @@ export default function AddTheme() {
                 flexDirection: "column",
               }}
             >
-              <Box
+              <Stack
+                direction="row"
+                alignItems="center"
                 sx={{
-                  display: "flex",
                   justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  gap: 2,
                   mb: 2,
                 }}
               >
@@ -655,16 +661,16 @@ export default function AddTheme() {
                 >
                   Refresh
                 </Button>
-              </Box>
+              </Stack>
 
               <Divider sx={{ mb: 2 }} />
 
               {loadingList ? (
-                <Box
+                <Stack
+                  direction="row"
+                  alignItems="center"
                   sx={{
-                    display: "flex",
                     justifyContent: "center",
-                    alignItems: "center",
                     py: 6,
                   }}
                 >
@@ -673,7 +679,7 @@ export default function AddTheme() {
                     sx={{ color: BRAND.indigo }}
                     aria-label="Loading themes"
                   />
-                </Box>
+                </Stack>
               ) : themes.length === 0 ? (
                 <Box
                   sx={{
@@ -686,11 +692,7 @@ export default function AddTheme() {
                     bgcolor: alpha(BRAND.indigo, 0.03),
                   }}
                 >
-                  <Typography
-                    fontWeight={700}
-                    color={BRAND.ink}
-                    gutterBottom
-                  >
+                  <Typography fontWeight={700} color={BRAND.ink} gutterBottom>
                     No themes available
                   </Typography>
                   <Typography color="text.secondary">
@@ -755,9 +757,7 @@ export default function AddTheme() {
                         <TableRow
                           key={theme.themeId}
                           hover
-                          selected={
-                            String(editingId) === String(theme.themeId)
-                          }
+                          selected={String(editingId) === String(theme.themeId)}
                           sx={{
                             "&.Mui-selected": {
                               bgcolor: alpha(BRAND.indigo, 0.06),
@@ -817,7 +817,7 @@ export default function AddTheme() {
                                 placement="top"
                                 arrow
                               >
-                                <Box
+                                <Stack
                                   sx={{
                                     width: 38,
                                     height: 28,
@@ -827,7 +827,6 @@ export default function AddTheme() {
                                     border: "1px solid",
                                     borderColor: "divider",
                                     borderRadius: 1,
-                                    display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
                                     fontSize: 11,
@@ -836,7 +835,7 @@ export default function AddTheme() {
                                   }}
                                 >
                                   Aa
-                                </Box>
+                                </Stack>
                               </Tooltip>
 
                               <Stack spacing={0.25} sx={{ minWidth: 0 }}>

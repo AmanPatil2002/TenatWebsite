@@ -21,54 +21,239 @@ import {
 /*  Resource metadata — mirrors RESOURCE_CONFIG in SiteAdminData       */
 /* ------------------------------------------------------------------ */
 const RESOURCE_META = {
-  students: {
-    label: "Students",
-    color: "#1976d2",
-  },
-  teachers: {
-    label: "Teachers",
-    color: "#2e7d32",
-  },
-  classes: {
-    label: "Classes",
-    color: "#6a1b9a",
-  },
-  departments: {
-    label: "Departments",
-    color: "#c62828",
-  },
-  doctors: {
-    label: "Doctors",
-    color: "#00695c",
-  },
-  productcategories: {
-    label: "Product categories",
-    color: "#ef6c00",
-  },
-  products: {
-    label: "Products",
-    color: "#4527a0",
-  },
-  menucategories: {
-    label: "Menu categories",
-    color: "#ad1457",
-  },
-  menuitems: {
-    label: "Menu items",
-    color: "#3e2723",
-  },
+  // Common tables (all sites)
+  headers: { label: "Headers", color: "#607d8b" },
+  pages: { label: "Pages", color: "#3f51b5" },
+  news: { label: "News", color: "#ff9800" },
+  galleries: { label: "Galleries", color: "#9c27b0" },
+  slider: { label: "Slider", color: "#e91e63" },
+  employees: { label: "Employees", color: "#009688" },
+
+  // School pack
+  teachers: { label: "Teachers", color: "#2e7d32" },
+  classes: { label: "Classes", color: "#6a1b9a" },
+  students: { label: "Students", color: "#1976d2" },
+
+  // Medical pack
+  departments: { label: "Departments", color: "#c62828" },
+  doctors: { label: "Doctors", color: "#00695c" },
+
+  // E-commerce pack
+  productcategories: { label: "Product categories", color: "#ef6c00" },
+  products: { label: "Products", color: "#4527a0" },
+
+  // Restaurant pack
+  menucategories: { label: "Menu categories", color: "#ad1457" },
+  menuitems: { label: "Menu items", color: "#3e2723" },
+  reservations: { label: "Reservations", color: "#5d4037" },
+
+  // Hotel pack
+  roomtypes: { label: "Room types", color: "#1565c0" },
+  rooms: { label: "Rooms", color: "#0277bd" },
+  bookings: { label: "Bookings", color: "#0288d1" },
+
+  // Real Estate pack
+  propertytypes: { label: "Property types", color: "#2e7d32" },
+  properties: { label: "Properties", color: "#388e3c" },
+  agents: { label: "Agents", color: "#43a047" },
+
+  // Gym pack
+  trainers: { label: "Trainers", color: "#f57f17" },
+  membershipplans: { label: "Membership plans", color: "#ff8f00" },
+  members: { label: "Members", color: "#ffa000" },
+
+  // Blog pack
+  blogcategories: { label: "Blog categories", color: "#6a1b9a" },
+  blogposts: { label: "Blog posts", color: "#7b1fa2" },
+  comments: { label: "Comments", color: "#8e24aa" },
+
+  // Portfolio pack
+  projectcategories: { label: "Project categories", color: "#c62828" },
+  projects: { label: "Projects", color: "#d32f2f" },
+  testimonials: { label: "Testimonials", color: "#e53935" },
+
+  // Event Management pack
+  eventtypes: { label: "Event types", color: "#00695c" },
+  events: { label: "Events", color: "#00796b" },
+  registrations: { label: "Registrations", color: "#00897b" },
+
+  // NGO pack
+  causes: { label: "Causes", color: "#4a148c" },
+  donations: { label: "Donations", color: "#6a1b9a" },
+  volunteers: { label: "Volunteers", color: "#7b1fa2" },
+
+  // Spa pack
+  servicecategories: { label: "Service categories", color: "#1a237e" },
+  services: { label: "Services", color: "#283593" },
+  appointments: { label: "Appointments", color: "#303f9f" },
+
+  // Law Firm pack
+  practiceareas: { label: "Practice areas", color: "#bf360c" },
+  attorneys: { label: "Attorneys", color: "#d84315" },
+  caseinquiries: { label: "Case inquiries", color: "#e64a19" },
+
+  // Agriculture pack
+  farmproducts: { label: "Farm products", color: "#1b5e20" },
+  farminquiries: { label: "Farm inquiries", color: "#2e7d32" },
+  farmorders: { label: "Farm orders", color: "#388e3c" },
+  farmorderitems: { label: "Farm order items", color: "#43a047" },
+
+  // Consulting pack
+  consultingservices: { label: "Consulting services", color: "#0d47a1" },
+  consultants: { label: "Consultants", color: "#1565c0" },
+  consultationrequests: { label: "Consultation requests", color: "#1976d2" },
+  proposals: { label: "Proposals", color: "#1e88e5" },
+  engagements: { label: "Engagements", color: "#2196f3" },
+
+  // Petcare pack
+  petservices: { label: "Pet services", color: "#4a148c" },
+  veterinarians: { label: "Veterinarians", color: "#6a1b9a" },
+  petappointments: { label: "Pet appointments", color: "#7b1fa2" },
+  petrecords: { label: "Pet records", color: "#8e24aa" },
+  petpayments: { label: "Pet payments", color: "#9c27b0" },
+
+  // Daycare pack
+  daycareprograms: { label: "Daycare programs", color: "#e65100" },
+  caregivers: { label: "Caregivers", color: "#ef6c00" },
+  admissionenquiries: { label: "Admission enquiries", color: "#f57c00" },
+  enrollments: { label: "Enrollments", color: "#fb8c00" },
+  daycarepayments: { label: "Daycare payments", color: "#ff9800" },
+
+  // Dental pack
+  dentalservices: { label: "Dental services", color: "#004d40" },
+  dentists: { label: "Dentists", color: "#00695c" },
+  dentalappointments: { label: "Dental appointments", color: "#00796b" },
+  dentalpatients: { label: "Dental patients", color: "#00897b" },
+  treatmentplans: { label: "Treatment plans", color: "#009688" },
+  dentalpayments: { label: "Dental payments", color: "#26a69a" },
+
+  // Mobile Apps pack
+  appcategories: { label: "App categories", color: "#311b92" },
+  mobileapps: { label: "Mobile apps", color: "#4527a0" },
+  appreviews: { label: "App reviews", color: "#5e35b1" },
+  downloads: { label: "Downloads", color: "#673ab7" },
+  apppurchases: { label: "App purchases", color: "#7e57c2" },
+
+  // Interior Design pack
+  designservices: { label: "Design services", color: "#880e4f" },
+  designprojects: { label: "Design projects", color: "#ad1457" },
+  designinquiries: { label: "Design inquiries", color: "#c2185b" },
+  sitevisits: { label: "Site visits", color: "#d81b60" },
+  moodboards: { label: "Mood boards", color: "#ec407a" },
+
+  // Music pack
+  artists: { label: "Artists", color: "#b71c1c" },
+  albums: { label: "Albums", color: "#c62828" },
+  tracks: { label: "Tracks", color: "#d32f2f" },
+  eventshows: { label: "Event shows", color: "#e53935" },
+
+  // Streaming pack
+  genres: { label: "Genres", color: "#3e2723" },
+  movies: { label: "Movies", color: "#4e342e" },
+  subscriptionplans: { label: "Subscription plans", color: "#5d4037" },
+  watchlist: { label: "Watchlist", color: "#6d4c41" },
+  episodes: { label: "Episodes", color: "#795548" },
+  subscriptions: { label: "Subscriptions", color: "#8d6e63" },
+  watchhistory: { label: "Watch history", color: "#a1887f" },
+
+  // Gaming pack
+  gamecategories: { label: "Game categories", color: "#1a237e" },
+  games: { label: "Games", color: "#283593" },
+  teams: { label: "Teams", color: "#303f9f" },
+  tournaments: { label: "Tournaments", color: "#3f51b5" },
+  players: { label: "Players", color: "#5c6bc0" },
+  teamrosters: { label: "Team rosters", color: "#7986cb" },
+  matches: { label: "Matches", color: "#9fa8da" },
+  matchresults: { label: "Match results", color: "#c5cae9" },
+
+  // Jewelry pack
+  jewelrycategories: { label: "Jewelry categories", color: "#ff6f00" },
+  jewelryproducts: { label: "Jewelry products", color: "#ff8f00" },
+  jewelryinquiries: { label: "Jewelry inquiries", color: "#ffa000" },
+  goldrates: { label: "Gold rates", color: "#ffb300" },
+  jewelryorders: { label: "Jewelry orders", color: "#ffc107" },
+  jewelryorderitems: { label: "Jewelry order items", color: "#ffca28" },
+
+  // Furniture pack
+  furniturecategories: { label: "Furniture categories", color: "#263238" },
+  furnitureproducts: { label: "Furniture products", color: "#37474f" },
+  customorders: { label: "Custom orders", color: "#455a64" },
+  furnitureorders: { label: "Furniture orders", color: "#546e7a" },
+  furnitureorderitems: { label: "Furniture order items", color: "#607d8b" },
+  deliveries: { label: "Deliveries", color: "#78909c" },
+
+  // Grocery pack
+  grocerycategories: { label: "Grocery categories", color: "#1b5e20" },
+  groceryproducts: { label: "Grocery products", color: "#2e7d32" },
+  deliveryslots: { label: "Delivery slots", color: "#388e3c" },
+  groceryorders: { label: "Grocery orders", color: "#43a047" },
+  groceryorderitems: { label: "Grocery order items", color: "#4caf50" },
+
+  // Cafe pack
+  cafecategories: { label: "Cafe categories", color: "#3e2723" },
+  cafeitems: { label: "Cafe items", color: "#4e342e" },
+  tablebookings: { label: "Table bookings", color: "#5d4037" },
+  cafeorders: { label: "Cafe orders", color: "#6d4c41" },
+  cafeorderitems: { label: "Cafe order items", color: "#795548" },
 };
 
 const RESOURCE_ORDER = [
-  "students",
-  "teachers",
-  "classes",
-  "departments",
-  "doctors",
-  "productcategories",
-  "products",
-  "menucategories",
-  "menuitems",
+  // Common
+  "headers", "pages", "news", "galleries", "slider", "employees",
+  // School
+  "teachers", "classes", "students",
+  // Medical
+  "departments", "doctors",
+  // E-commerce
+  "productcategories", "products",
+  // Restaurant
+  "menucategories", "menuitems", "reservations",
+  // Hotel
+  "roomtypes", "rooms", "bookings",
+  // Real Estate
+  "propertytypes", "properties", "agents",
+  // Gym
+  "trainers", "membershipplans", "members",
+  // Blog
+  "blogcategories", "blogposts", "comments",
+  // Portfolio
+  "projectcategories", "projects", "testimonials",
+  // Event Management
+  "eventtypes", "events", "registrations",
+  // NGO
+  "causes", "donations", "volunteers",
+  // Spa
+  "servicecategories", "services", "appointments",
+  // Law Firm
+  "practiceareas", "attorneys", "caseinquiries",
+  // Agriculture
+  "farmproducts", "farminquiries", "farmorders", "farmorderitems",
+  // Consulting
+  "consultingservices", "consultants", "consultationrequests", "proposals", "engagements",
+  // Petcare
+  "petservices", "veterinarians", "petappointments", "petrecords", "petpayments",
+  // Daycare
+  "daycareprograms", "caregivers", "admissionenquiries", "enrollments", "daycarepayments",
+  // Dental
+  "dentalservices", "dentists", "dentalappointments", "dentalpatients", "treatmentplans", "dentalpayments",
+  // Mobile Apps
+  "appcategories", "mobileapps", "appreviews", "downloads", "apppurchases",
+  // Interior Design
+  "designservices", "designprojects", "designinquiries", "sitevisits", "moodboards",
+  // Music
+  "artists", "albums", "tracks", "eventshows",
+  // Streaming
+  "genres", "movies", "subscriptionplans", "watchlist", "episodes", "subscriptions", "watchhistory",
+  // Gaming
+  "gamecategories", "games", "teams", "tournaments", "players", "teamrosters", "matches", "matchresults",
+  // Jewelry
+  "jewelrycategories", "jewelryproducts", "jewelryinquiries", "goldrates", "jewelryorders", "jewelryorderitems",
+  // Furniture
+  "furniturecategories", "furnitureproducts", "customorders", "furnitureorders", "furnitureorderitems", "deliveries",
+  // Grocery
+  "grocerycategories", "groceryproducts", "deliveryslots", "groceryorders", "groceryorderitems",
+  // Cafe
+  "cafecategories", "cafeitems", "tablebookings", "cafeorders", "cafeorderitems",
 ];
 
 /* ------------------------------------------------------------------ */
@@ -193,20 +378,40 @@ function SummaryCard({ title, value, caption, icon, accent }) {
       }}
     >
       <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
+        <Stack
+          direction="row"
+          spacing={2}
+          sx={{
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+          }}
+        >
           <Box sx={{ minWidth: 0 }}>
             <Typography
               color="text.secondary"
               variant="body2"
               fontWeight={600}
-              sx={{ textTransform: "uppercase", letterSpacing: ".06em", fontSize: 11 }}
+              sx={{
+                textTransform: "uppercase",
+                letterSpacing: ".06em",
+                fontSize: 11,
+              }}
             >
               {title}
             </Typography>
-            <Typography variant="h4" fontWeight={800} sx={{ mt: 1, lineHeight: 1.1 }}>
+            <Typography
+              variant="h4"
+              fontWeight={800}
+              sx={{ mt: 1, lineHeight: 1.1 }}
+            >
               {value}
             </Typography>
-            <Typography color="text.secondary" variant="caption" component="div" sx={{ mt: 0.5 }}>
+            <Typography
+              color="text.secondary"
+              variant="caption"
+              component="div"
+              sx={{ mt: 0.5 }}
+            >
               {caption}
             </Typography>
           </Box>
@@ -233,7 +438,11 @@ function SummaryCard({ title, value, caption, icon, accent }) {
 function DetailItem({ icon, label, value }) {
   const theme = useTheme();
   return (
-    <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0 }}>
+    <Stack
+      direction="row"
+      spacing={1.5}
+      sx={{ alignItems: "center", minWidth: 0 }}
+    >
       <Box
         sx={{
           width: 38,
@@ -421,9 +630,11 @@ export default function SiteAdminDashboard() {
       {/* ---------- Page header ---------- */}
       <Stack
         direction={{ xs: "column", sm: "row" }}
-        justifyContent="space-between"
-        alignItems={{ xs: "stretch", sm: "center" }}
         spacing={2}
+        sx={{
+          justifyContent: "space-between",
+          alignItems: { xs: "stretch", sm: "center" },
+        }}
       >
         <Box>
           <Typography variant="h4" fontWeight={800} letterSpacing="-0.02em">
@@ -448,7 +659,14 @@ export default function SiteAdminDashboard() {
               <RefreshIcon size={18} />
             )
           }
-          sx={{ borderRadius: 2, alignSelf: { xs: "stretch", sm: "auto" } }}
+          sx={{
+            borderRadius: 2,
+            alignSelf: { xs: "stretch", sm: "auto" },
+            // ✅ removed alignItems: "center" — it was doing nothing useful here
+            // Button content is already vertically centered by default
+            whiteSpace: "nowrap", // ✅ prevents "Refresh" from wrapping on narrow screens
+            minWidth: "fit-content", // ✅ keeps button from shrinking awkwardly
+          }}
         >
           Refresh
         </Button>
@@ -474,7 +692,9 @@ export default function SiteAdminDashboard() {
             title="Employees"
             value={employeesLoading ? "…" : employees.length}
             caption={
-              employeesLoading ? "Loading employees" : `${activeEmployees} active`
+              employeesLoading
+                ? "Loading employees"
+                : `${activeEmployees} active`
             }
             accent={theme.palette.success.main}
             icon={<EmployeesIcon size={22} />}
@@ -518,7 +738,11 @@ export default function SiteAdminDashboard() {
       {/* ---------- Site details ---------- */}
       <Card variant="outlined" sx={{ borderRadius: 3 }}>
         <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{ alignItems: "center", mb: 2 }}
+          >
             <Box
               sx={{
                 width: 32,
@@ -576,13 +800,19 @@ export default function SiteAdminDashboard() {
           <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
             <Stack
               direction={{ xs: "column", sm: "row" }}
-              justifyContent="space-between"
-              alignItems={{ xs: "stretch", sm: "center" }}
               spacing={2}
-              sx={{ mb: 2 }}
+              sx={{
+                justifyContent: "space-between",
+                alignItems: { xs: "stretch", sm: "center" },
+                mb: 2,
+              }}
             >
               <Box>
-                <Stack direction="row" alignItems="center" spacing={1}>
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  sx={{ alignItems: "center" }}
+                >
                   <Box
                     sx={{
                       width: 32,
@@ -600,7 +830,11 @@ export default function SiteAdminDashboard() {
                     Your data
                   </Typography>
                 </Stack>
-                <Typography color="text.secondary" variant="body2" sx={{ mt: 0.5 }}>
+                <Typography
+                  color="text.secondary"
+                  variant="body2"
+                  sx={{ mt: 0.5 }}
+                >
                   {totalRecords} record{totalRecords === 1 ? "" : "s"} across{" "}
                   {populatedResources.length} table
                   {populatedResources.length === 1 ? "" : "s"}.
@@ -640,9 +874,11 @@ export default function SiteAdminDashboard() {
                       <CardContent sx={{ p: 2 }}>
                         <Stack
                           direction="row"
-                          justifyContent="space-between"
-                          alignItems="center"
                           spacing={1}
+                          sx={{
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                          }}
                         >
                           <Box sx={{ minWidth: 0 }}>
                             <Typography

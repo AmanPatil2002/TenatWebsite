@@ -10,7 +10,6 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  Divider,
   GlobalStyles,
   IconButton,
   InputAdornment,
@@ -27,10 +26,10 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import CloseIcon from "@mui/icons-material/Close";
-import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
 import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import SearchIcon from "@mui/icons-material/Search";
+import CloseIcon from "@mui/icons-material/Close";
+import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
 
 const API_URL = (
   import.meta.env.VITE_API_URL || "http://localhost:5000"
@@ -105,32 +104,95 @@ const headCellSx = {
 
 /* ---------------- Invoice dialog ---------------- */
 
-function InvoiceDialog({ payment, admin, adminContact, onClose }) {
-  const adminemail = localStorage.getItem("email");
+const invoiceHeadCellSx = {
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: 0.8,
+  textTransform: "uppercase",
+  color: "text.secondary",
+  bgcolor: "action.hover",
+  borderBottom: "1px solid",
+  borderColor: "divider",
+  py: 1,
+};
+
+const sectionLabelSx = {
+  display: "block",
+  mb: 0.75,
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: 1,
+  textTransform: "uppercase",
+  color: "text.secondary",
+};
+
+/* Label on the left, value on the right – aligned in a 2-column grid */
+function MetaRow({ label, value, breakAll }) {
+  return (
+    <>
+      <Typography variant="body2" color="text.secondary">
+        {label}
+      </Typography>
+      <Typography
+        variant="body2"
+        fontWeight={600}
+        sx={{
+          textAlign: "right",
+          wordBreak: breakAll ? "break-all" : "normal",
+        }}
+      >
+        {value}
+      </Typography>
+    </>
+  );
+}
+
+function InvoiceDialog({ payment, adminContact, onClose }) {
+  const adminEmail = localStorage.getItem("email");
   if (!payment) return null;
 
   const pages = [...getPages(payment.pages)].sort(
     (a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0),
   );
-  const status = statusMeta(payment.status);
+
+  const currency = payment.currency;
+
   const hasPagePrices = pages.some(
     (page) => page.price != null && page.price !== "",
   );
   const baseAmount =
     payment.baseAmount ?? payment.templatePriceSnapshot ?? null;
 
-  // ---- FROM = admin contact (fallback to COMPANY) ----
-  const fromName = adminemail || "";
+  /* ---- Totals ---- */
+  const pagesTotal =
+    payment.pagesAmount ??
+    (hasPagePrices
+      ? pages.reduce((sum, p) => sum + Number(p.price || 0), 0)
+      : 0);
+
+  const totalPaid = Number(payment.amount || 0);
+
+  /* ---- From (seller) ---- */
+  const fromName =
+    adminContact?.companyName || adminContact?.name || adminEmail || "Company";
   const fromEmail = adminContact?.email || "";
   const fromAddress = adminContact?.address || "";
-  const fromPhone = adminContact?.contact || "";
 
-  // ---- BILLED TO = buyer info from payment ----
+  /* ---- Billed to (buyer) ---- */
   const billedName = payment.userName || payment.email || "—";
   const billedEmail = payment.email || "";
 
+  const invoiceDate = formatShortDate(payment.paidAt || payment.createdAt);
+  const isPaid = payment.status === "paid";
+
   return (
-    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
+    <Dialog
+      open
+      onClose={onClose}
+      fullWidth
+      maxWidth="md"
+      PaperProps={{ sx: { borderRadius: 2, overflow: "hidden" } }}
+    >
       <GlobalStyles
         styles={{
           "@media print": {
@@ -141,23 +203,30 @@ function InvoiceDialog({ payment, admin, adminContact, onClose }) {
               left: 0,
               top: 0,
               width: "100%",
+              boxShadow: "none",
             },
             ".no-print": { display: "none !important" },
+            "@page": { margin: "12mm" },
           },
         }}
       />
 
-      <Box className="invoice-print">
-        {/* Invoice header */}
+      <Box
+        className="invoice-print"
+        sx={{
+          bgcolor: "background.paper",
+          WebkitPrintColorAdjust: "exact",
+          printColorAdjust: "exact",
+        }}
+      >
+        {/* ---------- Header band ---------- */}
         <Box
           sx={(theme) => ({
-            px: 3,
-            py: 2.5,
+            position: "relative",
+            px: { xs: 3, sm: 5 },
+            py: 3.5,
             color: "common.white",
             background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-            position: "relative",
-            WebkitPrintColorAdjust: "exact",
-            printColorAdjust: "exact",
           })}
         >
           <IconButton
@@ -170,66 +239,92 @@ function InvoiceDialog({ payment, admin, adminContact, onClose }) {
             <CloseIcon fontSize="small" />
           </IconButton>
 
-          <Stack
-            direction="row"
-            justifyContent="space-between"
-            alignItems="flex-start"
-          >
-            <Box>
-              <Typography
-                variant="overline"
-                sx={{ opacity: 0.85, letterSpacing: 1.2 }}
-              >
-                Invoice
-              </Typography>
-              <Typography
-                variant="h6"
-                fontWeight={700}
-                sx={{ lineHeight: 1.2 }}
-              >
-                {payment.invoiceNumber || "—"}
-              </Typography>
-            </Box>
-            <Box sx={{ textAlign: "right" }}>
-              <Box sx={{ mt: 0.5 }}>
-                <Chip
-                  size="small"
-                  label={status.label}
-                  color={status.color}
-                  sx={{
-                    textTransform: "capitalize",
-                    fontWeight: 600,
-                    color: "common.white",
-                    borderColor: "rgba(255,255,255,.5)",
-                  }}
-                  variant="outlined"
-                />
-              </Box>
-            </Box>
-          </Stack>
+          <Box sx={{ textAlign: "center" }}>
+            <Typography
+              sx={{
+                fontSize: 28,
+                fontWeight: 800,
+                letterSpacing: 4,
+                lineHeight: 1,
+              }}
+            >
+              INVOICE
+            </Typography>
+          </Box>
         </Box>
 
-        <DialogContent sx={{ px: 3, py: 3 }}>
-          <Stack spacing={3}>
-            {/* From / Billed to */}
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              spacing={{ xs: 3, sm: 4 }}
-              justifyContent="space-between"
-              alignItems={{ xs: "stretch", sm: "flex-start" }}
-              sx={{ width: "100%" }}
+        <DialogContent sx={{ px: { xs: 3, sm: 5 }, py: 4 }}>
+          <Stack spacing={4}>
+            {/* ---------- From / Billed to / Details ---------- */}
+            {/* Invoice details */}
+            <Box sx={{ minWidth: 80 }}>
+              <Typography sx={sectionLabelSx}>Invoice details</Typography>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "auto 1fr",
+                  columnGap: 2,
+                  rowGap: 0.75,
+                  alignItems: "baseline",
+                }}
+              >
+                <MetaRow
+                  label="Invoice no."
+                  value={payment.invoiceNumber || "—"}
+                />
+                <MetaRow label="Date" value={invoiceDate} />
+                {payment.method && (
+                  <MetaRow label="Method" value={payment.method} />
+                )}
+                {payment.transactionId && (
+                  <MetaRow
+                    label="Txn ID"
+                    value={payment.transactionId}
+                    breakAll
+                  />
+                )}
+              </Box>
+            </Box>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  sm: "repeat(2, minmax(0, 1fr))",
+                },
+                columnGap: { xs: 3, sm: 4 },
+                rowGap: 3,
+                alignItems: "start",
+                width: "100%",
+              }}
             >
-              {/* From: Business / Admin details */}
-              <Box sx={{ flex: 1, minWidth: 0 }}>
+              {/* Billed to */}
+              <Box sx={{ minWidth: 0, width: "100%" }}>
+                <Typography sx={sectionLabelSx}>Billed to</Typography>
+
                 <Typography
-                  variant="overline"
-                  color="text.secondary"
-                  sx={{ letterSpacing: 1, fontWeight: 700 }}
+                  variant="body1"
+                  fontWeight={700}
+                  sx={{ overflowWrap: "anywhere" }}
                 >
-                  From
+                  {billedName}
                 </Typography>
 
-                <Typography variant="body1" fontWeight={700} sx={{ mt: 0.5 }}>
+                {billedEmail && billedEmail !== billedName && (
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: 0.5, overflowWrap: "anywhere" }}
+                  >
+                    {billedEmail}
+                  </Typography>
+                )}
+              </Box>
+              {/* From */}
+              <Box sx={{ minWidth: 0, width: "100%" }}>
+                <Typography sx={sectionLabelSx}>From</Typography>
+
+                <Typography variant="body1" fontWeight={700}>
                   {fromName}
                 </Typography>
 
@@ -240,89 +335,46 @@ function InvoiceDialog({ payment, admin, adminContact, onClose }) {
                     sx={{
                       mt: 0.5,
                       whiteSpace: "pre-line",
-                      wordBreak: "break-word",
+                      overflowWrap: "anywhere",
                     }}
                   >
                     {fromAddress}
                   </Typography>
                 )}
-
-                {fromEmail && (
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mt: 0.5, wordBreak: "break-word" }}
-                  >
-                    {fromEmail}
-                  </Typography>
-                )}
-
-                {fromPhone && (
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mt: 0.5 }}
-                  >
-                    {fromPhone}
-                  </Typography>
-                )}
               </Box>
+            </Box>
 
-              {/* Billed to: Customer details */}
-              <Box
-                sx={{
-                  flex: 1,
-                  minWidth: 0,
-                  textAlign: { xs: "left", sm: "right" },
-                }}
-              >
-                <Typography
-                  variant="overline"
-                  color="text.secondary"
-                  sx={{ letterSpacing: 1, fontWeight: 700 }}
-                >
-                  Billed to
-                </Typography>
-
-                <Typography variant="body1" fontWeight={700} sx={{ mt: 0.5 }}>
-                  {billedName}
-                </Typography>
-
-                {billedEmail && billedEmail !== billedName && (
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mt: 0.5, wordBreak: "break-word" }}
-                  >
-                    {billedEmail}
-                  </Typography>
-                )}
-              </Box>
-            </Stack>
-
-            <Divider />
-
-            {/* Line items */}
-            <TableContainer>
-              <Table size="small">
+            {/* ---------- Line items ---------- */}
+            <TableContainer
+              sx={{
+                border: "1px solid",
+                borderColor: "divider",
+                borderRadius: 1.5,
+              }}
+            >
+              <Table size="small" sx={{ tableLayout: "fixed", minWidth: 480 }}>
                 <TableHead>
                   <TableRow>
-                    <TableCell
-                      sx={{ ...headCellSx, bgcolor: "transparent", pl: 0 }}
-                    >
-                      Description
+                    <TableCell sx={{ ...invoiceHeadCellSx, width: 44, pl: 2 }}>
+                      #
                     </TableCell>
+                    <TableCell sx={invoiceHeadCellSx}>Description</TableCell>
                     <TableCell
-                      sx={{ ...headCellSx, bgcolor: "transparent", pr: 0 }}
+                      sx={{ ...invoiceHeadCellSx, width: 120, pr: 2 }}
                       align="right"
                     >
                       Amount
                     </TableCell>
                   </TableRow>
                 </TableHead>
+
                 <TableBody>
+                  {/* Base template */}
                   <TableRow>
-                    <TableCell sx={{ pl: 0 }}>
+                    <TableCell sx={{ pl: 2, verticalAlign: "top" }}>
+                      Site
+                    </TableCell>
+                    <TableCell sx={{ wordBreak: "break-word" }}>
                       <Typography variant="body2" fontWeight={600}>
                         {payment.templateName ||
                           `Template #${payment.templateId}`}
@@ -333,36 +385,53 @@ function InvoiceDialog({ payment, admin, adminContact, onClose }) {
                     </TableCell>
                     <TableCell
                       align="right"
-                      sx={{ pr: 0, whiteSpace: "nowrap" }}
+                      sx={{
+                        pr: 2,
+                        verticalAlign: "top",
+                        fontWeight: 600,
+                        whiteSpace: "nowrap",
+                      }}
                     >
                       {baseAmount != null
-                        ? formatMoney(baseAmount, payment.currency)
+                        ? formatMoney(baseAmount, currency)
                         : "—"}
                     </TableCell>
                   </TableRow>
 
+                  {/* Pages */}
                   {hasPagePrices ? (
                     pages.map((page, index) => (
                       <TableRow key={page.pagesId || index}>
-                        <TableCell sx={{ pl: 0 }}>
+                        <TableCell sx={{ pl: 2, verticalAlign: "top" }}>
+                          {index + 1}
+                        </TableCell>
+                        <TableCell sx={{ wordBreak: "break-word" }}>
                           <Typography variant="body2">
                             {page.title || `Page #${page.pagesId}`}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            Page
+                            Additional page
                           </Typography>
                         </TableCell>
                         <TableCell
                           align="right"
-                          sx={{ pr: 0, whiteSpace: "nowrap" }}
+                          sx={{
+                            pr: 2,
+                            verticalAlign: "top",
+                            fontWeight: 600,
+                            whiteSpace: "nowrap",
+                          }}
                         >
-                          {formatMoney(page.price, payment.currency)}
+                          {formatMoney(page.price, currency)}
                         </TableCell>
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell sx={{ pl: 0 }}>
+                      <TableCell sx={{ pl: 2, verticalAlign: "top" }}>
+                        2
+                      </TableCell>
+                      <TableCell sx={{ wordBreak: "break-word" }}>
                         <Typography variant="body2">
                           Selected pages ({pages.length})
                         </Typography>
@@ -377,12 +446,23 @@ function InvoiceDialog({ payment, admin, adminContact, onClose }) {
                             : "No pages recorded"}
                         </Typography>
                       </TableCell>
+                      <TableCell align="right" sx={{ verticalAlign: "top" }}>
+                        {pages.length || "—"}
+                      </TableCell>
+                      <TableCell align="right" sx={{ verticalAlign: "top" }}>
+                        —
+                      </TableCell>
                       <TableCell
                         align="right"
-                        sx={{ pr: 0, whiteSpace: "nowrap" }}
+                        sx={{
+                          pr: 2,
+                          verticalAlign: "top",
+                          fontWeight: 600,
+                          whiteSpace: "nowrap",
+                        }}
                       >
                         {payment.pagesAmount != null
-                          ? formatMoney(payment.pagesAmount, payment.currency)
+                          ? formatMoney(payment.pagesAmount, currency)
                           : "—"}
                       </TableCell>
                     </TableRow>
@@ -391,35 +471,48 @@ function InvoiceDialog({ payment, admin, adminContact, onClose }) {
               </Table>
             </TableContainer>
 
-            {/* Total */}
+            {/* ---------- Totals ---------- */}
             <Box
+              alignItems="center"
+              justifyContent="space-between"
               sx={(theme) => ({
-                p: 2,
-                borderRadius: 1.5,
-                bgcolor: alpha(theme.palette.primary.main, 0.08),
-                WebkitPrintColorAdjust: "exact",
-                printColorAdjust: "exact",
+                px: 2,
+                py: 1.5,
+                bgcolor: theme.palette.primary.main,
+                color: "common.white",
+                textAlign: "center",
               })}
             >
-              <Stack direction="row" alignItems="center">
-                <Typography variant="subtitle1" fontWeight={700}>
-                  Total paid
-                </Typography>
-                <Typography
-                  variant="h5"
-                  fontWeight={700}
-                  color="primary"
-                  sx={{ ml: "auto", textAlign: "right" }}
-                >
-                  {formatMoney(payment.amount, payment.currency)}
-                </Typography>
-              </Stack>
+              <Typography variant="subtitle1" fontWeight={700}>
+                {isPaid ? "Total paid" : "Total"}{" "}
+                {formatMoney(totalPaid, currency)}
+              </Typography>
             </Box>
           </Stack>
         </DialogContent>
+
+        {/* ---------- Footer ---------- */}
+        <Box
+          sx={{
+            px: { xs: 3, sm: 5 },
+            py: 2,
+            borderTop: "1px solid",
+            borderColor: "divider",
+            bgcolor: "action.hover",
+          }}
+        >
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ display: "block", textAlign: "center" }}
+          >
+            This is a computer-generated invoice and does not require a
+            signature. For questions, contact {fromEmail || fromName}.
+          </Typography>
+        </Box>
       </Box>
 
-      <DialogActions className="no-print" sx={{ px: 3, pb: 2.5, pt: 0 }}>
+      <DialogActions className="no-print" sx={{ px: 3, py: 2 }}>
         <Button onClick={onClose} sx={{ textTransform: "none" }}>
           Close
         </Button>
@@ -545,20 +638,28 @@ export default function ViewPayment({ admin = true }) {
     >
       <Box sx={{ maxWidth: 1500, mx: "auto" }}>
         {/* Page header */}
+
         <Stack
           direction={{ xs: "column", sm: "row" }}
           justifyContent="space-between"
           alignItems={{ xs: "stretch", sm: "center" }}
-          spacing={2}
-          sx={{ mb: 3 }}
+          spacing={{ xs: 2, sm: 2 }}
+          sx={{ mb: 3, width: "100%" }}
         >
-          <Stack direction="row" alignItems="center" spacing={1.5}>
+          {/* Header */}
+          <Stack
+            direction="row"
+            alignItems="center"
+            spacing={1.5}
+            sx={{ minWidth: 0, flex: 1 }}
+          >
             <Box
               sx={{
                 display: "grid",
                 placeItems: "center",
                 width: 40,
                 height: 40,
+                minWidth: 40,
                 borderRadius: 2,
                 bgcolor: "primary.main",
                 color: "primary.contrastText",
@@ -566,7 +667,8 @@ export default function ViewPayment({ admin = true }) {
             >
               <ReceiptLongOutlinedIcon fontSize="small" />
             </Box>
-            <Box>
+
+            <Box sx={{ minWidth: 0 }}>
               <Typography
                 variant="h5"
                 fontWeight={700}
@@ -574,6 +676,7 @@ export default function ViewPayment({ admin = true }) {
               >
                 Purchased Templates
               </Typography>
+
               <Typography variant="body2" color="text.secondary">
                 {admin
                   ? "All template purchases and their invoices."
@@ -582,15 +685,23 @@ export default function ViewPayment({ admin = true }) {
             </Box>
           </Stack>
 
+          {/* Search */}
           <TextField
             size="small"
+            fullWidth
             placeholder="Search invoice, user, template..."
             value={search}
             onChange={(event) => {
               setSearch(event.target.value);
               setPage(0);
             }}
-            sx={{ width: { xs: "100%", sm: 320 }, bgcolor: "background.paper" }}
+            sx={{
+              width: { xs: "100%", sm: 350 },
+              maxWidth: { sm: 350 },
+              flexShrink: 0,
+              height: 40,
+              bgcolor: "background.paper",
+            }}
             slotProps={{
               input: {
                 startAdornment: (
@@ -630,11 +741,11 @@ export default function ViewPayment({ admin = true }) {
                     {admin && (
                       <TableCell sx={headCellSx}>Purchased by</TableCell>
                     )}
-                    <TableCell sx={headCellSx}>Template &amp; pages</TableCell>
+                    <TableCell sx={headCellSx}>Site &amp; pages</TableCell>
                     <TableCell sx={headCellSx} align="right">
-                      Amount
+                      Amount / Date
                     </TableCell>
-                    <TableCell sx={headCellSx}>Date</TableCell>
+                    {/* <TableCell sx={headCellSx}>Date</TableCell> */}
                     <TableCell sx={headCellSx}>Status</TableCell>
                     <TableCell sx={headCellSx} align="center" width={110}>
                       Action
@@ -711,15 +822,15 @@ export default function ViewPayment({ admin = true }) {
                           </Typography>
                         </TableCell>
 
-                        <TableCell
-                          align="right"
-                          sx={{ whiteSpace: "nowrap", fontWeight: 600 }}
-                        >
-                          {formatMoney(payment.amount, payment.currency)}
-                        </TableCell>
-
-                        <TableCell sx={{ whiteSpace: "nowrap" }}>
-                          {formatShortDate(payment.paidAt || payment.createdAt)}
+                        <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {formatMoney(payment.amount, payment.currency)}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {formatShortDate(
+                              payment.paidAt || payment.createdAt,
+                            )}
+                          </Typography>
                         </TableCell>
 
                         <TableCell>

@@ -33,7 +33,7 @@ import ViewTemplate from "./Mycomponent/ViewTemplate";
 import MySiteView from "./Mycomponent/MySiteView";
 import AddTheme from "./Mycomponent/AddTheme";
 import AddPages from "./Mycomponent/AddPages";
-import SiteAdminAccess from "./Mycomponent/SiteAdminAccess";
+// import SiteAdminAccess from "./Mycomponent/SiteAdminAccess";
 import SiteAdminLogin from "./Pages/Client/SiteAdminLogin";
 import SiteAdminLayout from "./Mycomponent/SiteAdminLayout";
 import SiteAdminDashboard from "./Mycomponent/SiteAdminDashboard";
@@ -44,6 +44,7 @@ import SiteAdminNews from "./Mycomponent/SiteAdminNews";
 import SiteAdminGalary from "./Mycomponent/SiteAdminGalary";
 import SiteAdminSlider from "./Mycomponent/SiteAdminSlider";
 import SiteAdminData from "./Mycomponent/SiteAdminData";
+import SiteAdminThemePage from "./Mycomponent/SiteAdminThemePage";
 import BugReports from "./Mycomponent/BugReports";
 import SiteHeader from "./Mycomponent/SiteHeader";
 import Site from "./Pages/Client/Site";
@@ -69,6 +70,7 @@ function App() {
           <Route path="gallery" element={<SiteAdminGalary />} />
           <Route path="header-footer" element={<SiteHeader />} />
           <Route path="data" element={<SiteAdminData />} />
+          <Route path="theme" element={<SiteAdminThemePage />} />
         </Route>
 
         {/* Client */}
@@ -106,7 +108,7 @@ function App() {
             <Route path="usereview" element={<ViewReview />} />
             <Route path="admindashboard" element={<AdminDashboard />} />
             <Route path="invoice" element={<ViewPayment />} />
-            <Route path="site-admins" element={<SiteAdminAccess />} />
+            {/* <Route path="site-admins" element={<SiteAdminAccess />} /> */}
             <Route path="bug-reports" element={<BugReports />} />
             <Route path="faq" element={<AddFaq />} />
             <Route path="contact" element={<AddContact />} />

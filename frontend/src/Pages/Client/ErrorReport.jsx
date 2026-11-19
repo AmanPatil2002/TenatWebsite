@@ -23,7 +23,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { alpha } from "@mui/material/styles";
+import { alpha, useTheme } from "@mui/material/styles";
 
 const API_URL = (
   import.meta.env.VITE_API_URL || "http://localhost:5000"
@@ -37,13 +37,6 @@ const EMPTY_REPORT = {
   type: "error",
   severity: "medium",
   siteId: "",
-};
-
-const BRAND = {
-  indigo: "#4f46e5",
-  indigoDeep: "#3730a3",
-  ink: "#0f172a",
-  muted: "#64748b",
 };
 
 const getToken = () =>
@@ -72,13 +65,6 @@ const severityColor = {
   critical: "error.main",
 };
 
-const severityTint = {
-  low: "rgba(22,163,74,0.04)",
-  medium: "rgba(2,132,199,0.04)",
-  high: "rgba(245,158,11,0.05)",
-  critical: "rgba(220,38,38,0.05)",
-};
-
 const formatDate = (value) =>
   value
     ? new Date(value).toLocaleString(undefined, {
@@ -92,10 +78,23 @@ const resolveImageUrl = (url) =>
 
 /* ------------------------------ Report card ------------------------------ */
 function ReportCard({ item }) {
+  const theme = useTheme();
+  const primary = theme.palette.primary.main;
+  const textPrimary = theme.palette.text.primary;
+  const textSecondary = theme.palette.text.secondary;
+  const textMuted = theme.palette.text.muted;
+
   const [expanded, setExpanded] = useState(false);
   const isLong =
     item.description.length > 220 || item.description.split("\n").length > 4;
   const imageUrl = resolveImageUrl(item.screenshotUrl);
+
+  const severityTint = {
+    low: alpha(theme.palette.success.main, 0.04),
+    medium: alpha(primary, 0.04),
+    high: alpha(theme.palette.warning.main, 0.05),
+    critical: alpha(theme.palette.error.main, 0.05),
+  };
 
   return (
     <Card
@@ -109,7 +108,7 @@ function ReportCard({ item }) {
         bgcolor: severityTint[item.severity] || "background.paper",
         transition: "box-shadow 0.2s ease, border-color 0.2s ease",
         "&:hover": {
-          boxShadow: "0 8px 22px rgba(15,23,42,0.06)",
+          boxShadow: `0 8px 22px ${alpha(theme.palette.common.black, 0.06)}`,
         },
       }}
     >
@@ -126,7 +125,7 @@ function ReportCard({ item }) {
               <Typography
                 variant="caption"
                 sx={{
-                  color: BRAND.muted,
+                  color: textMuted,
                   fontWeight: 600,
                   letterSpacing: "0.02em",
                 }}
@@ -137,7 +136,7 @@ function ReportCard({ item }) {
                 variant="subtitle1"
                 sx={{
                   fontWeight: 700,
-                  color: BRAND.ink,
+                  color: textPrimary,
                   overflowWrap: "anywhere",
                   lineHeight: 1.35,
                 }}
@@ -171,7 +170,7 @@ function ReportCard({ item }) {
               sx={{
                 whiteSpace: "pre-wrap",
                 overflowWrap: "anywhere",
-                color: BRAND.ink,
+                color: textPrimary,
                 lineHeight: 1.6,
                 ...(!expanded && {
                   display: "-webkit-box",
@@ -193,7 +192,7 @@ function ReportCard({ item }) {
                   mt: 0.5,
                   textTransform: "none",
                   fontWeight: 600,
-                  color: BRAND.indigo,
+                  color: primary,
                 }}
               >
                 {expanded ? "Show less" : "Show more"}
@@ -232,7 +231,7 @@ function ReportCard({ item }) {
               sx={{
                 p: 1.5,
                 borderRadius: 1.5,
-                bgcolor: alpha("#0284c7", 0.06),
+                bgcolor: alpha(primary, 0.06),
                 borderLeft: "3px solid",
                 borderLeftColor: "info.main",
               }}
@@ -253,7 +252,7 @@ function ReportCard({ item }) {
                   whiteSpace: "pre-wrap",
                   overflowWrap: "anywhere",
                   mt: 0.5,
-                  color: BRAND.ink,
+                  color: textPrimary,
                 }}
               >
                 {item.adminNote}
@@ -261,14 +260,14 @@ function ReportCard({ item }) {
               {item.resolvedAt && (
                 <Typography
                   variant="caption"
-                  sx={{ color: BRAND.muted, display: "block", mt: 0.5 }}
+                  sx={{ color: textMuted, display: "block", mt: 0.5 }}
                 >
                   Resolved {formatDate(item.resolvedAt)}
                 </Typography>
               )}
             </Box>
           ) : (
-            <Typography variant="caption" sx={{ color: BRAND.muted }}>
+            <Typography variant="caption" sx={{ color: textMuted }}>
               No admin response yet.
             </Typography>
           )}
@@ -280,6 +279,9 @@ function ReportCard({ item }) {
 
 /* Section label helper */
 function SectionLabel({ children }) {
+  const theme = useTheme();
+  const primary = theme.palette.primary.main;
+
   return (
     <Typography
       variant="overline"
@@ -287,7 +289,7 @@ function SectionLabel({ children }) {
         display: "block",
         fontWeight: 700,
         letterSpacing: "0.1em",
-        color: BRAND.indigo,
+        color: primary,
         lineHeight: 1.6,
       }}
     >
@@ -298,6 +300,19 @@ function SectionLabel({ children }) {
 
 /* --------------------------------- Page ---------------------------------- */
 export default function ErrorReport() {
+  const theme = useTheme();
+  const primary = theme.palette.primary.main;
+  const primaryDark = theme.palette.primary.dark;
+  const textPrimary = theme.palette.text.primary;
+  const textSecondary = theme.palette.text.secondary;
+  const textMuted = theme.palette.text.muted;
+  const infoMain = theme.palette.info.main;
+  const successMain = theme.palette.success.main;
+  const warningMain = theme.palette.warning.main;
+  const errorMain = theme.palette.error.main;
+  const divider = theme.palette.divider;
+  const backgroundPaper = theme.palette.background.paper;
+
   const [tab, setTab] = useState(0);
 
   const [sites, setSites] = useState([]);
@@ -463,8 +478,7 @@ export default function ErrorReport() {
       sx={{
         minHeight: "80vh",
         py: { xs: 4, md: 7 },
-        background:
-          "linear-gradient(160deg, #f8fafc 0%, #eef2ff 45%, #f0fdfa 100%)",
+        background: `linear-gradient(160deg, ${theme.palette.background.default} 0%, ${alpha(theme.palette.primary.main, 0.04)} 45%, ${alpha(theme.palette.info.main, 0.04)} 100%)`,
       }}
     >
       <Container maxWidth="md">
@@ -476,7 +490,7 @@ export default function ErrorReport() {
               display: "block",
               fontWeight: 700,
               letterSpacing: "0.12em",
-              color: BRAND.indigo,
+              color: primary,
             }}
           >
             Support
@@ -487,7 +501,7 @@ export default function ErrorReport() {
             sx={{
               fontWeight: 800,
               letterSpacing: "-0.02em",
-              color: BRAND.ink,
+              color: textPrimary,
               mt: 0.5,
             }}
           >
@@ -508,9 +522,9 @@ export default function ErrorReport() {
           sx={{
             borderRadius: 3.5,
             overflow: "hidden",
-            borderColor: "divider",
+            borderColor: divider,
             boxShadow: "0 24px 60px rgba(15,23,42,0.08)",
-            bgcolor: "background.paper",
+            bgcolor: backgroundPaper,
           }}
         >
           <Tabs
@@ -522,16 +536,16 @@ export default function ErrorReport() {
             variant="fullWidth"
             sx={{
               borderBottom: 1,
-              borderColor: "divider",
-              bgcolor: alpha(BRAND.indigo, 0.02),
+              borderColor: divider,
+              bgcolor: alpha(primary, 0.02),
               "& .MuiTab-root": {
                 fontWeight: 700,
                 textTransform: "none",
                 fontSize: "0.95rem",
                 py: 1.75,
               },
-              "& .Mui-selected": { color: BRAND.indigo },
-              "& .MuiTabs-indicator": { bgcolor: BRAND.indigo, height: 3 },
+              "& .Mui-selected": { color: primary },
+              "& .MuiTabs-indicator": { bgcolor: primary, height: 3 },
             }}
           >
             <Tab label="New report" />
@@ -739,7 +753,7 @@ export default function ErrorReport() {
                   </Stack>
                   <Typography
                     variant="caption"
-                    sx={{ color: BRAND.muted, display: "block", mt: 1 }}
+                    sx={{ color: textMuted, display: "block", mt: 1 }}
                   >
                     JPG, PNG, WEBP or GIF, up to 5 MB.
                   </Typography>
@@ -769,11 +783,11 @@ export default function ErrorReport() {
                       textTransform: "none",
                       fontWeight: 700,
                       px: 3,
-                      bgcolor: BRAND.indigo,
-                      boxShadow: `0 8px 20px ${alpha(BRAND.indigo, 0.25)}`,
+                      bgcolor: primary,
+                      boxShadow: `0 8px 20px ${alpha(primary, 0.25)}`,
                       "&:hover": {
-                        bgcolor: BRAND.indigoDeep,
-                        boxShadow: `0 10px 24px ${alpha(BRAND.indigo, 0.32)}`,
+                        bgcolor: primaryDark,
+                        boxShadow: `0 10px 24px ${alpha(primary, 0.32)}`,
                       },
                     }}
                   >
@@ -839,7 +853,7 @@ export default function ErrorReport() {
                     }}
                   >
                     <CircularProgress
-                      sx={{ color: BRAND.indigo }}
+                      sx={{ color: primary }}
                       aria-label="Loading reports"
                     />
                   </Box>
@@ -850,14 +864,14 @@ export default function ErrorReport() {
                       py: 8,
                       px: 2,
                       borderRadius: 3,
-                      bgcolor: alpha(BRAND.indigo, 0.03),
+                      bgcolor: alpha(primary, 0.03),
                       border: "1px dashed",
-                      borderColor: alpha(BRAND.indigo, 0.2),
+                      borderColor: alpha(primary, 0.2),
                     }}
                   >
                     <Typography
                       fontWeight={700}
-                      color={BRAND.ink}
+                      color={textPrimary}
                       gutterBottom
                     >
                       No reports yet
@@ -872,9 +886,9 @@ export default function ErrorReport() {
                         borderRadius: 2,
                         textTransform: "none",
                         fontWeight: 700,
-                        bgcolor: BRAND.indigo,
-                        boxShadow: `0 8px 20px ${alpha(BRAND.indigo, 0.25)}`,
-                        "&:hover": { bgcolor: BRAND.indigoDeep },
+                        bgcolor: primary,
+                        boxShadow: `0 8px 20px ${alpha(primary, 0.25)}`,
+                        "&:hover": { bgcolor: primaryDark },
                       }}
                     >
                       Create a report
@@ -888,7 +902,7 @@ export default function ErrorReport() {
                       pr: 1,
                       "&::-webkit-scrollbar": { width: 6 },
                       "&::-webkit-scrollbar-thumb": {
-                        bgcolor: alpha(BRAND.indigo, 0.25),
+                        bgcolor: alpha(primary, 0.25),
                         borderRadius: 3,
                       },
                     }}

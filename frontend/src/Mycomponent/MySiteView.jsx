@@ -18,6 +18,7 @@ import {
   Typography,
 } from "@mui/material";
 import { createSiteSlug } from "../utils/siteSlug";
+import { buildSiteTheme } from "../utils/siteTheme";
 
 /* ------------------------------------------------------------------ */
 /* Inline SVG icons (no @mui/icons-material dependency)                */
@@ -194,16 +195,6 @@ const resolveMediaImage = (url) => {
   if (url.startsWith("/uploads/")) return `${API_URL}${url}`;
   return /^https?:\/\/\S+$/i.test(url) ? url : "";
 };
-
-const buildTheme = (background, color) => ({
-  background,
-  color,
-  border: `color-mix(in srgb, ${color} 18%, transparent)`,
-  headerBg: `color-mix(in srgb, ${color} 6%, ${background})`,
-  footerBg: `color-mix(in srgb, ${color} 10%, ${background})`,
-  muted: `color-mix(in srgb, ${color} 70%, transparent)`,
-  hover: `color-mix(in srgb, ${color} 12%, transparent)`,
-});
 
 const renderGallery = (items) => {
   if (!Array.isArray(items)) return "";
@@ -1296,6 +1287,7 @@ export default function MySiteView() {
   const [newsOpen, setNewsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [themeConfig, setThemeConfig] = useState(null);
   const scrollRef = useRef(null);
   const observerRef = useRef(null);
 
@@ -1348,11 +1340,15 @@ export default function MySiteView() {
         const pagesUrl = siteAdminMode
           ? `${API_URL}/sites/client-admin/${targetSiteId}/pages`
           : `${API_URL}/sites/${targetSiteId}/pages`;
+        const themeUrl = siteAdminMode
+          ? `${API_URL}/sites/client-admin/${targetSiteId}/theme`
+          : `${API_URL}/sites/${targetSiteId}/theme`;
         const mediaUrl = siteAdminMode
           ? `${API_URL}/sites/client-admin/${targetSiteId}/media`
           : `${API_URL}/sites/${targetSiteId}/media`;
-        const [pagesRes, mediaRes] = await Promise.all([
+        const [pagesRes, themeRes, mediaRes] = await Promise.all([
           axios.get(pagesUrl, { headers }),
+          axios.get(themeUrl, { headers }).catch(() => ({ data: null })),
           axios.get(mediaUrl, { headers }),
         ]);
         if (cancelled) return;
@@ -1362,6 +1358,7 @@ export default function MySiteView() {
           : [];
 
         setPages(list);
+        setThemeConfig(themeRes.data);
 
         const news = Array.isArray(mediaRes.data?.news)
           ? mediaRes.data.news
@@ -1464,8 +1461,13 @@ export default function MySiteView() {
   );
 
   const theme = useMemo(
-    () => buildTheme(site.background || "#ffffff", site.color || "#222222"),
-    [site.background, site.color],
+    () =>
+      buildSiteTheme(
+        site.background || "#ffffff",
+        site.color || "#222222",
+        themeConfig,
+      ),
+    [site.background, site.color, themeConfig],
   );
 
   const srcDoc = useMemo(

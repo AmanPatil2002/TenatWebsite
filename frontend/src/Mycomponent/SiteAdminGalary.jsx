@@ -285,10 +285,12 @@ export default function SiteAdminGalary() {
       {/* ---------------- Page header ---------------- */}
       <Stack
         direction={{ xs: "column", sm: "row" }}
-        justifyContent="space-between"
-        alignItems={{ xs: "stretch", sm: "center" }}
         spacing={2}
-        sx={{ mb: 3 }}
+        sx={{
+          mb: 3,
+          justifyContent: "space-between",
+          alignItems: { xs: "stretch", sm: "center" },
+        }}
       >
         <Box>
           <Typography variant="h4" fontWeight={800} letterSpacing="-0.02em">
@@ -365,7 +367,11 @@ export default function SiteAdminGalary() {
             borderColor: alpha(theme.palette.primary.main, 0.2),
           }}
         >
-          <Stack direction="row" alignItems="center" spacing={1.25} sx={{ mb: 0.5 }}>
+          <Stack
+            direction="row"
+            spacing={1.25}
+            sx={{ mb: 0.5, alignItems: "center" }}
+          >
             <Box
               sx={{
                 width: 36,
@@ -380,7 +386,11 @@ export default function SiteAdminGalary() {
               {editingId ? <EditIcon size={18} /> : <AddIcon size={18} />}
             </Box>
             <Box>
-              <Typography variant="h6" fontWeight={700} lineHeight={1.2}>
+              <Typography
+                variant="h6"
+                fontWeight={700}
+                sx={{ lineHeight: 1.2 }}
+              >
                 {editingId ? "Edit image" : "Add image"}
               </Typography>
               <Typography variant="caption" color="text.secondary">
@@ -518,7 +528,7 @@ export default function SiteAdminGalary() {
               label="Title"
               value={form.title}
               onChange={updateField("title")}
-              inputProps={{ maxLength: 150 }}
+              slotProps={{ htmlInput: { maxLength: 150 } }}
               fullWidth
               size="small"
             />
@@ -529,7 +539,7 @@ export default function SiteAdminGalary() {
               onChange={updateField("caption")}
               multiline
               minRows={2}
-              inputProps={{ maxLength: 500 }}
+              slotProps={{ htmlInput: { maxLength: 500 } }}
               fullWidth
               size="small"
             />
@@ -538,7 +548,7 @@ export default function SiteAdminGalary() {
               label="Alt text"
               value={form.altText}
               onChange={updateField("altText")}
-              inputProps={{ maxLength: 255 }}
+              slotProps={{ htmlInput: { maxLength: 255 } }}
               fullWidth
               size="small"
               helperText="Describes the image for accessibility and SEO."
@@ -550,7 +560,7 @@ export default function SiteAdminGalary() {
                 type="number"
                 value={form.sortOrder}
                 onChange={updateField("sortOrder")}
-                inputProps={{ min: 0, step: 1 }}
+                slotProps={{ htmlInput: { min: 0, step: 1 } }}
                 fullWidth
                 size="small"
                 sx={{ flex: 1 }}
@@ -624,9 +634,11 @@ export default function SiteAdminGalary() {
         >
           <Stack
             direction="row"
-            alignItems="center"
-            justifyContent="space-between"
-            sx={{ mb: 0.5 }}
+            sx={{
+              mb: 0.5,
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
           >
             <Typography variant="h6" fontWeight={700}>
               Gallery images
@@ -804,9 +816,8 @@ export default function SiteAdminGalary() {
 
                     <Stack
                       direction="row"
-                      justifyContent="flex-end"
                       spacing={0.5}
-                      sx={{ mt: "auto" }}
+                      sx={{ mt: "auto", justifyContent: "flex-end" }}
                     >
                       <IconButton
                         aria-label={`Edit ${item.title || "gallery image"}`}

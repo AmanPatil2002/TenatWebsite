@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
+import { useTheme, alpha } from "@mui/material/styles";
 import {
   Alert,
   Box,
@@ -14,6 +15,7 @@ import {
   Typography,
 } from "@mui/material";
 import { createSiteSlug } from "../../utils/siteSlug";
+import { buildSiteTheme } from "../../utils/siteTheme";
 
 /* ------------------------------------------------------------------ */
 /* Inline SVG icons (no @mui/icons-material dependency)                */
@@ -156,16 +158,6 @@ const resolveMediaImage = (url) => {
   if (url.startsWith("/uploads/")) return `${API_URL}${url}`;
   return /^https?:\/\/\S+$/i.test(url) ? url : "";
 };
-
-const buildTheme = (background, color) => ({
-  background,
-  color,
-  border: `color-mix(in srgb, ${color} 18%, transparent)`,
-  headerBg: `color-mix(in srgb, ${color} 6%, ${background})`,
-  footerBg: `color-mix(in srgb, ${color} 10%, ${background})`,
-  muted: `color-mix(in srgb, ${color} 70%, transparent)`,
-  hover: `color-mix(in srgb, ${color} 12%, transparent)`,
-});
 
 const renderGallery = (items) => {
   if (!Array.isArray(items)) return "";
@@ -700,8 +692,7 @@ const hydrateSiteData = (html, siteData = {}) => {
 /* ------------------------------------------------------------------ */
 const buildSrcDoc = ({
   html,
-  background,
-  color,
+  themeConfig,
   pageTitle,
   galleries,
   slides,
@@ -727,7 +718,14 @@ const buildSrcDoc = ({
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <style>
       :root {
-        --site-header-bg: color-mix(in srgb, ${color} 6%, ${background});
+        --site-primary: ${themeConfig.primaryColor || themeConfig.color || "#0284c7"};
+        --site-secondary: ${themeConfig.secondaryColor || themeConfig.color || "#0369a1"};
+        --site-bg: ${themeConfig.background || "#ffffff"};
+        --site-text: ${themeConfig.textColor || themeConfig.color || "#0f172a"};
+        --site-header-bg: ${themeConfig.headerBackground || themeConfig.headerBg || "#ffffff"};
+        --site-footer-bg: ${themeConfig.footerBackground || themeConfig.footerBg || "#0f172a"};
+        --site-button-bg: ${themeConfig.buttonBackground || themeConfig.primaryColor || "#0284c7"};
+        --site-button-text: ${themeConfig.buttonTextColor || "#ffffff"};
       }
       * { box-sizing: border-box; }
       html { scroll-behavior: smooth; }
@@ -736,24 +734,44 @@ const buildSrcDoc = ({
         margin: 0;
         padding: 0;
         overflow-x: hidden;
-        background: ${background};
-        color: ${color};
-        font-family: Arial, Helvetica, sans-serif;
+        background: var(--site-bg);
+        color: var(--site-text);
+        font-family: ${themeConfig.fontFamily || "Arial, sans-serif"};
       }
       .site-page { padding: 16px; }
       img { max-width: 100%; height: auto; }
       table { max-width: 100%; }
-      .site-home-slider { width: 100%; margin: 22px auto 28px; overflow: hidden; border-radius: 12px; background: #f0f0f0; }
+
+      /* Buttons */
+      button, .btn {
+        background: var(--site-button-bg);
+        color: var(--site-button-text);
+        border-radius: ${themeConfig.borderRadius || "4px"};
+        padding: 8px 16px;
+        border: none;
+        cursor: pointer;
+      }
+
+      .site-home-slider { width: 100%; margin: 22px auto 28px; overflow: hidden; border-radius: ${themeConfig.borderRadius || "12px"}; background: #f0f0f0; }
       .site-slider-track { display: flex; width: 100%; }
       .site-slide { position: relative; flex: 0 0 100%; height: clamp(220px, 42vw, 520px); }
       .site-slide img { width: 100%; height: 100%; object-fit: cover; }
       .site-slide span { position: absolute; inset: auto 0 0; padding: 18px 22px; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,.7)); font-size: 1.15rem; text-align: left; }
       .site-gallery { margin-top: 32px; }
       .site-gallery-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 16px; }
-      .site-gallery figure { margin: 0; overflow: hidden; border-radius: 10px; background: var(--site-header-bg); }
+      .site-gallery figure { margin: 0; overflow: hidden; border-radius: ${themeConfig.borderRadius || "10px"}; background: var(--site-header-bg); }
       .site-gallery img { display: block; width: 100%; height: 240px; object-fit: cover; transition: transform 0.4s ease; }
       .site-gallery figure:hover img { transform: scale(1.06); }
       .site-gallery figcaption { padding: 10px 12px; }
+      /* Ensure CSS variables are applied globally to all elements within the iframe */
+      main, div, section, p, h1, h2, h3, h4, h5, h6, span, a, li, ul, ol {
+        color: inherit;
+      }
+      body {
+        color: var(--site-text);
+        background-color: var(--site-bg);
+      }
+
     </style>
   </head>
   <body><main class="site-page">${bodyHtml}${isGallery ? renderGallery(galleries) : ""}</main></body>
@@ -774,10 +792,9 @@ function SiteHeader({ header, siteName, pages, activeId, onNavigate, theme }) {
         position: "sticky",
         top: 0,
         zIndex: 1100,
-        color: theme.color,
+        color: theme.textColor || theme.color,
         borderBottom: `1px solid ${theme.border}`,
-        backgroundColor: theme.background,
-        backgroundImage: `linear-gradient(${theme.headerBg}, ${theme.headerBg})`,
+        backgroundColor: theme.headerBackground || theme.headerBg || theme.background,
       }}
     >
       <Box
@@ -879,15 +896,15 @@ function SiteHeader({ header, siteName, pages, activeId, onNavigate, theme }) {
             sx={{
               minHeight: 48,
               minWidth: 0,
-              color: theme.color,
+              color: theme.textColor || theme.color,
               "& .MuiTabs-flexContainer": { gap: 0.5 },
               "& .MuiTabs-indicator": {
-                backgroundColor: theme.color,
+                backgroundColor: theme.primaryColor || theme.color,
                 height: 3,
                 borderRadius: "3px 3px 0 0",
               },
               "& .MuiTabScrollButton-root": {
-                color: theme.color,
+                color: theme.textColor || theme.color,
                 width: 32,
               },
               "& .MuiTab-root": {
@@ -898,7 +915,7 @@ function SiteHeader({ header, siteName, pages, activeId, onNavigate, theme }) {
                 textTransform: "none",
                 fontWeight: 600,
                 fontSize: "0.95rem",
-                color: theme.color,
+                color: theme.textColor || theme.color,
                 opacity: 0.7,
                 borderRadius: 1,
                 whiteSpace: "nowrap",
@@ -908,7 +925,7 @@ function SiteHeader({ header, siteName, pages, activeId, onNavigate, theme }) {
                 "&:hover": { opacity: 1, bgcolor: theme.hover },
               },
               "& .MuiTab-root.Mui-selected": {
-                color: theme.color,
+                color: theme.textColor || theme.color,
                 opacity: 1,
               },
             }}
@@ -1008,9 +1025,8 @@ function SiteFooter({ header, siteName, pages, activeId, onNavigate, theme }) {
     <Box
       component="footer"
       sx={{
-        backgroundColor: theme.background,
-        backgroundImage: `linear-gradient(${theme.footerBg}, ${theme.footerBg})`,
-        color: theme.color,
+        backgroundColor: theme.footerBackground || theme.footerBg || theme.background,
+        color: theme.textColor || theme.color,
         borderTop: `1px solid ${theme.border}`,
       }}
     >
@@ -1160,7 +1176,7 @@ function SiteFooter({ header, siteName, pages, activeId, onNavigate, theme }) {
                     rel="noopener noreferrer"
                     aria-label={label}
                     sx={{
-                      color: theme.color,
+                      color: theme.textColor || theme.color,
                       border: `1px solid ${theme.border}`,
                       width: 40,
                       height: 40,
@@ -1218,6 +1234,7 @@ export default function Site() {
   const [newsOpen, setNewsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [themeConfig, setThemeConfig] = useState(null);
   const observerRef = useRef(null);
 
   useEffect(() => {
@@ -1265,11 +1282,16 @@ export default function Site() {
         const pagesUrl = siteAdminMode
           ? `${API_URL}/sites/client-admin/${targetSiteId}/pages`
           : `${API_URL}/sites/${targetSiteId}/pages`;
+        const themeUrl = siteAdminMode
+          ? `${API_URL}/sites/client-admin/${targetSiteId}/theme`
+          : `${API_URL}/sites/${targetSiteId}/theme`;
         const mediaUrl = siteAdminMode
           ? `${API_URL}/sites/client-admin/${targetSiteId}/media`
           : `${API_URL}/sites/${targetSiteId}/media`;
-        const [pagesRes, mediaRes] = await Promise.all([
+
+        const [pagesRes, themeRes, mediaRes] = await Promise.all([
           axios.get(pagesUrl, { headers }),
+          axios.get(themeUrl, { headers }).catch(() => ({ data: null })),
           axios.get(mediaUrl, { headers }),
         ]);
         if (cancelled) return;
@@ -1279,6 +1301,7 @@ export default function Site() {
           : [];
 
         setPages(list);
+        setThemeConfig(themeRes.data);
 
         const news = Array.isArray(mediaRes.data?.news)
           ? mediaRes.data.news
@@ -1296,8 +1319,6 @@ export default function Site() {
         });
 
         // Fetch site data resources.
-        // Each resource is loaded independently so one failing table
-        // (e.g. not whitelisted on the backend) does not blank the others.
         try {
           const base = siteAdminMode
             ? `${API_URL}/sites/client-admin/${targetSiteId}/data`
@@ -1305,9 +1326,6 @@ export default function Site() {
           const dataRes = await axios.get(base, { headers });
           if (cancelled) return;
 
-          // Handle both response shapes:
-          //  - { sections: [{ resource: "students" }, ...] }
-          //  - ["students", "classes", ...]
           const resources = Array.isArray(dataRes.data?.sections)
             ? dataRes.data.sections.map((s) => s.resource)
             : Array.isArray(dataRes.data)
@@ -1384,14 +1402,28 @@ export default function Site() {
 
   useEffect(() => () => observerRef.current?.disconnect(), []);
 
+  const muiTheme = useTheme();
+  const muiPrimary = muiTheme.palette.primary.main;
+  const muiPrimaryDark = muiTheme.palette.primary.dark;
+  const muiTextPrimary = muiTheme.palette.text.primary;
+  const muiTextSecondary = muiTheme.palette.text.secondary;
+  const muiBackgroundDefault = muiTheme.palette.background.default;
+  const muiBackgroundPaper = muiTheme.palette.background.paper;
+  const muiDivider = muiTheme.palette.divider;
+
   const activePage = useMemo(
     () => pages.find((p) => pageKey(p) === String(activeId)),
     [pages, activeId],
   );
 
   const theme = useMemo(
-    () => buildTheme(site.background || "#ffffff", site.color || "#222222"),
-    [site.background, site.color],
+    () =>
+      buildSiteTheme(
+        site.background || "#ffffff",
+        site.color || "#222222",
+        themeConfig,
+      ),
+    [site.background, site.color, themeConfig],
   );
 
   // Re-mount the iframe when the data set changes so tables re-hydrate.
@@ -1401,14 +1433,12 @@ export default function Site() {
     () =>
       buildSrcDoc({
         html: activePage?.page,
-        background: theme.background,
-        color: theme.color,
+        themeConfig: theme,
         pageTitle: activePage?.title || "Site",
         galleries: media.galleries,
         slides: media.slider,
         siteData: {
           ...siteData,
-          // Lets pages hydrate header/footer details via data-entity="headers"
           headers:
             site.header && Object.keys(site.header).length
               ? [site.header]
@@ -1448,11 +1478,11 @@ export default function Site() {
   return (
     <Box
       sx={{
-        bgcolor: theme.background,
         minHeight: "100vh",
         width: "100%",
         display: "flex",
         flexDirection: "column",
+        background: `linear-gradient(160deg, ${muiBackgroundDefault} 0%, ${alpha(muiTheme.palette.primary.main, 0.04)} 45%, ${alpha(muiTheme.palette.info.main, 0.04)} 100%)`,
       }}
     >
       {loading ? (
@@ -1462,19 +1492,19 @@ export default function Site() {
             placeItems: "center",
             flex: 1,
             minHeight: 320,
-            bgcolor: "#f8fafc",
+            bgcolor: muiBackgroundPaper,
           }}
         >
-          <CircularProgress />
+          <CircularProgress color="primary" />
         </Box>
       ) : error ? (
-        <Box sx={{ p: { xs: 2, sm: 3 }, bgcolor: "#f8fafc", flex: 1 }}>
+        <Box sx={{ p: { xs: 2, sm: 3 }, bgcolor: muiBackgroundPaper, flex: 1 }}>
           <Alert severity="error" sx={{ maxWidth: 720, mx: "auto" }}>
             {error}
           </Alert>
         </Box>
       ) : pages.length === 0 ? (
-        <Box sx={{ p: { xs: 2, sm: 3 }, bgcolor: "#f8fafc", flex: 1 }}>
+        <Box sx={{ p: { xs: 2, sm: 3 }, bgcolor: muiBackgroundPaper, flex: 1 }}>
           <Alert severity="info" sx={{ maxWidth: 720, mx: "auto" }}>
             This site has no pages yet.
           </Alert>
@@ -1540,7 +1570,7 @@ export default function Site() {
           slotProps={{
             backdrop: {
               sx: {
-                backgroundColor: "rgba(15, 23, 42, 0.6)",
+                backgroundColor: alpha(muiTheme.palette.common.black, 0.6),
                 backdropFilter: "blur(3px)",
               },
             },
@@ -1548,7 +1578,7 @@ export default function Site() {
               sx: {
                 borderRadius: 3,
                 overflow: "hidden",
-                boxShadow: "0 24px 60px rgba(0,0,0,0.25)",
+                boxShadow: `0 24px 60px ${alpha(muiTheme.palette.common.black, 0.25)}`,
                 position: "relative",
               },
             },
@@ -1576,9 +1606,9 @@ export default function Site() {
               position: "absolute",
               top: 12,
               right: 12,
-              color: "#fff",
-              bgcolor: "rgba(0,0,0,0.5)",
-              "&:hover": { bgcolor: "rgba(0,0,0,0.75)" },
+              color: muiTheme.palette.common.white,
+              bgcolor: alpha(muiTheme.palette.common.black, 0.5),
+              "&:hover": { bgcolor: alpha(muiTheme.palette.common.black, 0.75) },
             }}
           >
             <CloseIcon />
@@ -1594,6 +1624,7 @@ export default function Site() {
                 lineHeight: 1.3,
                 mb: 2,
                 textAlign: "center",
+                color: muiTextPrimary,
               }}
             >
               {media.news[newsIndex].title}
@@ -1602,8 +1633,8 @@ export default function Site() {
             <Typography
               sx={{
                 whiteSpace: "pre-wrap",
-                color: "text.secondary",
-                lineHeight: 1.75,
+                color: muiTextSecondary,
+                lineHeight: 1.7,
                 textAlign: "center",
               }}
             >

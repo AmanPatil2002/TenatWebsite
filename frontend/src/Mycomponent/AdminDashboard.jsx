@@ -656,6 +656,15 @@ function DonutChart({ data, centerLabel = "Total", maxItems = 6 }) {
 }
 
 function RatingBreakdown({ reviews, average }) {
+  // Proper color scale per star rating
+  const starColors = {
+    5: "#43a047", // green
+    4: "#7cb342", // light green
+    3: "#fdd835", // yellow
+    2: "#fb8c00", // orange
+    1: "#e53935", // red
+  };
+
   const counts = [5, 4, 3, 2, 1].map((star) => ({
     star,
     count: reviews.filter((r) => Number(r.rating) === star).length,
@@ -681,34 +690,37 @@ function RatingBreakdown({ reviews, average }) {
           </Typography>
         </Box>
         <Stack spacing={0.9} sx={{ flex: 1, minWidth: 0 }}>
-          {counts.map(({ star, count }) => (
-            <Stack key={star} direction="row" alignItems="center" spacing={1}>
-              <Typography variant="caption" sx={{ width: 22, flexShrink: 0 }}>
-                {star} ★
-              </Typography>
-              <LinearProgress
-                variant="determinate"
-                value={total ? (count / total) * 100 : 0}
-                sx={{
-                  flex: 1,
-                  height: 8,
-                  borderRadius: 4,
-                  bgcolor: alpha(C.amber, 0.15),
-                  "& .MuiLinearProgress-bar": {
+          {counts.map(({ star, count }) => {
+            const barColor = starColors[star];
+            return (
+              <Stack key={star} direction="row" alignItems="center" spacing={1}>
+                <Typography variant="caption" sx={{ width: 22, flexShrink: 0 }}>
+                  {star} ★
+                </Typography>
+                <LinearProgress
+                  variant="determinate"
+                  value={total ? (count / total) * 100 : 0}
+                  sx={{
+                    flex: 1,
+                    height: 8,
                     borderRadius: 4,
-                    bgcolor: C.amber,
-                  },
-                }}
-              />
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ width: 24, textAlign: "right", flexShrink: 0 }}
-              >
-                {count}
-              </Typography>
-            </Stack>
-          ))}
+                    bgcolor: alpha(barColor, 0.15),
+                    "& .MuiLinearProgress-bar": {
+                      borderRadius: 4,
+                      bgcolor: barColor,
+                    },
+                  }}
+                />
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ width: 24, textAlign: "right", flexShrink: 0 }}
+                >
+                  {count}
+                </Typography>
+              </Stack>
+            );
+          })}
         </Stack>
       </Stack>
     </Box>
@@ -1030,7 +1042,7 @@ export default function AdminDashboard() {
             position: "relative",
             overflow: "hidden",
             background:
-              "linear-gradient(135deg, #4f46e5 0%, #0ea5e9 45%, #14b8a6 100%)",
+              "linear-gradient(135deg, #24d9c4 0%, #0ea5e9 45%, #24d9c4 100%)",
             boxShadow:
               "0 24px 48px -24px rgba(79,70,229,0.55), 0 8px 16px -8px rgba(14,165,233,0.4)",
             "&::before": {
@@ -1065,31 +1077,6 @@ export default function AdminDashboard() {
             sx={{ position: "relative", zIndex: 1 }}
           >
             <Box sx={{ minWidth: 0 }}>
-              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
-                <Box
-                  sx={{
-                    display: "inline-flex",
-                    px: 1.25,
-                    py: 0.4,
-                    borderRadius: 10,
-                    bgcolor: "rgba(255,255,255,0.18)",
-                    backdropFilter: "blur(6px)",
-                    border: "1px solid rgba(255,255,255,0.25)",
-                  }}
-                >
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      fontWeight: 700,
-                      letterSpacing: 1,
-                      textTransform: "uppercase",
-                      fontSize: 10.5,
-                    }}
-                  >
-                    Admin Dashboard
-                  </Typography>
-                </Box>
-              </Stack>
               <Typography
                 variant="h4"
                 fontWeight={800}
@@ -1112,7 +1099,6 @@ export default function AdminDashboard() {
                   month: "long",
                   year: "numeric",
                 })}{" "}
-                · Here's what's happening across your platform.
               </Typography>
             </Box>
 

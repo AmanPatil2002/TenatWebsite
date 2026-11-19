@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTheme } from "@mui/material/styles";
 import {
   Alert,
   Box,
@@ -21,69 +22,71 @@ import SupportAgentOutlinedIcon from "@mui/icons-material/SupportAgentOutlined";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const CONTACT_URL = `${API_URL}/contact/acontact`;
 
-const BRAND = {
-  indigo: "#4f46e5",
-  indigoDeep: "#3730a3",
-  ink: "#0f172a",
-  muted: "#64748b",
+// One labelled row: soft tinted icon tile + label + value (optionally a link)
+const InfoRow = ({ icon, label, value, href, external }) => {
+  const theme = useTheme();
+  const indigo = theme.palette.primary.main;
+  const indigoDeep = theme.palette.primary.dark;
+
+  return (
+    <Stack direction="row" spacing={2} alignItems="flex-start">
+      <Box
+        sx={{
+          width: 44,
+          height: 44,
+          flexShrink: 0,
+          display: "grid",
+          placeItems: "center",
+          borderRadius: 2,
+          color: indigo,
+          bgcolor: alpha(indigo, 0.08),
+          "& .MuiSvgIcon-root": { fontSize: "1.3rem" },
+        }}
+      >
+        {icon}
+      </Box>
+
+      {/* minWidth: 0 lets long emails/addresses wrap instead of overflowing */}
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Typography
+          variant="overline"
+          color="text.secondary"
+          sx={{ display: "block", lineHeight: 1.6, letterSpacing: 1, fontWeight: 600, fontSize: "0.7rem" }}
+        >
+          {label}
+        </Typography>
+
+        {href ? (
+          <Link
+            href={href}
+            {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+            underline="hover"
+            color="text.primary"
+            variant="body1"
+            sx={{
+              fontWeight: 500,
+              wordBreak: "break-word",
+              fontSize: "0.95rem",
+              transition: "color 0.2s ease",
+              "&:hover": { color: indigo },
+            }}
+          >
+            {value}
+          </Link>
+        ) : (
+          <Typography variant="body1" sx={{ fontWeight: 500, wordBreak: "break-word", fontSize: "0.95rem" }}>
+            {value}
+          </Typography>
+        )}
+      </Box>
+    </Stack>
+  );
 };
 
-// One labelled row: soft tinted icon tile + label + value (optionally a link)
-const InfoRow = ({ icon, label, value, href, external }) => (
-  <Stack direction="row" spacing={2} alignItems="flex-start">
-    <Box
-      sx={{
-        width: 44,
-        height: 44,
-        flexShrink: 0,
-        display: "grid",
-        placeItems: "center",
-        borderRadius: 2,
-        color: BRAND.indigo,
-        bgcolor: alpha(BRAND.indigo, 0.08),
-        "& .MuiSvgIcon-root": { fontSize: "1.3rem" },
-      }}
-    >
-      {icon}
-    </Box>
-
-    {/* minWidth: 0 lets long emails/addresses wrap instead of overflowing */}
-    <Box sx={{ minWidth: 0, flex: 1 }}>
-      <Typography
-        variant="overline"
-        color="text.secondary"
-        sx={{ display: "block", lineHeight: 1.6, letterSpacing: 1, fontWeight: 600, fontSize: "0.7rem" }}
-      >
-        {label}
-      </Typography>
-
-      {href ? (
-        <Link
-          href={href}
-          {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-          underline="hover"
-          color="text.primary"
-          variant="body1"
-          sx={{
-            fontWeight: 500,
-            wordBreak: "break-word",
-            fontSize: "0.95rem",
-            transition: "color 0.2s ease",
-            "&:hover": { color: BRAND.indigo },
-          }}
-        >
-          {value}
-        </Link>
-      ) : (
-        <Typography variant="body1" sx={{ fontWeight: 500, wordBreak: "break-word", fontSize: "0.95rem" }}>
-          {value}
-        </Typography>
-      )}
-    </Box>
-  </Stack>
-);
-
 const ContactCard = ({ contact, index, showIndex }) => {
+  const theme = useTheme();
+  const indigo = theme.palette.primary.main;
+
   const phone = String(contact.contact ?? "").trim();
   const email = String(contact.email ?? "").trim();
   const address = String(contact.address ?? "").trim();
@@ -139,8 +142,8 @@ const ContactCard = ({ contact, index, showIndex }) => {
         borderColor: "divider",
         transition: "border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease",
         "&:hover": {
-          borderColor: alpha(BRAND.indigo, 0.4),
-          boxShadow: `0 16px 40px ${alpha(BRAND.indigo, 0.08)}`,
+          borderColor: alpha(indigo, 0.4),
+          boxShadow: `0 16px 40px ${alpha(indigo, 0.08)}`,
           transform: "translateY(-2px)",
         },
       }}
@@ -184,6 +187,10 @@ const CardSkeleton = () => (
 );
 
 export default function Contact() {
+  const theme = useTheme();
+  const indigo = theme.palette.primary.main;
+  const indigoDeep = theme.palette.primary.dark;
+
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -220,7 +227,7 @@ export default function Contact() {
     <Box
       sx={{
         minHeight: "100vh",
-        background: "linear-gradient(160deg, #f8fafc 0%, #eef2ff 45%, #f0fdfa 100%)",
+        background: `linear-gradient(160deg, ${theme.palette.background.default} 0%, ${alpha(theme.palette.primary.main, 0.04)} 45%, ${alpha(theme.palette.info.main, 0.04)} 100%)`,
       }}
     >
       <Container maxWidth="md" sx={{ py: { xs: 6, sm: 8, md: 12 }, px: { xs: 2, sm: 3 } }}>
@@ -234,8 +241,8 @@ export default function Contact() {
               width: 56,
               height: 56,
               borderRadius: 2.5,
-              bgcolor: alpha(BRAND.indigo, 0.1),
-              color: BRAND.indigo,
+              bgcolor: alpha(indigo, 0.1),
+              color: indigo,
               mb: 2.5,
             }}
           >
@@ -244,35 +251,9 @@ export default function Contact() {
 
           <Typography
             variant="overline"
-            sx={{ display: "block", fontWeight: 700, letterSpacing: "0.12em", color: BRAND.indigo }}
+            sx={{ display: "block", fontWeight: 700, letterSpacing: "0.12em", color: indigo }}
           >
             Contact Us
-          </Typography>
-          <Typography
-            variant="h3"
-            component="h1"
-            sx={{
-              fontWeight: 800,
-              mt: 0.5,
-              mb: 2,
-              letterSpacing: "-0.02em",
-              color: BRAND.ink,
-              fontSize: { xs: "1.9rem", sm: "2.4rem", md: "2.9rem" },
-            }}
-          >
-            Get in touch
-          </Typography>
-          <Typography
-            variant="body1"
-            color="text.secondary"
-            sx={{
-              maxWidth: 520,
-              mx: "auto",
-              fontSize: { xs: "0.95rem", sm: "1.05rem" },
-              lineHeight: 1.7,
-            }}
-          >
-            We'd be glad to hear from you. Reach our team using the details below.
           </Typography>
         </Box>
 

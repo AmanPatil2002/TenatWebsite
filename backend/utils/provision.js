@@ -28,6 +28,33 @@ const provisionSite = async (connection, payment) => {
     ],
   );
 
+  const [[siteAdminAccount]] = await connection.query(
+    `SELECT email, passwordHash
+       FROM users
+      WHERE userId = ? AND status = 'active'
+      FOR UPDATE`,
+    [payment.userId],
+  );
+  if (!siteAdminAccount) {
+    throw new Error("Client account is not available for site login");
+  }
+
+  await connection.query(
+    "INSERT INTO `admin` (siteId, userId, email, passwordHash) VALUES (?, ?, ?, ?)",
+    [
+      site.insertId,
+      payment.userId,
+      siteAdminAccount.email,
+      siteAdminAccount.passwordHash,
+    ],
+  );
+
+  const [[theme]] = await connection.query(
+    "SELECT color, background FROM theme WHERE themeId = ?",
+    [payment.themeId],
+  );
+  if (!theme) throw new Error("Purchased theme is not available");
+
   await connection.query(
     `INSERT INTO sitepages (siteId, sourcePagesId, title, page, sortOrder)
      SELECT ?, p.pagesId, p.title, p.page, tp.sortOrder
@@ -37,6 +64,16 @@ const provisionSite = async (connection, payment) => {
          ON tp.templateId = pp.templateId AND tp.pagesId = pp.pagesId
       WHERE pp.paymentId = ?`,
     [site.insertId, payment.id],
+  );
+
+  await connection.query(
+    `INSERT INTO sitethemes (siteId, defaultThemeId, defaultTheme)
+     VALUES (?, ?, ?)`,
+    [
+      site.insertId,
+      payment.themeId,
+      JSON.stringify({ color: theme.color, background: theme.background }),
+    ],
   );
 
   return { siteId: site.insertId, invoiceNumber };

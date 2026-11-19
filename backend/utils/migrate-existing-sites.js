@@ -9,11 +9,20 @@ const { provisionSiteDatabase, tn } = require('../config/provisionSite');
 const q = (sql, params = []) =>
   new Promise((res, rej) => db.query(sql, params, (e, r) => (e ? rej(e) : res(r))));
 
+const mainTableExists = async (tableName) => {
+  const rows = await q(
+    `SELECT TABLE_NAME
+       FROM information_schema.TABLES
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?`,
+    [tableName],
+  );
+  return rows.length > 0;
+};
+
 async function migrateSite(siteId) {
   console.log(`\n=== Migrating Site ${siteId} ===`);
 
   try {
-    // Check if already provisioned
     const site = await q('SELECT id, name, dbName, provisionStatus FROM sites WHERE id = ?', [siteId]);
     if (!site || site.length === 0) {
       console.log(`❌ Site ${siteId} not found`);
@@ -21,12 +30,7 @@ async function migrateSite(siteId) {
     }
 
     const s = site[0];
-    if (s.provisionStatus === 'ready' && s.dbName) {
-      console.log(`✓ Site ${siteId} already provisioned: ${s.dbName}`);
-      return true;
-    }
-
-    console.log(`Site: ${s.name}`);
+    console.log(`Site: ${s.name} (${s.provisionStatus || 'unknown'})`);
 
     // Provision the database (creates DB, tables, seeds pages from paymentpages)
     await provisionSiteDatabase(siteId);
@@ -55,20 +59,25 @@ async function migrateData(siteId, dbName) {
 
   // Migrate headers (siteheaders → headers)
   try {
-    const [existing] = await q(`SELECT COUNT(*) as count FROM ${table('headers')}`);
-    if (existing[0].count === 0) {
-      const result = await q(`
-        INSERT INTO ${table('headers')}
-          (logoUrl, siteTitle, footerText, footerAddress, footerPhone,
-           footerEmail, copyrightText, socialLinks, createdAt, updatedAt)
-        SELECT logoUrl, siteTitle, footerText, footerAddress, footerPhone,
-               footerEmail, copyrightText, socialLinks, createdAt, updatedAt
-        FROM siteheaders
-        WHERE siteId = ?
-      `, [siteId]);
-      console.log(`  ✓ Headers: ${result.affectedRows} rows migrated`);
+    if (!(await mainTableExists('siteheaders'))) {
+      console.log('  ✓ Headers: no legacy source table; skipped');
     } else {
-      console.log(`  ✓ Headers: already seeded (${existing[0].count} rows)`);
+      const existing = await q(`SELECT COUNT(*) AS count FROM ${table('headers')}`);
+      const count = Number(existing[0]?.count || 0);
+      if (count === 0) {
+        const result = await q(`
+          INSERT INTO ${table('headers')}
+            (logoUrl, siteTitle, footerText, footerAddress, footerPhone,
+             footerEmail, copyrightText, socialLinks, createdAt, updatedAt)
+          SELECT logoUrl, siteTitle, footerText, footerAddress, footerPhone,
+                 footerEmail, copyrightText, socialLinks, createdAt, updatedAt
+          FROM siteheaders
+          WHERE siteId = ?
+        `, [siteId]);
+        console.log(`  ✓ Headers: ${result.affectedRows} rows migrated`);
+      } else {
+        console.log(`  ✓ Headers: already seeded (${count} rows)`);
+      }
     }
   } catch (err) {
     console.log(`  ⚠ Headers: ${err.message}`);
@@ -76,56 +85,72 @@ async function migrateData(siteId, dbName) {
 
   // Migrate news (sitenews → news)
   try {
-    const result = await q(`
-      INSERT IGNORE INTO ${table('news')}
-        (title, imageUrl, content, status, publishedAt, createdAt, updatedAt)
-      SELECT title, imageUrl, content, status, publishedAt, createdAt, updatedAt
-      FROM sitenews
-      WHERE siteId = ?
-    `, [siteId]);
-    console.log(`  ✓ News: ${result.affectedRows} rows migrated`);
+    if (!(await mainTableExists('sitenews'))) {
+      console.log('  ✓ News: no legacy source table; skipped');
+    } else {
+      const result = await q(`
+        INSERT IGNORE INTO ${table('news')}
+          (title, imageUrl, content, status, publishedAt, createdAt, updatedAt)
+        SELECT title, imageUrl, content, status, publishedAt, createdAt, updatedAt
+          FROM sitenews
+         WHERE siteId = ?
+      `, [siteId]);
+      console.log(`  ✓ News: ${result.affectedRows} rows migrated`);
+    }
   } catch (err) {
     console.log(`  ⚠ News: ${err.message}`);
   }
 
   // Migrate galleries (sitegalleries → galleries)
   try {
-    const result = await q(`
-      INSERT IGNORE INTO ${table('galleries')}
-        (title, imageUrl, caption, altText, sortOrder, status, createdAt, updatedAt)
-      SELECT title, imageUrl, caption, altText, sortOrder, status, createdAt, updatedAt
-      FROM sitegalleries
-      WHERE siteId = ?
-    `, [siteId]);
-    console.log(`  ✓ Galleries: ${result.affectedRows} rows migrated`);
+    if (!(await mainTableExists('sitegalleries'))) {
+      console.log('  ✓ Galleries: no legacy source table; skipped');
+    } else {
+      const result = await q(`
+        INSERT IGNORE INTO ${table('galleries')}
+          (title, imageUrl, caption, altText, sortOrder, status, createdAt, updatedAt)
+        SELECT title, imageUrl, caption, altText, sortOrder, status, createdAt, updatedAt
+          FROM sitegalleries
+         WHERE siteId = ?
+      `, [siteId]);
+      console.log(`  ✓ Galleries: ${result.affectedRows} rows migrated`);
+    }
   } catch (err) {
     console.log(`  ⚠ Galleries: ${err.message}`);
   }
 
   // Migrate slider (siteslider → slider)
   try {
-    const result = await q(`
-      INSERT IGNORE INTO ${table('slider')}
-        (title, imageUrl, sortOrder, status, createdAt, updatedAt)
-      SELECT title, imageUrl, sortOrder, status, createdAt, updatedAt
-      FROM siteslider
-      WHERE siteId = ?
-    `, [siteId]);
-    console.log(`  ✓ Slider: ${result.affectedRows} rows migrated`);
+    if (!(await mainTableExists('siteslider'))) {
+      console.log('  ✓ Slider: no legacy source table; skipped');
+    } else {
+      const result = await q(`
+        INSERT IGNORE INTO ${table('slider')}
+          (title, imageUrl, sortOrder, status, createdAt, updatedAt)
+        SELECT title, imageUrl, sortOrder, status, createdAt, updatedAt
+          FROM siteslider
+         WHERE siteId = ?
+      `, [siteId]);
+      console.log(`  ✓ Slider: ${result.affectedRows} rows migrated`);
+    }
   } catch (err) {
     console.log(`  ⚠ Slider: ${err.message}`);
   }
 
   // Migrate employees (siteemployees → employees)
   try {
-    const result = await q(`
-      INSERT IGNORE INTO ${table('employees')}
-        (name, email, phone, jobTitle, status, createdAt, updatedAt)
-      SELECT name, email, phone, jobTitle, status, createdAt, updatedAt
-      FROM siteemployees
-      WHERE siteId = ?
-    `, [siteId]);
-    console.log(`  ✓ Employees: ${result.affectedRows} rows migrated`);
+    if (!(await mainTableExists('siteemployees'))) {
+      console.log('  ✓ Employees: no legacy source table; skipped');
+    } else {
+      const result = await q(`
+        INSERT IGNORE INTO ${table('employees')}
+          (name, email, phone, jobTitle, status, createdAt, updatedAt)
+        SELECT name, email, phone, jobTitle, status, createdAt, updatedAt
+          FROM siteemployees
+         WHERE siteId = ?
+      `, [siteId]);
+      console.log(`  ✓ Employees: ${result.affectedRows} rows migrated`);
+    }
   } catch (err) {
     console.log(`  ⚠ Employees: ${err.message}`);
   }
@@ -139,16 +164,27 @@ async function main() {
   console.log('MIGRATING EXISTING SITES TO PER-SITE DATABASES');
   console.log('='.repeat(60));
 
-  // Find sites that need migration (not provisioned yet)
+  const requestedSiteIds = process.argv.slice(2);
+  if (
+    requestedSiteIds.some(
+      id =>
+        !/^[1-9]\d{0,19}$/.test(id) ||
+        BigInt(id) > 18446744073709551615n
+    )
+  ) {
+    throw new Error('Provide valid positive site IDs.');
+  }
+
+  // Re-run idempotent provisioning to ensure every pack table exists.
   const sites = await q(`
     SELECT id, name, provisionStatus
     FROM sites
-    WHERE provisionStatus != 'ready' OR dbName IS NULL
+    ${requestedSiteIds.length ? 'WHERE id IN (?)' : ''}
     ORDER BY id
-  `);
+  `, requestedSiteIds.length ? [requestedSiteIds] : []);
 
   if (!sites || sites.length === 0) {
-    console.log('\n✅ All sites are already provisioned!');
+    console.log('\n✅ No sites need migration.');
     db.end();
     return;
   }

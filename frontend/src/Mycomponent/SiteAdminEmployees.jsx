@@ -215,10 +215,12 @@ export default function SiteAdminEmployees() {
       {/* ---------------- Page header ---------------- */}
       <Stack
         direction={{ xs: "column", sm: "row" }}
-        justifyContent="space-between"
-        alignItems={{ xs: "stretch", sm: "center" }}
         spacing={2}
-        sx={{ mb: 3 }}
+        sx={{
+          mb: 3,
+          justifyContent: "space-between",
+          alignItems: { xs: "stretch", sm: "center" },
+        }}
       >
         <Box>
           <Typography variant="h4" fontWeight={800} letterSpacing="-0.02em">
@@ -283,9 +285,11 @@ export default function SiteAdminEmployees() {
         <Box sx={{ p: { xs: 2, md: 2.5 } }}>
           <Stack
             direction={{ xs: "column", sm: "row" }}
-            justifyContent="space-between"
-            alignItems={{ xs: "stretch", sm: "center" }}
             spacing={1.5}
+            sx={{
+              justifyContent: "space-between",
+              alignItems: { xs: "stretch", sm: "center" },
+            }}
           >
             <Box>
               <Typography variant="h6" fontWeight={700}>
@@ -395,9 +399,8 @@ export default function SiteAdminEmployees() {
                     <TableCell>
                       <Stack
                         direction="row"
-                        alignItems="center"
                         spacing={1.5}
-                        sx={{ minWidth: 0 }}
+                        sx={{ minWidth: 0, alignItems: "center" }}
                       >
                         <Avatar
                           sx={{
@@ -433,9 +436,12 @@ export default function SiteAdminEmployees() {
                     <TableCell>
                       <Stack
                         direction="row"
-                        alignItems="center"
                         spacing={0.75}
-                        sx={{ color: "text.secondary", minWidth: 0 }}
+                        sx={{
+                          color: "text.secondary",
+                          minWidth: 0,
+                          alignItems: "center",
+                        }}
                       >
                         <BriefcaseIcon
                           size={15}
@@ -452,9 +458,8 @@ export default function SiteAdminEmployees() {
                           {employee.email && (
                             <Stack
                               direction="row"
-                              alignItems="center"
                               spacing={0.75}
-                              sx={{ minWidth: 0 }}
+                              sx={{ minWidth: 0, alignItems: "center" }}
                             >
                               <MailIcon
                                 size={14}
@@ -481,9 +486,8 @@ export default function SiteAdminEmployees() {
                           {employee.phone && (
                             <Stack
                               direction="row"
-                              alignItems="center"
                               spacing={0.75}
-                              sx={{ minWidth: 0 }}
+                              sx={{ minWidth: 0, alignItems: "center" }}
                             >
                               <PhoneIcon
                                 size={14}
@@ -541,7 +545,7 @@ export default function SiteAdminEmployees() {
                       <Stack
                         direction="row"
                         spacing={0.5}
-                        justifyContent="flex-end"
+                        sx={{ justifyContent: "flex-end" }}
                       >
                         <Tooltip title="Edit">
                           <IconButton
@@ -606,7 +610,11 @@ export default function SiteAdminEmployees() {
       >
         <Box component="form" onSubmit={saveEmployee}>
           <DialogTitle sx={{ pb: 1 }}>
-            <Stack direction="row" alignItems="center" spacing={1.25}>
+            <Stack
+              direction="row"
+              spacing={1.25}
+              sx={{ alignItems: "center" }}
+            >
               <Box
                 sx={{
                   width: 36,
@@ -621,7 +629,7 @@ export default function SiteAdminEmployees() {
                 {employeeId ? <EditIcon size={18} /> : <AddIcon size={18} />}
               </Box>
               <Box>
-                <Typography fontWeight={700} lineHeight={1.2}>
+                <Typography fontWeight={700} sx={{ lineHeight: 1.2 }}>
                   {employeeId ? "Edit employee" : "Add employee"}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
@@ -645,7 +653,7 @@ export default function SiteAdminEmployees() {
                   label="Name"
                   value={form.name}
                   onChange={(e) => updateForm("name", e.target.value)}
-                  inputProps={{ maxLength: 150 }}
+                  slotProps={{ htmlInput: { maxLength: 150 } }}
                   required
                   fullWidth
                   size="small"
@@ -656,7 +664,7 @@ export default function SiteAdminEmployees() {
                   label="Job title"
                   value={form.jobTitle}
                   onChange={(e) => updateForm("jobTitle", e.target.value)}
-                  inputProps={{ maxLength: 120 }}
+                  slotProps={{ htmlInput: { maxLength: 120 } }}
                   required
                   fullWidth
                   size="small"
@@ -677,7 +685,7 @@ export default function SiteAdminEmployees() {
                   label="Phone"
                   value={form.phone || ""}
                   onChange={(e) => updateForm("phone", e.target.value)}
-                  inputProps={{ maxLength: 30 }}
+                  slotProps={{ htmlInput: { maxLength: 30 } }}
                   fullWidth
                   size="small"
                 />

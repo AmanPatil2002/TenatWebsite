@@ -314,7 +314,19 @@ const getOne = (admin) => async (req, res) => {
       [req.params.templateId],
     );
     if (!rows.length) return res.status(404).json({ message: "Template not found" });
-    return res.json(templateRows(rows)[0]);
+    const template = templateRows(rows)[0];
+    const [pages] = await db.query(
+      `SELECT tp.pagesId, p.title, tp.isDefault,
+              IF(tp.isDefault = 1, 0, p.pagePrice) AS pagePrice,
+              tp.sortOrder
+         FROM templatepages tp
+         JOIN pages p ON p.pagesId = tp.pagesId
+        WHERE tp.templateId = ?
+        ORDER BY tp.sortOrder, tp.pagesId`,
+      [req.params.templateId],
+    );
+    template.pages = pages;
+    return res.json(template);
   } catch (error) {
     console.error("Get template error:", error);
     return res.status(500).json({ message: "Failed to fetch template" });

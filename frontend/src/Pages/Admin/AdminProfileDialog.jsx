@@ -24,8 +24,8 @@ import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 const API_URL = "http://localhost:5000/auth";
 
 const BRAND = {
-  indigo: "#4f46e5",
-  indigoDeep: "#3730a3",
+  indigo: "#0284c7",
+  indigoDeep: "#0369a1",
   ink: "#0f172a",
   muted: "#64748b",
 };

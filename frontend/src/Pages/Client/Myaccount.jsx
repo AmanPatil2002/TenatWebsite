@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { useTheme } from "@mui/material/styles";
 
 import {
   Alert,
@@ -22,13 +23,6 @@ import PhoneOutlinedIcon from "@mui/icons-material/PhoneOutlined";
 import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserOutlined";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
-const BRAND = {
-  indigo: "#4f46e5",
-  indigoDeep: "#3730a3",
-  ink: "#0f172a",
-  muted: "#64748b",
-};
 
 /**
  * Arranges items into rows for a 2‑column grid on `sm` and up.
@@ -56,6 +50,7 @@ const computeSpans = (items) => {
 };
 
 function InfoItem({ icon, label, value }) {
+  const theme = useTheme();
   return (
     <Box
       sx={{
@@ -69,8 +64,8 @@ function InfoItem({ icon, label, value }) {
         flexDirection: "column",
         transition: "border-color 0.2s ease, box-shadow 0.2s ease",
         "&:hover": {
-          borderColor: alpha(BRAND.indigo, 0.35),
-          boxShadow: `0 8px 20px ${alpha(BRAND.indigo, 0.06)}`,
+          borderColor: alpha(theme.palette.primary.main, 0.35),
+          boxShadow: `0 8px 20px ${alpha(theme.palette.primary.main, 0.06)}`,
         },
       }}
     >
@@ -90,8 +85,8 @@ function InfoItem({ icon, label, value }) {
             display: "grid",
             placeItems: "center",
             borderRadius: 2,
-            color: BRAND.indigo,
-            bgcolor: alpha(BRAND.indigo, 0.08),
+            color: theme.palette.primary.main,
+            bgcolor: alpha(theme.palette.primary.main, 0.08),
             "& .MuiSvgIcon-root": { fontSize: "1.2rem" },
           }}
         >
@@ -116,7 +111,7 @@ function InfoItem({ icon, label, value }) {
             variant="body1"
             sx={{
               fontWeight: 600,
-              color: BRAND.ink,
+              color: "text.primary",
               wordBreak: "break-word",
               fontSize: "0.95rem",
             }}
@@ -133,6 +128,7 @@ function InfoItem({ icon, label, value }) {
 
 export default function Myaccount() {
   const navigate = useNavigate();
+  const theme = useTheme();
 
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -191,7 +187,7 @@ export default function Myaccount() {
         <CircularProgress
           aria-label="Loading account information"
           size={36}
-          sx={{ color: BRAND.indigo }}
+          sx={{ color: theme.palette.primary.main }}
         />
       </Box>
     );
@@ -257,8 +253,7 @@ export default function Myaccount() {
       sx={{
         minHeight: "80vh",
         py: { xs: 4, md: 8 },
-        background:
-          "linear-gradient(160deg, #f8fafc 0%, #eef2ff 45%, #f0fdfa 100%)",
+        background: `linear-gradient(160deg, ${theme.palette.background.default} 0%, ${alpha(theme.palette.primary.main, 0.04)} 45%, ${alpha(theme.palette.info.main, 0.04)} 100%)`,
       }}
     >
       <Container maxWidth="md">
@@ -269,7 +264,7 @@ export default function Myaccount() {
             overflow: "hidden",
             border: "1px solid",
             borderColor: "divider",
-            boxShadow: "0 24px 60px rgba(15,23,42,0.08)",
+            boxShadow: theme.shadows[8],
           }}
         >
           {/* Header banner */}
@@ -277,7 +272,7 @@ export default function Myaccount() {
             sx={{
               position: "relative",
               overflow: "hidden",
-              background: `linear-gradient(135deg, ${BRAND.indigoDeep} 0%, ${BRAND.indigo} 60%, #6366f1 100%)`,
+              background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 60%, ${theme.palette.tertiary.main} 100%)`,
               py: { xs: 5, md: 7 },
               px: { xs: 2, md: 4 },
               textAlign: "center",
@@ -320,7 +315,7 @@ export default function Myaccount() {
                   mx: "auto",
                   mb: { xs: 2, md: 2.5 },
                   bgcolor: "#fff",
-                  color: BRAND.indigoDeep,
+                  color: theme.palette.primary.dark,
                   fontSize: { xs: 34, md: 40 },
                   fontWeight: 800,
                   border: "4px solid",
@@ -338,6 +333,7 @@ export default function Myaccount() {
                   fontWeight: 800,
                   letterSpacing: "-0.02em",
                   wordBreak: "break-word",
+                  color: "#fff",
                 }}
               >
                 {displayName}
@@ -346,7 +342,7 @@ export default function Myaccount() {
               {user?.email && (
                 <Typography
                   variant="body2"
-                  sx={{ opacity: 0.85, mt: 0.5, wordBreak: "break-word" }}
+                  sx={{ opacity: 0.85, mt: 0.5, wordBreak: "break-word", color: "#fff" }}
                 >
                   {user.email}
                 </Typography>
@@ -370,7 +366,7 @@ export default function Myaccount() {
                 />
                 <Typography
                   variant="caption"
-                  sx={{ fontWeight: 600, letterSpacing: "0.03em" }}
+                  sx={{ fontWeight: 600, letterSpacing: "0.03em", color: "#fff" }}
                 >
                   {user?.role ? String(user.role).toUpperCase() : "MEMBER"}
                 </Typography>
@@ -387,7 +383,7 @@ export default function Myaccount() {
                   display: "block",
                   fontWeight: 700,
                   letterSpacing: "0.1em",
-                  color: BRAND.indigo,
+                  color: theme.palette.primary.main,
                 }}
               >
                 Account Details
@@ -410,7 +406,6 @@ export default function Myaccount() {
                 gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" },
                 gap: { xs: 2, md: 2.5 },
                 alignItems: "stretch",
-                
               }}
             >
               {fields.map((f) => (
@@ -421,9 +416,6 @@ export default function Myaccount() {
                     minWidth: 0,
                     display: "flex",
                     "& > *": { width: "100%" },
-                    height:50,
-                    padding: 2,
-                    marginBottom: 2
                   }}
                 >
                   <InfoItem

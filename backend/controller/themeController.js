@@ -31,16 +31,25 @@ const createTheme = (req, res) => {
   if (!HEX.test(color.trim()) || !HEX.test(background.trim())) {
     return res
       .status(400)
-      .json({ message: "Color and background must be hex values like #ffffff" });
+      .json({
+        message: "Color and background must be hex values like #ffffff",
+      });
   }
 
   // JWT payload is { userId, name, role }
   const createdBy = req.user.userId;
 
   db.query(
-    `INSERT INTO theme (name, color, background, createdBy)
+    `INSERT INTO theme (
+       name, color, background,createdBy
+     )
      VALUES (?, ?, ?, ?)`,
-    [name.trim(), color.trim(), background.trim(), createdBy],
+    [
+      name.trim(),
+      color.trim(),
+      background.trim(),
+      createdBy,
+    ],
     (err, result) => {
       if (err) return fail(res, err);
       res.status(201).json({ id: result.insertId });
@@ -49,22 +58,30 @@ const createTheme = (req, res) => {
 };
 
 const updateTheme = (req, res) => {
-  const { name, color, background } = req.body;
+  const {
+    name,
+    color,
+    background,
+  } = req.body;
 
   if (name && name.trim().length > 190) {
     return res
       .status(400)
       .json({ message: "Name must be 190 characters or fewer" });
   }
-  if (color && !HEX.test(color.trim())) {
-    return res
-      .status(400)
-      .json({ message: "Color must be a hex value like #ffffff" });
-  }
-  if (background && !HEX.test(background.trim())) {
-    return res
-      .status(400)
-      .json({ message: "Background must be a hex value like #121212" });
+
+  // Validate hex colors if provided
+  const hexFields = {
+    color,
+    background,
+  };
+
+  for (const [key, val] of Object.entries(hexFields)) {
+    if (val && !HEX.test(val.trim())) {
+      return res
+        .status(400)
+        .json({ message: `${key} must be a hex value like #ffffff` });
+    }
   }
 
   db.query(

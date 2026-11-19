@@ -32,8 +32,9 @@ async function migrateDatabaseNames() {
       console.log(`  Old DB Name: ${site.dbName}`);
 
       // Generate new camelCase name
-      const newDbName = generateDbName(site.userName, site.siteName);
+      const newDbName = generateDbName(site.userName, site.siteName, site.id);
       console.log(`  New DB Name: ${newDbName}`);
+      let siteRecordUpdated = false;
 
       try {
         // Check if old database exists
@@ -91,6 +92,7 @@ async function migrateDatabaseNames() {
           'UPDATE sites SET dbName = ? WHERE id = ?',
           [newDbName, site.id]
         );
+        siteRecordUpdated = true;
         console.log(`  ✓ Updated site record`);
 
         // Drop old database
@@ -101,13 +103,34 @@ async function migrateDatabaseNames() {
 
       } catch (siteError) {
         console.error(`  ❌ Error migrating Site ID ${site.id}:`, siteError.message);
-        console.log(`  Rolling back...`);
+        let newDatabaseIsActive = siteRecordUpdated;
+        if (!newDatabaseIsActive) {
+          try {
+            const [[currentSite]] = await db.query(
+              'SELECT dbName FROM sites WHERE id = ?',
+              [site.id]
+            );
+            newDatabaseIsActive = currentSite?.dbName === newDbName;
+          } catch (lookupError) {
+            newDatabaseIsActive = true;
+            console.error(
+              '  Could not verify the active database; preserving the new database:',
+              lookupError.message
+            );
+          }
+        }
 
-        // Attempt to drop new database if it was created
-        try {
-          await db.query(`DROP DATABASE IF EXISTS \`${newDbName}\``);
-        } catch (rollbackError) {
-          console.error(`  Failed to rollback:`, rollbackError.message);
+        if (newDatabaseIsActive) {
+          console.error(
+            `  Preserving ${newDbName} because the site may already reference it.`
+          );
+        } else {
+          try {
+            await db.query(`DROP DATABASE IF EXISTS \`${newDbName}\``);
+            console.log('  Removed incomplete new database.');
+          } catch (rollbackError) {
+            console.error('  Failed to remove incomplete database:', rollbackError.message);
+          }
         }
         console.log('');
       }

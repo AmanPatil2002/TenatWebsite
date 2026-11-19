@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams, Link as RouterLink } from "react-router-dom";
 import axios from "axios";
+import { useTheme, alpha } from "@mui/material/styles";
 import {
   Alert,
   Box,
@@ -24,12 +25,16 @@ const API_URL = (
 export default function SiteAdminLogin() {
   const { siteId } = useParams();
   const navigate = useNavigate();
+  const theme = useTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const [showPassword, setShowPassword] = useState(false);
+
+  const primary = theme.palette.primary.main;
+  const primaryDark = theme.palette.primary.dark;
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -63,10 +68,8 @@ export default function SiteAdminLogin() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        bgcolor: "#f5f7fb",
-        backgroundImage:
-          "radial-gradient(circle at 15% 15%, rgba(99,102,241,0.08), transparent 45%), radial-gradient(circle at 85% 85%, rgba(14,165,233,0.08), transparent 45%)",
         p: 2,
+        background: `linear-gradient(160deg, ${theme.palette.background.default} 0%, ${alpha(theme.palette.primary.main, 0.04)} 45%, ${alpha(theme.palette.info.main, 0.04)} 100%)`,
       }}
     >
       <Container maxWidth="xs" disableGutters>
@@ -75,8 +78,9 @@ export default function SiteAdminLogin() {
           sx={{
             borderRadius: 3,
             borderColor: "divider",
-            boxShadow: "0 10px 30px rgba(15,23,42,0.06)",
+            boxShadow: `0 10px 30px ${alpha(theme.palette.common.black, 0.06)}`,
             overflow: "hidden",
+            bgcolor: theme.palette.background.paper,
           }}
         >
           {/* Top accent bar */}
@@ -84,7 +88,7 @@ export default function SiteAdminLogin() {
             sx={{
               height: 4,
               width: "100%",
-              background: "linear-gradient(90deg, #6366f1 0%, #0ea5e9 100%)",
+              background: `linear-gradient(90deg, ${primary} 0%, ${primaryDark} 100%)`,
             }}
           />
           <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
@@ -94,7 +98,7 @@ export default function SiteAdminLogin() {
                 <Typography
                   variant="h5"
                   fontWeight={700}
-                  sx={{ mb: 0.5, letterSpacing: "-0.01em" }}
+                  sx={{ mb: 0.5, letterSpacing: "-0.01em", color: theme.palette.text.primary }}
                 >
                   Site Admin
                 </Typography>
@@ -108,7 +112,7 @@ export default function SiteAdminLogin() {
               </Box>
 
               {error && (
-                <Alert severity="error" onClose={() => setError("")}>
+                <Alert severity="error" onClose={() => setError("")} sx={{ borderRadius: 2 }}>
                   {error}
                 </Alert>
               )}
@@ -167,8 +171,17 @@ export default function SiteAdminLogin() {
                   fontWeight: 600,
                   py: 1.35,
                   borderRadius: 2,
-                  boxShadow: "none",
-                  "&:hover": { boxShadow: "none" },
+                  boxShadow: `0 6px 16px ${alpha(primary, 0.22)}`,
+                  bgcolor: primary,
+                  "&:hover": {
+                    bgcolor: primaryDark,
+                    boxShadow: `0 8px 20px ${alpha(primary, 0.30)}`,
+                  },
+                  "&.Mui-disabled": {
+                    bgcolor: alpha(primary, 0.12),
+                    color: alpha(primary, 0.4),
+                    boxShadow: "none",
+                  },
                 }}
               >
                 {loading ? "Signing in…" : "Sign in"}

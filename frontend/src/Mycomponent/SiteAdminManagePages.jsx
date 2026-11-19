@@ -19,6 +19,8 @@ import {
   useTheme,
 } from "@mui/material";
 
+import { buildPageBody } from "../utils/buildPageContent";
+
 /* ------------------------------------------------------------------ */
 /*  Inline SVG icons — no MUI icon imports, no tree-shaking issues     */
 /* ------------------------------------------------------------------ */
@@ -79,40 +81,47 @@ const CheckIcon = (p) => (
 );
 const DeleteIcon = (p) => (
   <SvgIcon {...p}>
-    <path d="M6 6h12v12H6zM8 9v6M16 9v6M10 9h4" />
+    <path d="M3 6h18" />
+    <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+    <path d="M10 11v6M14 11v6" />
   </SvgIcon>
 );
 
-const API_URL = (
-  import.meta.env.VITE_API_URL || "http://localhost:5000"
-).replace(/\/+$/, "");
-
 export default function SiteAdminManagePages() {
+  const { site, pages, setPages, setSite, baseUrl, authConfig, API_URL } = useOutletContext();
   const theme = useTheme();
-  const { baseUrl, authConfig } = useOutletContext();
-  const pagesUrl = `${baseUrl}/pages`;
 
-  const [site, setSite] = useState(null);
-  const [pages, setPages] = useState([]);
-  const [selectedId, setSelectedId] = useState("");
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [reordering, setReordering] = useState(false);
   const [deletingId, setDeletingId] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-
-  // Hold a reference to the CKEditor instance so we can re-apply the
-  // theme colors once the site data has finished loading.
+  const [selectedId, setSelectedId] = useState("");
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [sliders, setSliders] = useState([]);
+  const [galleryItems, setGalleryItems] = useState([]);
+  const [siteData, setSiteData] = useState({});
+  const [, setResourcesLoading] = useState(false);
+  const [, setDataSections] = useState([]);
   const editorRef = useRef(null);
+  const pagesUrl = `${baseUrl}/pages`;
+
+  const hiddenScrollSx = {
+    overflowY: "auto",
+    "&::-webkit-scrollbar": { display: "none" },
+    scrollbarWidth: "none",
+  };
 
   const applyTheme = (editor) => {
     if (!editor) return;
-    const bg = site?.background || "#ffffff";
-    const fg = site?.color || "#222222";
+    // Prefer effectiveTheme from /theme endpoint; fallback to legacy top-level fields
+    const eff = site?.effectiveTheme || {};
+    const bg = eff.background || site?.background || "#ffffff";
+    const fg = eff.color || site?.color || "#222222";
     const doc = editor.document.$;
     const existing = doc.querySelector('style[data-tenat-theme="1"]');
     if (existing) existing.remove();
@@ -176,14 +185,104 @@ export default function SiteAdminManagePages() {
     };
   }, [pagesUrl, authConfig]);
 
-  // Re-apply theme colors to the CKEditor instance whenever the loaded
-  // site data changes (the onInstanceReady callback runs before the
-  // first React render of `site`, so the theme would otherwise be null).
+  const previewHtml = (rawHtml, pageTitle) => {
+    // 1. Build the base hydrated HTML
+    let hydratedHtml = buildPageBody({
+      html: rawHtml,
+      pageTitle,
+      slides: sliders,
+      galleries: galleryItems,
+      siteData,
+    });
+
+    // 2. Build visual placeholders for the editor
+    const sliderPreview = `<div style="background:#f0f9ff; border:1px solid #bae6fd; padding:10px; margin:10px 0;"><strong>Slider Data:</strong> ${sliders.length} slides. Use <code>[[slider]]</code>.</div>`;
+    const galleryPreview = `<div style="background:#f0fdf4; border:1px solid #bbf7d0; padding:10px; margin:10px 0;"><strong>Gallery Data:</strong> ${galleryItems.length} items.</div>`;
+
+    const dataPreviews = Object.entries(siteData).map(([key, items]) => `
+      <div style="background:#fefce8; border:1px solid #fde68a; padding:10px; margin:10px 0;">
+        <strong>Data: [[${key}]]</strong> (${items.length} items)
+        <ul style="font-size: 0.8rem; margin: 5px 0;">${items.slice(0, 3).map(i => `<li>${i.name || i.title || 'Item'}</li>`).join('')}${items.length > 3 ? '<li>...</li>' : ''}</ul>
+      </div>
+    `).join('');
+
+    // 3. Inject into the HTML, appended at the end
+    return hydratedHtml + `
+      <div style="margin-top:40px; border-top: 2px dashed #999; padding-top:20px;">
+        <h4 style="color:#666; margin-bottom:10px;">Data Placeholders (Visible in Editor)</h4>
+        ${sliderPreview}
+        ${galleryPreview}
+        ${dataPreviews}
+      </div>
+    `;
+  };
   useEffect(() => {
     if (site && editorRef.current) {
       applyTheme(editorRef.current);
     }
   }, [site]);
+
+  // --- Render resource sections ---
+  // [Removed renderResources() as it is no longer used in the layout]
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadResources = async () => {
+      setResourcesLoading(true);
+      try {
+        const [sliderRes, galleryRes, sectionsRes] = await Promise.allSettled([
+          axios.get(`${baseUrl}/slider`, authConfig),
+          axios.get(`${baseUrl}/galleries`, authConfig),
+          axios.get(`${baseUrl}/data`, authConfig),
+        ]);
+        if (cancelled) return;
+
+        const sliderList =
+          sliderRes.status === "fulfilled" &&
+          Array.isArray(sliderRes.value.data)
+            ? sliderRes.value.data
+            : [];
+        const galleryList =
+          galleryRes.status === "fulfilled" &&
+          Array.isArray(galleryRes.value.data)
+            ? galleryRes.value.data
+            : [];
+        const sections =
+          sectionsRes.status === "fulfilled" &&
+          Array.isArray(sectionsRes.value.data)
+            ? sectionsRes.value.data
+            : [];
+
+        setSliders(sliderList);
+        setGalleryItems(galleryList);
+        setDataSections(sections);
+
+        const recordsEntries = await Promise.all(
+          sections.map(async (resource) => {
+            try {
+              const { data } = await axios.get(
+                `${baseUrl}/data/${resource}`,
+                authConfig,
+              );
+              return [resource, Array.isArray(data) ? data : []];
+            } catch {
+              return [resource, []];
+            }
+          }),
+        );
+        if (!cancelled) {
+          setSiteData(Object.fromEntries(recordsEntries));
+        }
+      } finally {
+        if (!cancelled) setResourcesLoading(false);
+      }
+    };
+
+    loadResources();
+    return () => {
+      cancelled = true;
+    };
+  }, [baseUrl, authConfig]);
 
   const selectPage = (page) => {
     setSelectedId(String(page.sitePageId));
@@ -278,10 +377,7 @@ export default function SiteAdminManagePages() {
     setError("");
     setSuccess("");
     try {
-      await axios.delete(
-        `${pagesUrl}/${page.sitePageId}`,
-        authConfig,
-      );
+      await axios.delete(`${pagesUrl}/${page.sitePageId}`, authConfig);
       // If the deleted page was the one being edited, clear the editor
       // and let loadPages pick the next page (or enter creating mode).
       const keepSelectedId =
@@ -307,12 +403,10 @@ export default function SiteAdminManagePages() {
       {/* ---------------- Page header ---------------- */}
       <Stack
         direction={{ xs: "column", sm: "row" }}
-        justifyContent="space-between"
-        alignItems={{ xs: "stretch", sm: "center" }}
         spacing={2}
-        sx={{ mb: 3 }}
+        sx={{ mb: 3, alignItems: { xs: "stretch", sm: "center" } }}
       >
-        <Box>
+        <Stack>
           <Typography variant="h4" fontWeight={800} letterSpacing="-0.02em">
             Manage pages
           </Typography>
@@ -320,8 +414,8 @@ export default function SiteAdminManagePages() {
             Edit the content of your site's pages and control their display
             order.
           </Typography>
-        </Box>
-      </Stack> 
+        </Stack>
+      </Stack>
 
       {error && (
         <Alert
@@ -359,8 +453,15 @@ export default function SiteAdminManagePages() {
             alignItems: "start",
           }}
         >
-          {/* ---------------- Sidebar: theme + pages ---------------- */}
-          <Stack spacing={2}>
+          {/* ---------------- Sidebar: theme, resources + pages ---------------- */}
+          <Stack
+            spacing={2}
+            sx={{
+              ...hiddenScrollSx,
+              maxHeight: { xs: "none", md: "calc(100vh - 220px)" },
+              pr: { md: 0.5 },
+            }}
+          >
             {/* Theme card */}
             {site && (
               <Paper
@@ -369,9 +470,8 @@ export default function SiteAdminManagePages() {
               >
                 <Stack
                   direction="row"
-                  alignItems="center"
                   spacing={1}
-                  sx={{ mb: 1.5 }}
+                  sx={{ mb: 1.5, alignItems: "center" }}
                 >
                   <Box
                     sx={{
@@ -420,7 +520,7 @@ export default function SiteAdminManagePages() {
                   Colors
                 </Typography>
                 <Stack spacing={1}>
-                  <Stack direction="row" alignItems="center" spacing={1.25}>
+                  <Stack direction="row" sx={{ alignItems: "center" }} spacing={1.25}>
                     <Box
                       sx={{
                         width: 26,
@@ -440,7 +540,7 @@ export default function SiteAdminManagePages() {
                       </Typography>
                     </Box>
                   </Stack>
-                  <Stack direction="row" alignItems="center" spacing={1.25}>
+                  <Stack direction="row" sx={{ alignItems: "center" }} spacing={1.25}>
                     <Box
                       sx={{
                         width: 26,
@@ -471,9 +571,7 @@ export default function SiteAdminManagePages() {
             >
               <Stack
                 direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-                sx={{ mb: 1 }}
+                sx={{ mb: 1, alignItems: "center", justifyContent: "space-between" }}
               >
                 <Typography variant="h6" fontWeight={700}>
                   Pages
@@ -501,20 +599,17 @@ export default function SiteAdminManagePages() {
               >
                 Use the arrows to reorder.
               </Typography>
-
               <Divider sx={{ mb: 1.5 }} />
-
-              <Stack spacing={0.75}>
+              <Stack spacing={0.75} sx={{ ...hiddenScrollSx, maxHeight: 320 }}>
                 {pages.map((page, index) => {
                   const isActive =
                     !creating && selectedId === String(page.sitePageId);
                   return (
-                    <Box
+                    <Stack
                       key={page.sitePageId}
+                      direction="row"
+                      gap={0.5}
                       sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 0.5,
                         borderRadius: 2,
                         bgcolor: isActive
                           ? alpha(theme.palette.primary.main, 0.08)
@@ -530,13 +625,13 @@ export default function SiteAdminManagePages() {
                             ? alpha(theme.palette.primary.main, 0.1)
                             : alpha(theme.palette.primary.main, 0.04),
                         },
+                        alignItems: "center",
                       }}
                     >
                       <Button
                         fullWidth
                         onClick={() => selectPage(page)}
                         sx={{
-                          justifyContent: "flex-start",
                           textAlign: "left",
                           textTransform: "none",
                           fontWeight: isActive ? 700 : 500,
@@ -580,7 +675,11 @@ export default function SiteAdminManagePages() {
                         </Box>
                       </Button>
 
-                      <Stack direction="row" alignItems="center" spacing={0.25} sx={{ flexShrink: 0 }}>
+                      <Stack
+                        direction="row"
+                        spacing={0.25}
+                        sx={{ flexShrink: 0, alignItems: "center" }}
+                      >
                         <Stack sx={{ flexShrink: 0 }}>
                           <IconButton
                             size="small"
@@ -594,7 +693,11 @@ export default function SiteAdminManagePages() {
                           <IconButton
                             size="small"
                             aria-label={`Move ${page.title} down`}
-                            disabled={reordering || deletingId || index === pages.length - 1}
+                            disabled={
+                              reordering ||
+                              deletingId ||
+                              index === pages.length - 1
+                            }
                             onClick={() => movePage(index, 1)}
                             sx={{ p: 0.25, borderRadius: 1 }}
                           >
@@ -606,7 +709,9 @@ export default function SiteAdminManagePages() {
                             size="small"
                             aria-label={`Delete ${page.title}`}
                             color="error"
-                            disabled={reordering || deletingId || pages.length <= 1}
+                            disabled={
+                              reordering || deletingId || pages.length <= 1
+                            }
                             onClick={() => deletePage(page)}
                             sx={{ p: 0.25, borderRadius: 1 }}
                           >
@@ -618,7 +723,7 @@ export default function SiteAdminManagePages() {
                           </IconButton>
                         </Tooltip>
                       </Stack>
-                    </Box>
+                    </Stack>
                   );
                 })}
                 {!pages.length && (
@@ -649,7 +754,7 @@ export default function SiteAdminManagePages() {
             variant="outlined"
             sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, minWidth: 0 }}
           >
-            <Stack direction="row" alignItems="center" spacing={1.25}>
+            <Stack direction="row" sx={{ alignItems: "center" }} spacing={1.25}>
               <Box
                 sx={{
                   width: 36,
@@ -668,7 +773,7 @@ export default function SiteAdminManagePages() {
                 <Typography
                   variant="h6"
                   fontWeight={700}
-                  lineHeight={1.2}
+                  sx={{ lineHeight: 1.2 }}
                   noWrap
                 >
                   {creating ? "Create a custom page" : "Edit page"}
@@ -687,7 +792,7 @@ export default function SiteAdminManagePages() {
                 label="Page title"
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
-                inputProps={{ maxLength: 150 }}
+                slotProps={{ htmlInput: { maxLength: 150 } }}
                 fullWidth
                 size="small"
                 helperText="Shown in the site navigation and browser tab."
@@ -730,9 +835,17 @@ export default function SiteAdminManagePages() {
                   }}
                 >
                   <CKEditor
-                    key={creating ? "new" : selectedId}
+                    key={
+                      creating
+                        ? "new"
+                        : selectedId +
+                          ":" +
+                          sliders.length +
+                          ":" +
+                          galleryItems.length
+                    }
                     editorUrl="https://cdn.ckeditor.com/4.22.1/standard-all/ckeditor.js"
-                    initData={content}
+                    initData={creating ? "" : previewHtml(content, title)}
                     onBeforeLoad={(CKEDITOR) => {
                       if (CKEDITOR.plugins.get("localvideo")) return;
 
@@ -918,9 +1031,8 @@ export default function SiteAdminManagePages() {
 
               <Stack
                 direction={{ xs: "column", sm: "row" }}
-                justifyContent="space-between"
-                alignItems={{ xs: "stretch", sm: "center" }}
                 spacing={1.5}
+                sx={{ justifyContent: "space-between", alignItems: { xs: "stretch", sm: "center" } }}
               >
                 <Typography variant="caption" color="text.secondary">
                   {creating

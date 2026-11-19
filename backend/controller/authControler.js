@@ -300,21 +300,83 @@ const changePassword = (req, res) => {
             .json({ message: "Current password is incorrect" });
         }
         const hashed = await bcrypt.hash(newPassword, 10);
-        db.query(
+
+        // Update users table
+        await db.promise().execute(
           "UPDATE users SET passwordHash=? WHERE userId=?",
-          [hashed, req.user.userId],
-          (updateErr) => {
-            if (updateErr)
-              return res.status(500).json({ message: updateErr.message });
-            res.json({ message: "Password changed" });
-          },
+          [hashed, req.user.userId]
         );
+
+        // Also update admin table IF user is a site admin
+        await db.promise().execute(
+          "UPDATE `admin` SET passwordHash=? WHERE userId=?",
+          [hashed, req.user.userId]
+        );
+
+        res.json({ message: "Password changed" });
       } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Server error" });
       }
     },
   );
+};
+
+// Admin updates password for a site admin (site admin context)
+const changeSiteAdminPassword = async (req, res) => {
+  const { siteAdminId, currentPassword, newPassword } = req.body;
+  if (!siteAdminId || !currentPassword || !newPassword) {
+    return res
+      .status(400)
+      .json({ message: "Site admin ID, current and new password are required" });
+  }
+  if (typeof newPassword !== "string" || newPassword.length < 6) {
+    return res
+      .status(400)
+      .json({ message: "Password must be at least 6 characters" });
+  }
+
+  try {
+    // Verify the site admin exists and belongs to this site
+    const [siteAdmins] = await db.promise().execute(
+      `SELECT a.id, a.userId, a.passwordHash
+       FROM \`admin\` a
+       WHERE a.id = ? AND a.siteId = ?`,
+      [siteAdminId, req.siteAdmin.siteId]
+    );
+
+    if (siteAdmins.length === 0) {
+      return res.status(404).json({ message: "Site admin not found" });
+    }
+
+    const siteAdmin = siteAdmins[0];
+
+    const same = await bcrypt.compare(String(currentPassword), siteAdmin.passwordHash);
+    if (!same) {
+      return res.status(401).json({ message: "Current password is incorrect" });
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+
+    // Update admin table
+    await db.promise().execute(
+      "UPDATE `admin` SET passwordHash=? WHERE id=?",
+      [hashed, siteAdminId]
+    );
+
+    // Also update users table if linked
+    if (siteAdmin.userId) {
+      await db.promise().execute(
+        "UPDATE users SET passwordHash=? WHERE userId=?",
+        [hashed, siteAdmin.userId]
+      );
+    }
+
+    res.json({ message: "Password changed" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
 };
 
 // Step 1 of forgot password: email a 6-digit code.
@@ -476,6 +538,13 @@ const resetPassword = async (req, res) => {
     await db
       .promise()
       .execute("UPDATE users SET passwordHash=? WHERE userId=?", [
+        hashed,
+        r.userId,
+      ]);
+    // Also update admin table if the user is a site admin
+    await db
+      .promise()
+      .execute("UPDATE `admin` SET passwordHash=? WHERE userId=?", [
         hashed,
         r.userId,
       ]);

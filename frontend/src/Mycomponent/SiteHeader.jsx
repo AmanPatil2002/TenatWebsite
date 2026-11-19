@@ -64,8 +64,7 @@ function CardHeader({ icon, title, description }) {
     <Stack
       direction="row"
       spacing={1.5}
-      alignItems="flex-start"
-      sx={{ mb: 2.5 }}
+      sx={{ alignItems: "flex-start", mb: 2.5 }}
     >
       <Box
         sx={{
@@ -353,7 +352,7 @@ export default function SiteHeader() {
               />
               <Divider sx={{ mb: 3 }} />
 
-              <Grid container spacing={3} alignItems="stretch">
+              <Grid container spacing={3} sx={{ alignItems: "stretch" }}>
                 {/* Logo column */}
                 <Grid size={{ xs: 12, sm: 4, md: 4 }} sx={{ minWidth: 0 }}>
                   <Stack spacing={1.25} sx={{ height: "100%" }}>
@@ -421,8 +420,7 @@ export default function SiteHeader() {
                       ) : (
                         <Stack
                           spacing={1}
-                          alignItems="center"
-                          textAlign="center"
+                          sx={{ alignItems: "center", textAlign: "center" }}
                         >
                           <CloudUploadOutlinedIcon
                             sx={{ fontSize: 28, color: "text.disabled" }}
@@ -437,9 +435,8 @@ export default function SiteHeader() {
                     <Stack
                       direction="row"
                       spacing={1}
-                      alignItems="center"
-                      flexWrap="wrap"
                       useFlexGap
+                      sx={{ alignItems: "center", flexWrap: "wrap" }}
                     >
                       <Button
                         component="label"
@@ -515,7 +512,7 @@ export default function SiteHeader() {
                         value={form.siteTitle}
                         onChange={updateForm}
                         placeholder="e.g. Shivraj High School"
-                        inputProps={{ maxLength: 150 }}
+                        slotProps={{ htmlInput: { maxLength: 150 } }}
                         helperText={`${form.siteTitle.length}/150 characters`}
                         fullWidth
                         size="small"
@@ -639,7 +636,7 @@ export default function SiteHeader() {
                     name="footerAddress"
                     value={form.footerAddress}
                     onChange={updateForm}
-                    inputProps={{ maxLength: 300 }}
+                    slotProps={{ htmlInput: { maxLength: 300 } }}
                     fullWidth
                     size="small"
                     placeholder="123 Main St, City, Country"
@@ -654,7 +651,7 @@ export default function SiteHeader() {
                       name="footerPhone"
                       value={form.footerPhone}
                       onChange={updateForm}
-                      inputProps={{ maxLength: 30 }}
+                      slotProps={{ htmlInput: { maxLength: 30 } }}
                       fullWidth
                       size="small"
                       placeholder="+1 (555) 000-0000"
@@ -668,7 +665,7 @@ export default function SiteHeader() {
                       type="email"
                       value={form.footerEmail}
                       onChange={updateForm}
-                      inputProps={{ maxLength: 190 }}
+                      slotProps={{ htmlInput: { maxLength: 190 } }}
                       fullWidth
                       size="small"
                       placeholder="hello@yourcompany.com"
@@ -683,7 +680,7 @@ export default function SiteHeader() {
                     name="copyrightText"
                     value={form.copyrightText}
                     onChange={updateForm}
-                    inputProps={{ maxLength: 255 }}
+                    slotProps={{ htmlInput: { maxLength: 255 } }}
                     fullWidth
                     size="small"
                     placeholder="© 2025 Your Company. All rights reserved."
@@ -718,23 +715,25 @@ export default function SiteHeader() {
                       value={social[platform] || ""}
                       onChange={updateSocial}
                       placeholder={PLACEHOLDERS[platform]}
-                      inputProps={{ maxLength: 500 }}
                       fullWidth
                       size="small"
                       sx={FIELD_SX}
-                      InputProps={{
-                        startAdornment: social[platform]?.trim() ? (
-                          <InputAdornment position="start">
-                            <Box
-                              sx={{
-                                width: 6,
-                                height: 6,
-                                borderRadius: "50%",
-                                bgcolor: "success.main",
-                              }}
-                            />
-                          </InputAdornment>
-                        ) : undefined,
+                      slotProps={{
+                        htmlInput: { maxLength: 500 },
+                        input: {
+                          startAdornment: social[platform]?.trim() ? (
+                            <InputAdornment position="start">
+                              <Box
+                                sx={{
+                                  width: 6,
+                                  height: 6,
+                                  borderRadius: "50%",
+                                  bgcolor: "success.main",
+                                }}
+                              />
+                            </InputAdornment>
+                          ) : undefined,
+                        },
                       }}
                     />
                   </Grid>

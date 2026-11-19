@@ -1,81 +1,7 @@
 const db = require('../config/db').promise();
 const { tn } = require('../config/provisionSite');
-
-const RESOURCES = {
-  // Common tables (all sites)
-  headers: [
-    'logoUrl', 'siteTitle', 'footerText', 'footerAddress', 'footerPhone',
-    'footerEmail', 'copyrightText', 'socialLinks',
-  ],
-  pages: ['sourcePagesId', 'title', 'page', 'sortOrder'],
-  news: ['title', 'imageUrl', 'content', 'status', 'publishedAt'],
-  galleries: ['title', 'imageUrl', 'caption', 'altText', 'sortOrder', 'status'],
-  slider: ['title', 'imageUrl', 'sortOrder', 'status'],
-  employees: ['name', 'email', 'phone', 'jobTitle', 'status'],
-
-  // School pack
-  teachers: ['name', 'email', 'phone', 'qualification', 'subjectSpecialty', 'photoUrl', 'joinedOn', 'status'],
-  classes: ['name', 'section', 'academicYear', 'classTeacherId', 'status'],
-  students: ['admissionNo', 'name', 'classId', 'rollNo', 'gender', 'dob', 'guardianName', 'guardianPhone', 'address', 'photoUrl', 'status'],
-
-  // Medical pack
-  departments: ['name', 'description', 'status'],
-  doctors: ['departmentId', 'name', 'qualification', 'specialization', 'experienceYears', 'consultationFee', 'bio', 'photoUrl', 'status'],
-
-  // E-commerce pack
-  productcategories: ['name', 'description', 'status'],
-  products: ['categoryId', 'name', 'sku', 'description', 'price', 'salePrice', 'stock', 'thumbnailUrl', 'attributes', 'status'],
-
-  // Restaurant pack
-  menucategories: ['name', 'description', 'sortOrder', 'status'],
-  menuitems: ['categoryId', 'name', 'description', 'price', 'imageUrl', 'isVeg', 'isSpecial', 'status'],
-  reservations: ['customerName', 'customerEmail', 'customerPhone', 'reservationDate', 'reservationTime', 'partySize', 'specialRequests', 'status'],
-
-  // Hotel pack
-  roomtypes: ['name', 'description', 'basePrice', 'maxOccupancy', 'amenities', 'imageUrl', 'status'],
-  rooms: ['roomTypeId', 'roomNumber', 'floorNumber', 'status'],
-  bookings: ['roomId', 'guestName', 'guestEmail', 'guestPhone', 'checkInDate', 'checkOutDate', 'adults', 'children', 'totalAmount', 'paymentStatus', 'bookingStatus', 'specialRequests'],
-
-  // Real Estate pack
-  propertytypes: ['name', 'description'],
-  properties: ['propertyTypeId', 'title', 'description', 'listingType', 'price', 'address', 'city', 'state', 'zipCode', 'bedrooms', 'bathrooms', 'area', 'areaUnit', 'yearBuilt', 'features', 'mainImageUrl', 'images', 'status', 'featuredProperty'],
-  agents: ['name', 'email', 'phone', 'photoUrl', 'bio', 'licenseNumber', 'specialization', 'status'],
-
-  // Gym pack
-  trainers: ['name', 'email', 'phone', 'specialization', 'certification', 'experienceYears', 'photoUrl', 'bio', 'status'],
-  membershipplans: ['name', 'description', 'durationMonths', 'price', 'features', 'status'],
-  members: ['membershipNo', 'name', 'email', 'phone', 'dob', 'gender', 'planId', 'joinDate', 'expiryDate', 'emergencyContact', 'emergencyPhone', 'photoUrl', 'status'],
-
-  // Blog pack
-  blogcategories: ['name', 'slug', 'description', 'status'],
-  blogposts: ['categoryId', 'authorId', 'title', 'slug', 'excerpt', 'content', 'featuredImageUrl', 'tags', 'viewCount', 'status', 'publishedAt'],
-  comments: ['postId', 'authorName', 'authorEmail', 'content', 'status'],
-
-  // Portfolio pack
-  projectcategories: ['name', 'description', 'sortOrder', 'status'],
-  projects: ['categoryId', 'title', 'description', 'clientName', 'projectUrl', 'thumbnailUrl', 'images', 'technologies', 'completedDate', 'featured', 'sortOrder', 'status'],
-  testimonials: ['clientName', 'clientCompany', 'clientPosition', 'content', 'rating', 'photoUrl', 'featured', 'status'],
-
-  // Event Management pack
-  eventtypes: ['name', 'description'],
-  events: ['eventTypeId', 'title', 'description', 'venue', 'address', 'startDateTime', 'endDateTime', 'capacity', 'ticketPrice', 'imageUrl', 'organizer', 'contactEmail', 'contactPhone', 'status', 'featured'],
-  registrations: ['eventId', 'attendeeName', 'attendeeEmail', 'attendeePhone', 'ticketCount', 'totalAmount', 'paymentStatus', 'registrationStatus'],
-
-  // NGO pack
-  causes: ['title', 'description', 'goalAmount', 'raisedAmount', 'imageUrl', 'startDate', 'endDate', 'status', 'featured'],
-  donations: ['causeId', 'donorName', 'donorEmail', 'donorPhone', 'amount', 'isAnonymous', 'paymentStatus', 'transactionId'],
-  volunteers: ['name', 'email', 'phone', 'address', 'skillsInterests', 'availability', 'photoUrl', 'status', 'joinedDate'],
-
-  // Spa pack
-  servicecategories: ['name', 'description', 'sortOrder', 'status'],
-  services: ['categoryId', 'name', 'description', 'duration', 'price', 'imageUrl', 'benefits', 'status'],
-  appointments: ['serviceId', 'therapistId', 'customerName', 'customerEmail', 'customerPhone', 'appointmentDate', 'appointmentTime', 'specialRequests', 'status'],
-
-  // Law Firm pack
-  practiceareas: ['name', 'description', 'sortOrder', 'status'],
-  attorneys: ['name', 'email', 'phone', 'practiceAreaId', 'barNumber', 'education', 'experienceYears', 'photoUrl', 'bio', 'status'],
-  caseinquiries: ['practiceAreaId', 'clientName', 'clientEmail', 'clientPhone', 'caseDetails', 'status'],
-};
+const packs = require('../config/packs');
+const SYSTEM_COLUMNS = new Set(['id', 'createdAt', 'updatedAt']);
 
 const ID_PATTERN = /^[1-9]\d{0,19}$/;
 const isId = (value) =>
@@ -95,16 +21,21 @@ const requireOwnedSite = async (siteId, userId) => {
     throw error;
   }
   const [[site]] = await db.query(
-    `SELECT s.id, s.dbName
+    `SELECT s.id, s.dbName, s.provisionStatus
        FROM sites s
        JOIN payments p ON p.id = s.paymentId AND p.status = 'captured'
-      WHERE s.id = ? AND s.userId = ? AND s.provisionStatus = 'ready'
+      WHERE s.id = ? AND s.userId = ?
         AND s.status = 'active' AND s.expiresAt > CURRENT_TIMESTAMP`,
     [siteId, userId],
   );
   if (!site) {
     const error = new Error('Site not found, unavailable, or not owned by this user');
     error.status = 403;
+    throw error;
+  }
+  if (site.provisionStatus !== 'ready' || !site.dbName) {
+    const error = new Error('Site database is not ready yet');
+    error.status = 503;
     throw error;
   }
   return site.dbName;
@@ -123,11 +54,11 @@ const requireManagedSite = async (siteId, req) => {
       throw error;
     }
     const [[site]] = await db.query(
-      `SELECT s.id, s.dbName
+      `SELECT s.id, s.dbName, s.provisionStatus
          FROM sites s
          JOIN payments p ON p.id = s.paymentId AND p.status = 'captured'
-        WHERE s.id = ? AND s.provisionStatus = 'ready'
-          AND s.status = 'active' AND s.expiresAt > CURRENT_TIMESTAMP`,
+        WHERE s.id = ? AND s.status = 'active'
+          AND s.expiresAt > CURRENT_TIMESTAMP`,
       [siteId],
     );
     if (!site) {
@@ -135,17 +66,65 @@ const requireManagedSite = async (siteId, req) => {
       error.status = 403;
       throw error;
     }
+    if (site.provisionStatus !== 'ready' || !site.dbName) {
+      const error = new Error('Site database is not ready yet');
+      error.status = 503;
+      throw error;
+    }
     return site.dbName;
   }
   return await requireOwnedSite(siteId, req.user.userId);
 };
 
-const requireResourceTable = async (siteId, resource) => {
-  if (!Object.prototype.hasOwnProperty.call(RESOURCES, resource)) {
-    const error = new Error('Unknown resource');
-    error.status = 404;
+const parseEnumValues = (columnType) =>
+  [...String(columnType).matchAll(/'((?:[^'\\]|\\.)*)'/g)].map(([, value]) =>
+    value.replace(/\\'/g, "'").replace(/\\\\/g, "\\"),
+  );
+
+const toColumnMetadata = (column) => {
+  const generated = /auto_increment|generated/i.test(column.extra || '');
+  const systemColumn = SYSTEM_COLUMNS.has(column.name);
+  const defaultIsExpression =
+    typeof column.columnDefault === 'string' &&
+    /^(CURRENT_TIMESTAMP|CURRENT_DATE|CURRENT_TIME)(\(\d+\))?$/i.test(
+      column.columnDefault,
+    );
+
+  return {
+    name: column.name,
+    dataType: column.dataType,
+    columnType: column.columnType,
+    nullable: column.isNullable === 'YES',
+    required:
+      column.isNullable === 'NO' &&
+      column.columnDefault === null &&
+      !generated &&
+      !systemColumn,
+    defaultValue:
+      column.columnDefault !== null && !defaultIsExpression
+        ? column.columnDefault
+        : null,
+    enumValues:
+      column.dataType === 'enum'
+        ? parseEnumValues(column.columnType)
+        : [],
+    editable: !systemColumn && !generated,
+    references: column.referencedTable
+      ? {
+          table: column.referencedTable,
+          column: column.referencedColumn,
+        }
+      : null,
+  };
+};
+
+const requireResourceTable = async (siteId, resource, dbName) => {
+  if (typeof resource !== 'string' || !/^[a-z][a-z0-9_]*$/.test(resource)) {
+    const error = new Error('Invalid resource');
+    error.status = 400;
     throw error;
   }
+
   const [[table]] = await db.query(
     'SELECT id FROM sitetables WHERE siteId = ? AND baseName = ?',
     [siteId, resource],
@@ -155,14 +134,88 @@ const requireResourceTable = async (siteId, resource) => {
     error.status = 404;
     throw error;
   }
-  return RESOURCES[resource];
+
+  const [columns] = await db.query(
+    `SELECT c.COLUMN_NAME AS name, c.DATA_TYPE AS dataType,
+            c.COLUMN_TYPE AS columnType, c.IS_NULLABLE AS isNullable,
+            c.COLUMN_DEFAULT AS columnDefault, c.EXTRA AS extra,
+            k.REFERENCED_TABLE_NAME AS referencedTable,
+            k.REFERENCED_COLUMN_NAME AS referencedColumn
+       FROM information_schema.COLUMNS c
+       LEFT JOIN information_schema.KEY_COLUMN_USAGE k
+         ON k.TABLE_SCHEMA = c.TABLE_SCHEMA
+        AND k.TABLE_NAME = c.TABLE_NAME
+        AND k.COLUMN_NAME = c.COLUMN_NAME
+        AND k.REFERENCED_TABLE_NAME IS NOT NULL
+      WHERE c.TABLE_SCHEMA = ? AND c.TABLE_NAME = ?
+      ORDER BY c.ORDINAL_POSITION`,
+    [dbName, resource],
+  );
+  if (!columns.length) {
+    const error = new Error('This resource table is missing from the site database');
+    error.status = 404;
+    throw error;
+  }
+
+  return columns.map(toColumnMetadata);
 };
 
-const readInput = (body, columns) =>
-  Object.fromEntries(
-    Object.entries(body && typeof body === 'object' && !Array.isArray(body) ? body : {})
-      .filter(([key]) => columns.includes(key)),
+const readInput = (body, columns) => {
+  const values =
+    body && typeof body === 'object' && !Array.isArray(body) ? body : {};
+  const editableColumns = new Set(
+    columns.filter((column) => column.editable).map((column) => column.name),
   );
+  const unknown = Object.keys(values).filter(
+    (key) => !editableColumns.has(key),
+  );
+  if (unknown.length) {
+    const error = new Error(`Unsupported field(s): ${unknown.join(', ')}`);
+    error.status = 400;
+    throw error;
+  }
+  return Object.fromEntries(Object.entries(values));
+};
+
+exports.schema = async (req, res) => {
+  try {
+    const siteId = req.params.siteId;
+    const dbName = await requireManagedSite(siteId, req);
+    const [rows] = await db.query(
+      `SELECT st.baseName, c.COLUMN_NAME AS name, c.DATA_TYPE AS dataType,
+              c.COLUMN_TYPE AS columnType, c.IS_NULLABLE AS isNullable,
+              c.COLUMN_DEFAULT AS columnDefault, c.EXTRA AS extra,
+              c.ORDINAL_POSITION AS ordinalPosition,
+              k.REFERENCED_TABLE_NAME AS referencedTable,
+              k.REFERENCED_COLUMN_NAME AS referencedColumn
+         FROM sitetables st
+         JOIN information_schema.COLUMNS c
+           ON c.TABLE_SCHEMA = ? AND c.TABLE_NAME = st.baseName
+         LEFT JOIN information_schema.KEY_COLUMN_USAGE k
+           ON k.TABLE_SCHEMA = c.TABLE_SCHEMA
+          AND k.TABLE_NAME = c.TABLE_NAME
+          AND k.COLUMN_NAME = c.COLUMN_NAME
+          AND k.REFERENCED_TABLE_NAME IS NOT NULL
+        WHERE st.siteId = ?
+        ORDER BY st.baseName, c.ORDINAL_POSITION`,
+      [dbName, siteId],
+    );
+    const commonTables = new Set(packs.common().map(([name]) => name));
+    const resources = {};
+
+    for (const row of rows) {
+      const resource = (resources[row.baseName] ||= {
+        isCommon: commonTables.has(row.baseName),
+        columns: [],
+      });
+      resource.columns.push(toColumnMetadata(row));
+    }
+
+    return res.json({ resources });
+  } catch (error) {
+    return sendError(res, error);
+  }
+};
 
 exports.sections = async (req, res) => {
   try {
@@ -181,7 +234,7 @@ exports.list = async (req, res) => {
   const { siteId, resource } = req.params;
   try {
     const dbName = await requireManagedSite(siteId, req);
-    await requireResourceTable(siteId, resource);
+    await requireResourceTable(siteId, resource, dbName);
     const [rows] = await db.query(
       `SELECT * FROM ${tn(siteId, resource, dbName)} ORDER BY id DESC`,
     );
@@ -195,7 +248,7 @@ exports.create = async (req, res) => {
   const { siteId, resource } = req.params;
   try {
     const dbName = await requireManagedSite(siteId, req);
-    const columns = await requireResourceTable(siteId, resource);
+    const columns = await requireResourceTable(siteId, resource, dbName);
     const data = readInput(req.body, columns);
     if (!Object.keys(data).length) {
       return res.status(400).json({ message: 'No editable fields were provided' });
@@ -215,15 +268,24 @@ exports.update = async (req, res) => {
   if (!isId(id)) return res.status(400).json({ message: 'Invalid record id' });
   try {
     const dbName = await requireManagedSite(siteId, req);
-    const columns = await requireResourceTable(siteId, resource);
+    const columns = await requireResourceTable(siteId, resource, dbName);
     const data = readInput(req.body, columns);
     if (!Object.keys(data).length) {
       return res.status(400).json({ message: 'No editable fields were provided' });
     }
-    await db.query(
+    const [result] = await db.query(
       `UPDATE ${tn(siteId, resource, dbName)} SET ? WHERE id = ?`,
       [data, id],
     );
+    if (result.affectedRows === 0) {
+      const [[record]] = await db.query(
+        `SELECT id FROM ${tn(siteId, resource, dbName)} WHERE id = ? LIMIT 1`,
+        [id],
+      );
+      if (!record) {
+        return res.status(404).json({ message: 'Record not found' });
+      }
+    }
     return res.json({ message: 'Updated' });
   } catch (error) {
     return sendError(res, error);
@@ -235,8 +297,14 @@ exports.remove = async (req, res) => {
   if (!isId(id)) return res.status(400).json({ message: 'Invalid record id' });
   try {
     const dbName = await requireManagedSite(siteId, req);
-    await requireResourceTable(siteId, resource);
-    await db.query(`DELETE FROM ${tn(siteId, resource, dbName)} WHERE id = ?`, [id]);
+    await requireResourceTable(siteId, resource, dbName);
+    const [result] = await db.query(
+      `DELETE FROM ${tn(siteId, resource, dbName)} WHERE id = ?`,
+      [id],
+    );
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Record not found' });
+    }
     return res.json({ message: 'Deleted' });
   } catch (error) {
     return sendError(res, error);

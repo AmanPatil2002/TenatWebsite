@@ -25,7 +25,11 @@ const CONTACT_URL = `${API_URL}/contact/acontact`;
 
 /* Reusable footer info row – mirrors the InfoRow from the contact page */
 const FooterInfoRow = ({ icon, label, value, href, external }) => (
-  <Stack direction="row" spacing={1.5} alignItems="flex-start">
+  <Stack
+    direction="row"
+    spacing={1.5}
+    sx={{ alignItems: "flex-start" }}
+  >
     <Box
       sx={{
         width: 36,
@@ -207,9 +211,8 @@ export default function Footer() {
           <Grid size={{ xs: 12, sm: 6, md: 4 }}>
             <Stack
               direction="row"
-              alignItems="center"
               spacing={1.25}
-              sx={{ mb: 2 }}
+              sx={{ alignItems: "center", mb: 2 }}
             >
               <Box
                 sx={{

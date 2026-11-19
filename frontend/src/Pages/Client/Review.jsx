@@ -12,18 +12,11 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { alpha } from "@mui/material/styles";
+import { alpha, useTheme } from "@mui/material/styles";
 import RateReviewOutlinedIcon from "@mui/icons-material/RateReviewOutlined";
 import ReviewsOutlinedIcon from "@mui/icons-material/ReviewsOutlined";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
-const BRAND = {
-  indigo: "#4f46e5",
-  indigoDeep: "#3730a3",
-  ink: "#0f172a",
-  muted: "#64748b",
-};
 
 const formatDate = (value) =>
   new Date(value).toLocaleDateString(undefined, {
@@ -33,6 +26,11 @@ const formatDate = (value) =>
   });
 
 export default function Review() {
+  const theme = useTheme();
+  const primary = theme.palette.primary.main;
+  const primaryDark = theme.palette.primary.dark;
+  const textPrimary = theme.palette.text.primary;
+  const textMuted = theme.palette.text.muted;
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -107,8 +105,7 @@ export default function Review() {
       sx={{
         minHeight: "80vh",
         py: { xs: 4, md: 7 },
-        background:
-          "linear-gradient(160deg, #f8fafc 0%, #eef2ff 45%, #f0fdfa 100%)",
+        background: `linear-gradient(160deg, ${theme.palette.background.default} 0%, ${alpha(theme.palette.primary.main, 0.04)} 45%, ${alpha(theme.palette.info.main, 0.04)} 100%)`,
       }}
     >
       <Container maxWidth="lg">
@@ -120,7 +117,7 @@ export default function Review() {
               display: "block",
               fontWeight: 700,
               letterSpacing: "0.12em",
-              color: BRAND.indigo,
+              color: primary,
             }}
           >
             Feedback
@@ -131,7 +128,7 @@ export default function Review() {
             sx={{
               fontWeight: 800,
               letterSpacing: "-0.02em",
-              color: BRAND.ink,
+              color: textPrimary,
               mt: 0.5,
             }}
           >
@@ -194,15 +191,15 @@ export default function Review() {
                   display: "grid",
                   placeItems: "center",
                   borderRadius: 2,
-                  color: BRAND.indigo,
-                  bgcolor: alpha(BRAND.indigo, 0.08),
+                  color: primary,
+                  bgcolor: alpha(primary, 0.08),
                   "& .MuiSvgIcon-root": { fontSize: "1.25rem" },
                 }}
               >
                 <RateReviewOutlinedIcon />
               </Box>
               <Box sx={{ minWidth: 0 }}>
-                <Typography variant="h6" fontWeight={700} color={BRAND.ink}>
+                <Typography variant="h6" fontWeight={700} color={textPrimary}>
                   Write a review
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -228,7 +225,7 @@ export default function Review() {
                   onChange={(_, value) => setRating(value || 0)}
                   precision={1}
                   size="large"
-                  sx={{ color: BRAND.indigo }}
+                  sx={{ color: primary }}
                 />
               </Box>
 
@@ -259,11 +256,11 @@ export default function Review() {
                     textTransform: "none",
                     fontWeight: 700,
                     py: 1.15,
-                    bgcolor: BRAND.indigo,
-                    boxShadow: `0 8px 20px ${alpha(BRAND.indigo, 0.25)}`,
+                    bgcolor: primary,
+                    boxShadow: `0 8px 20px ${alpha(primary, 0.25)}`,
                     "&:hover": {
-                      bgcolor: BRAND.indigoDeep,
-                      boxShadow: `0 10px 24px ${alpha(BRAND.indigo, 0.32)}`,
+                      bgcolor: primaryDark,
+                      boxShadow: `0 10px 24px ${alpha(primary, 0.32)}`,
                     },
                   }}
                 >
@@ -297,8 +294,8 @@ export default function Review() {
                   display: "grid",
                   placeItems: "center",
                   borderRadius: 2,
-                  color: BRAND.indigo,
-                  bgcolor: alpha(BRAND.indigo, 0.08),
+                  color: primary,
+                  bgcolor: alpha(primary, 0.08),
                   "& .MuiSvgIcon-root": { fontSize: "1.25rem" },
                 }}
               >
@@ -309,7 +306,7 @@ export default function Review() {
                   variant="h6"
                   component="h2"
                   fontWeight={700}
-                  color={BRAND.ink}
+                  color={textPrimary}
                 >
                   My reviews
                 </Typography>
@@ -337,7 +334,7 @@ export default function Review() {
               >
                 <CircularProgress
                   size={32}
-                  sx={{ color: BRAND.indigo }}
+                  sx={{ color: primary }}
                   aria-label="Loading reviews"
                 />
               </Box>
@@ -359,17 +356,17 @@ export default function Review() {
                     width: 56,
                     height: 56,
                     borderRadius: "50%",
-                    bgcolor: alpha(BRAND.indigo, 0.08),
+                    bgcolor: alpha(primary, 0.08),
                     display: "grid",
                     placeItems: "center",
                     mb: 2,
                   }}
                 >
                   <ReviewsOutlinedIcon
-                    sx={{ fontSize: 28, color: BRAND.indigo }}
+                    sx={{ fontSize: 28, color: primary }}
                   />
                 </Box>
-                <Typography fontWeight={600} color={BRAND.ink} gutterBottom>
+                <Typography fontWeight={600} color={textPrimary} gutterBottom>
                   No reviews yet
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -387,7 +384,7 @@ export default function Review() {
                   pr: 1,
                   "&::-webkit-scrollbar": { width: 6 },
                   "&::-webkit-scrollbar-thumb": {
-                    bgcolor: alpha(BRAND.indigo, 0.25),
+                    bgcolor: alpha(primary, 0.25),
                     borderRadius: 3,
                   },
                 }}
@@ -399,7 +396,7 @@ export default function Review() {
                       sx={{
                         p: 2,
                         borderRadius: 2,
-                        bgcolor: alpha(BRAND.indigo, 0.02),
+                        bgcolor: alpha(primary, 0.02),
                         border: "1px solid",
                         borderColor: "divider",
                       }}
@@ -415,7 +412,7 @@ export default function Review() {
                           value={review.rating}
                           readOnly
                           size="small"
-                          sx={{ color: BRAND.indigo }}
+                          sx={{ color: primary }}
                         />
                         <Typography variant="caption" color="text.secondary">
                           {formatDate(review.createdAt)}
@@ -425,7 +422,7 @@ export default function Review() {
                         sx={{
                           mt: 1,
                           whiteSpace: "pre-wrap",
-                          color: BRAND.ink,
+                          color: textPrimary,
                           fontSize: "0.95rem",
                           lineHeight: 1.6,
                         }}

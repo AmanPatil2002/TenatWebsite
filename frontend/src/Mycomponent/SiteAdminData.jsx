@@ -119,6 +119,234 @@ const ResourceIcons = {
       <path d="M9 11v5M15 11v5" />
     </SvgIcon>
   ),
+  agriculture: (p) => (
+    <SvgIcon {...p}>
+      <path d="M3 11h18M3 15h18M12 3v18" />
+      <path d="M12 3l9 9-9 9-9-9 9-9Z" />
+    </SvgIcon>
+  ),
+  blogcategories: (p) => (
+    <SvgIcon {...p}>
+      <path d="M4 4h16v16H4Z" />
+      <path d="M4 8h16M4 12h16M4 16h16" />
+    </SvgIcon>
+  ),
+  blogposts: (p) => (
+    <SvgIcon {...p}>
+      <path d="M4 2h16v20H4Z" />
+      <path d="M8 6h8M8 10h8M8 14h6" />
+    </SvgIcon>
+  ),
+  causes: (p) => (
+    <SvgIcon {...p}>
+      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2Z" />
+    </SvgIcon>
+  ),
+  donations: (p) => (
+    <SvgIcon {...p}>
+      <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+    </SvgIcon>
+  ),
+  volunteers: (p) => (
+    <SvgIcon {...p}>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 20c0-4 4-7 8-7s8 3 8 7" />
+    </SvgIcon>
+  ),
+  branches: (p) => (
+    <SvgIcon {...p}>
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z" />
+      <path d="M9 22V12h6v10" />
+    </SvgIcon>
+  ),
+  financeproducts: (p) => (
+    <SvgIcon {...p}>
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <path d="M2 10h20M7 15h0M12 15h0M17 15h0" />
+    </SvgIcon>
+  ),
+  financeapplications: (p) => (
+    <SvgIcon {...p}>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+      <polyline points="10 9 9 9 8 9" />
+    </SvgIcon>
+  ),
+  gymclasses: (p) => (
+    <SvgIcon {...p}>
+      <path d="M6 18h12M6 14h12M6 10h12" />
+      <circle cx="9" cy="5" r="2" />
+      <circle cx="15" cy="5" r="2" />
+    </SvgIcon>
+  ),
+  members: (p) => (
+    <SvgIcon {...p}>
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </SvgIcon>
+  ),
+  membershipplans: (p) => (
+    <SvgIcon {...p}>
+      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2Z" />
+    </SvgIcon>
+  ),
+  trainers: (p) => (
+    <SvgIcon {...p}>
+      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2Z" />
+    </SvgIcon>
+  ),
+  salonservices: (p) => (
+    <SvgIcon {...p}>
+      <path d="M12 2v20M2 12h20" />
+    </SvgIcon>
+  ),
+  stylists: (p) => (
+    <SvgIcon {...p}>
+      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2Z" />
+    </SvgIcon>
+  ),
+  salonbookings: (p) => (
+    <SvgIcon {...p}>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+    </SvgIcon>
+  ),
+  salonpackages: (p) => (
+    <SvgIcon {...p}>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M12 8v8M8 12h8" />
+    </SvgIcon>
+  ),
+  marketingservices: (p) => (
+    <SvgIcon {...p}>
+      <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+    </SvgIcon>
+  ),
+  casestudies: (p) => (
+    <SvgIcon {...p}>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+    </SvgIcon>
+  ),
+  leads: (p) => (
+    <SvgIcon {...p}>
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </SvgIcon>
+  ),
+  practiceareas: (p) => (
+    <SvgIcon {...p}>
+      <path d="M12 2v20M2 12h20" />
+    </SvgIcon>
+  ),
+  attorneys: (p) => (
+    <SvgIcon {...p}>
+      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2Z" />
+    </SvgIcon>
+  ),
+  caseinquiries: (p) => (
+    <SvgIcon {...p}>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+    </SvgIcon>
+  ),
+  consultations: (p) => (
+    <SvgIcon {...p}>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+    </SvgIcon>
+  ),
+  casedocuments: (p) => (
+    <SvgIcon {...p}>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+    </SvgIcon>
+  ),
+  propertytypes: (p) => (
+    <SvgIcon {...p}>
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z" />
+      <path d="M9 22V12h6v10" />
+    </SvgIcon>
+  ),
+  properties: (p) => (
+    <SvgIcon {...p}>
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z" />
+      <path d="M9 22V12h6v10" />
+    </SvgIcon>
+  ),
+  agents: (p) => (
+    <SvgIcon {...p}>
+      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2Z" />
+    </SvgIcon>
+  ),
+  roomtypes: (p) => (
+    <SvgIcon {...p}>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M3 10h18" />
+    </SvgIcon>
+  ),
+  rooms: (p) => (
+    <SvgIcon {...p}>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M3 10h18" />
+    </SvgIcon>
+  ),
+  bookings: (p) => (
+    <SvgIcon {...p}>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+    </SvgIcon>
+  ),
+  amenities: (p) => (
+    <SvgIcon {...p}>
+      <path d="M12 2v20M2 12h20" />
+    </SvgIcon>
+  ),
+  registrations: (p) => (
+    <SvgIcon {...p}>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+    </SvgIcon>
+  ),
+  venues: (p) => (
+    <SvgIcon {...p}>
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z" />
+      <path d="M9 22V12h6v10" />
+    </SvgIcon>
+  ),
+  events: (p) => (
+    <SvgIcon {...p}>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+    </SvgIcon>
+  ),
+  eventtypes: (p) => (
+    <SvgIcon {...p}>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M3 10h18" />
+    </SvgIcon>
+  ),
+  tickettypes: (p) => (
+    <SvgIcon {...p}>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M3 10h18" />
+    </SvgIcon>
+  ),
+  tickets: (p) => (
+    <SvgIcon {...p}>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M3 10h18" />
+    </SvgIcon>
+  ),
 };
 
 const FieldIcon = (p) => (
@@ -310,6 +538,145 @@ const RESOURCE_CONFIG = {
   },
 };
 
+const humanize = (value) =>
+  String(value)
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+const fieldFromSchema = (column) => {
+  const { dataType, columnType, name } = column;
+  const lowerType = String(dataType).toLowerCase();
+  const typeDefinition = String(columnType).toLowerCase();
+  const varcharLength = typeDefinition.match(/^(?:var)?char\((\d+)\)/);
+  const integer = ["tinyint", "smallint", "mediumint", "int", "integer", "bigint", "year"].includes(lowerType);
+  const decimalScale = typeDefinition.match(/^(?:decimal|numeric)\(\d+,(\d+)\)/);
+  const base = {
+    label: humanize(name),
+    required: Boolean(column.required),
+    nullable: Boolean(column.nullable),
+    defaultValue: column.defaultValue,
+    references: column.references,
+  };
+
+  if (lowerType === "enum") {
+    return {
+      ...base,
+      type: "select",
+      options: (column.enumValues || []).map((value) => ({
+        value,
+        label: humanize(value),
+      })),
+    };
+  }
+  if (lowerType === "json") return { ...base, type: "json", rows: 4 };
+  if (lowerType === "date") return { ...base, type: "date" };
+  if (lowerType === "datetime" || lowerType === "timestamp") {
+    return { ...base, type: "datetime-local" };
+  }
+  if (lowerType === "time") return { ...base, type: "time" };
+  if (lowerType === "tinyint" && /^tinyint\(1\)/.test(typeDefinition)) {
+    return { ...base, type: "boolean" };
+  }
+  if (/email$/i.test(name)) {
+    return {
+      ...base,
+      type: "email",
+      maxLength: varcharLength ? Number(varcharLength[1]) : undefined,
+    };
+  }
+  if (/(phone|mobile|telephone)$/i.test(name)) {
+    return {
+      ...base,
+      type: "tel",
+      maxLength: varcharLength ? Number(varcharLength[1]) : undefined,
+    };
+  }
+  if (integer || ["decimal", "numeric", "float", "double", "real"].includes(lowerType)) {
+    const scale = decimalScale ? Number(decimalScale[1]) : 0;
+    return {
+      ...base,
+      type: "number",
+      integer,
+      bigint: lowerType === "bigint",
+      min: typeDefinition.includes("unsigned") ? 0 : undefined,
+      step: integer
+        ? "1"
+        : scale > 0
+          ? `0.${"0".repeat(Math.max(0, scale - 1))}1`
+          : "any",
+    };
+  }
+  if (/(image|photo|thumbnail|poster|banner|cover|logo|icon)url$/i.test(name)) {
+    return {
+      ...base,
+      type: "image",
+      maxLength: varcharLength ? Number(varcharLength[1]) : undefined,
+    };
+  }
+  return {
+    ...base,
+    type: ["text", "mediumtext", "longtext", "tinytext"].includes(lowerType)
+      ? "textarea"
+      : "text",
+    rows: ["text", "mediumtext", "longtext", "tinytext"].includes(lowerType)
+      ? 4
+      : undefined,
+    maxLength: varcharLength ? Number(varcharLength[1]) : undefined,
+  };
+};
+
+const buildResourceConfig = (resource, schema, primaryColor) => {
+  if (!schema) return null;
+  const existing = RESOURCE_CONFIG[resource];
+  const fields = Object.fromEntries(
+    schema.columns
+      .filter((column) => column.editable)
+      .map((column) => {
+        const configuredField = existing?.fields[column.name];
+        const inferredField = fieldFromSchema(column);
+        const spec = {
+          ...inferredField,
+          ...(configuredField || {}),
+          label: configuredField?.label || inferredField.label,
+          type:
+            inferredField.type === "text" &&
+            configuredField?.type === "select" &&
+            configuredField.options
+              ? "select"
+              : inferredField.type,
+          required: column.required || Boolean(configuredField?.required),
+          nullable: column.nullable,
+          defaultValue:
+            column.defaultValue ?? configuredField?.defaultValue ?? null,
+          references: column.references,
+        };
+        if (inferredField.integer !== undefined) {
+          spec.integer = inferredField.integer;
+          spec.bigint = inferredField.bigint;
+          spec.step = inferredField.step;
+        }
+        if (inferredField.maxLength !== undefined) {
+          spec.maxLength = inferredField.maxLength;
+        }
+        if (column.dataType === "enum") {
+          spec.type = "select";
+          spec.options = inferredField.options;
+        }
+        return [column.name, spec];
+      }),
+  );
+  const label = existing?.label || humanize(resource);
+
+  return {
+    label,
+    singular: existing?.singular || label.replace(/s$/, ""),
+    icon: existing?.icon || ResourceIcons[resource] || FieldIcon,
+    color: existing?.color || primaryColor,
+    fields,
+  };
+};
+
 const RESOURCE_ORDER = [
   "students",
   "teachers",
@@ -321,27 +688,6 @@ const RESOURCE_ORDER = [
   "menucategories",
   "menuitems",
 ];
-
-const FK_MAP = {
-  classes: { classTeacherId: "teachers" },
-  students: { classId: "classes" },
-  doctors: { departmentId: "departments" },
-  products: { categoryId: "productcategories" },
-  menuitems: { categoryId: "menucategories" },
-  rooms: { roomTypeId: "roomtypes" },
-  bookings: { roomId: "rooms" },
-  properties: { propertyTypeId: "propertytypes" },
-  members: { planId: "membershipplans" },
-  blogposts: { categoryId: "blogcategories", authorId: "employees" },
-  comments: { postId: "blogposts" },
-  projects: { categoryId: "projectcategories" },
-  events: { eventTypeId: "eventtypes" },
-  registrations: { eventId: "events" },
-  donations: { causeId: "causes" },
-  appointments: { serviceId: "services", therapistId: "employees" },
-  attorneys: { practiceAreaId: "practiceareas" },
-  caseinquiries: { practiceAreaId: "practiceareas" },
-};
 
 /* ------------------------------------------------------------------ */
 /*  Date / time helpers                                                 */
@@ -404,6 +750,7 @@ const formatInputValue = (value, type) => {
     if (value instanceof Date) return toDateTimeInput(value);
     return String(value).replace(" ", "T").slice(0, 16);
   }
+  if (type === "time") return String(value).slice(0, 5);
   if (type === "boolean") return String(Number(value));
   return String(value);
 };
@@ -488,6 +835,10 @@ const validateField = (spec, raw) => {
       return Number.isNaN(new Date(value).getTime())
         ? `${spec.label} must be a valid date and time.`
         : "";
+    case "time":
+      return /^([01]\d|2[0-3]):[0-5]\d$/.test(value)
+        ? ""
+        : `${spec.label} must be a valid time.`;
     case "image":
       return isValidImageUrl(value)
         ? ""
@@ -541,7 +892,9 @@ const makePayload = (form, config) => {
       if (spec.nullable !== false) payload[name] = null;
       continue;
     }
-    if (spec.type === "number") payload[name] = Number(raw);
+    if (spec.type === "number") {
+      payload[name] = spec.bigint && spec.integer ? String(raw).trim() : Number(raw);
+    }
     else if (spec.type === "boolean") payload[name] = Number(raw);
     else if (spec.type === "json") payload[name] = JSON.stringify(JSON.parse(raw));
     else if (spec.type === "datetime-local") payload[name] = `${raw.replace("T", " ")}:00`;
@@ -643,6 +996,7 @@ export default function SiteAdminData() {
   const { baseUrl, authConfig } = useOutletContext();
 
   const [resources, setResources] = useState([]);
+  const [resourceSchemas, setResourceSchemas] = useState({});
   const [selectedResource, setSelectedResource] = useState("");
   const [rows, setRows] = useState([]);
   const [search, setSearch] = useState("");
@@ -659,17 +1013,30 @@ export default function SiteAdminData() {
   const [viewMode, setViewMode] = useState("table"); // 'table' | 'cards'
   const [hiddenColumns, setHiddenColumns] = useState([]);
 
-  const config = RESOURCE_CONFIG[selectedResource];
+  const resourceConfigs = useMemo(
+    () =>
+      Object.fromEntries(
+        resources.map((resource) => [
+          resource,
+          buildResourceConfig(
+            resource,
+            resourceSchemas[resource],
+            theme.palette.primary.main,
+          ),
+        ]),
+      ),
+    [resources, resourceSchemas, theme.palette.primary.main],
+  );
+  const config = resourceConfigs[selectedResource];
   const resourceColor = config?.color || theme.palette.primary.main;
   const resourceUrl = `${baseUrl}/data/${selectedResource}`;
-  const fkMap = FK_MAP[selectedResource] || {};
 
   /* ---------------- FK options ---------------- */
   const fetchFkOptions = useCallback(async () => {
     if (!config) return;
     const newOptions = {};
-    for (const name of Object.keys(config.fields)) {
-      const fk = FK_MAP[selectedResource]?.[name];
+    for (const [name, spec] of Object.entries(config.fields)) {
+      const fk = spec.references?.table;
       if (fk) {
         try {
           const { data } = await axios.get(`${baseUrl}/data/${fk}`, authConfig);
@@ -683,7 +1050,7 @@ export default function SiteAdminData() {
       }
     }
     setFkOptions(newOptions);
-  }, [config, selectedResource, baseUrl, authConfig]);
+  }, [config, baseUrl, authConfig]);
 
   useEffect(() => {
     fetchFkOptions();
@@ -741,14 +1108,29 @@ export default function SiteAdminData() {
     let cancelled = false;
     const loadResources = async () => {
       try {
-        const { data } = await axios.get(`${baseUrl}/data`, authConfig);
+        const { data } = await axios.get(`${baseUrl}/data/schema`, authConfig);
         if (cancelled) return;
-        const knownResources = Array.isArray(data)
-          ? data.filter((name) => RESOURCE_CONFIG[name])
-          : [];
+        const schemas =
+          data?.resources && typeof data.resources === "object"
+            ? data.resources
+            : {};
+        const knownResources = Object.entries(schemas)
+          .filter(
+            ([, schema]) =>
+              !schema.isCommon &&
+              Array.isArray(schema.columns) &&
+              schema.columns.some((column) => column.editable),
+          )
+          .map(([name]) => name);
+        setResourceSchemas(schemas);
         setResources(knownResources);
         if (knownResources.length) {
-          setSelectedResource(knownResources[0]);
+          setSelectedResource(
+            knownResources.find((name) => RESOURCE_ORDER.includes(name)) ||
+              knownResources[0],
+          );
+        } else {
+          setSelectedResource("");
         }
         setError("");
       } catch (requestError) {
@@ -881,7 +1263,7 @@ export default function SiteAdminData() {
 
   /* ---------------- Form field renderer ---------------- */
   const renderFormField = ([name, spec]) => {
-    const isFk = Boolean(fkMap[name]);
+    const isFk = Boolean(spec.references);
     const isSelect = spec.type === "select" || spec.type === "boolean" || isFk;
     const multiline = spec.type === "textarea" || spec.type === "json";
     const errorText = fieldErrors[name];
@@ -901,7 +1283,7 @@ export default function SiteAdminData() {
 
     const inputType = isSelect
       ? undefined
-      : ["date", "email", "tel", "number", "datetime-local"].includes(spec.type)
+      : ["date", "email", "tel", "number", "datetime-local", "time"].includes(spec.type)
         ? spec.type
         : "text";
 
@@ -972,7 +1354,7 @@ export default function SiteAdminData() {
               {option.label}
             </MenuItem>
           ))}
-        {isFk && (
+        {isFk && spec.nullable && (
           <MenuItem key="clear" value="">
             None
           </MenuItem>
@@ -1002,13 +1384,19 @@ export default function SiteAdminData() {
       {/* Page header */}
       <Stack
         direction={{ xs: "column", sm: "row" }}
-        justifyContent="space-between"
-        alignItems={{ xs: "stretch", sm: "center" }}
         spacing={2}
-        sx={{ mb: 3 }}
+        sx={{
+          mb: 3,
+          justifyContent: "space-between",
+          alignItems: { xs: "stretch", sm: "center" },
+        }}
       >
         <Box>
-          <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 0.5 }}>
+          <Stack
+            direction="row"
+            spacing={1.5}
+            sx={{ mb: 0.5, alignItems: "center" }}
+          >
             {config && (
               <Box
                 sx={{
@@ -1034,7 +1422,7 @@ export default function SiteAdminData() {
             </Box>
           </Stack>
         </Box>
-        <Stack direction="row" spacing={1.5} alignItems="center">
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
           {config && (
             <Button
               variant="contained"
@@ -1065,7 +1453,7 @@ export default function SiteAdminData() {
           <Stack
             direction={{ xs: "column", sm: "row" }}
             spacing={1.5}
-            alignItems={{ xs: "stretch", sm: "center" }}
+            sx={{ alignItems: { xs: "stretch", sm: "center" } }}
           >
             <TextField
               select
@@ -1083,10 +1471,14 @@ export default function SiteAdminData() {
               sx={{ minWidth: { sm: 280 }, flex: { sm: 1 } }}
             >
               {availableResources.map((resource) => {
-                const resConfig = RESOURCE_CONFIG[resource];
+                const resConfig = resourceConfigs[resource];
                 return (
                   <MenuItem key={resource} value={resource}>
-                    <Stack direction="row" alignItems="center" spacing={1}>
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      sx={{ alignItems: "center" }}
+                    >
                       <Box
                         sx={{
                           width: 24,
@@ -1120,10 +1512,12 @@ export default function SiteAdminData() {
           <Box sx={{ p: 2 }}>
             <Stack
               direction={{ xs: "column", sm: "row" }}
-              justifyContent="space-between"
-              alignItems={{ xs: "stretch", sm: "center" }}
               spacing={2}
-              sx={{ mb: 2 }}
+              sx={{
+                mb: 2,
+                justifyContent: "space-between",
+                alignItems: { xs: "stretch", sm: "center" },
+              }}
             >
               <Box>
                 <Typography variant="h6" fontWeight={700} color={resourceColor}>
@@ -1134,7 +1528,11 @@ export default function SiteAdminData() {
                   {rows.length === 1 ? "" : "s"}
                 </Typography>
               </Box>
-              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+              <Stack
+                direction="row"
+                spacing={1}
+                sx={{ alignItems: "center", flexWrap: "wrap" }}
+              >
                 <TextField
                   size="small"
                   placeholder="Search records"
@@ -1173,7 +1571,11 @@ export default function SiteAdminData() {
             </Stack>
 
             {/* Column visibility chips */}
-            <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 2 }}>
+            <Stack
+              direction="row"
+              spacing={1}
+              sx={{ mb: 2, flexWrap: "wrap" }}
+            >
               {Object.entries(config.fields).map(([name, spec]) => {
                 const hidden = hiddenColumns.includes(name);
                 return (
@@ -1351,11 +1753,17 @@ export default function SiteAdminData() {
                       <CardContent sx={{ p: 2 }}>
                         <Stack
                           direction="row"
-                          justifyContent="space-between"
-                          alignItems="flex-start"
-                          sx={{ mb: 1.5 }}
+                          sx={{
+                            mb: 1.5,
+                            justifyContent: "space-between",
+                            alignItems: "flex-start",
+                          }}
                         >
-                          <Stack direction="row" spacing={1.5} alignItems="center">
+                          <Stack
+                            direction="row"
+                            spacing={1.5}
+                            sx={{ alignItems: "center" }}
+                          >
                             {config.fields.photoUrl && row.photoUrl && (
                               <Avatar src={row.photoUrl} sx={{ width: 40, height: 40 }} />
                             )}
@@ -1484,7 +1892,7 @@ export default function SiteAdminData() {
             </Button>
             <Button type="submit" variant="contained" disabled={saving}>
               {saving ? (
-                <Stack direction="row" spacing={1} alignItems="center">
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                   <CircularProgress size={20} />
                   Saving...
                 </Stack>

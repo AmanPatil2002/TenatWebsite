@@ -10,7 +10,7 @@ const isId = (value) => {
 
 const getActiveOwnedSite = async (siteId, userId) => {
   const [[site]] = await db.query(
-    `SELECT s.id, s.userId, s.status, s.expiresAt, s.dbName,
+    `SELECT s.id, s.userId, s.status, s.expiresAt, s.dbName, s.provisionStatus,
             pay.status AS paymentStatus,
             s.expiresAt > CURRENT_TIMESTAMP AS notExpired
        FROM sites s
@@ -22,6 +22,9 @@ const getActiveOwnedSite = async (siteId, userId) => {
   if (site.status !== "active" || site.paymentStatus !== "captured" || !site.notExpired) {
     throw new HttpError(403, "Site is inactive or expired");
   }
+  if (site.provisionStatus !== "ready" || !site.dbName) {
+    throw new HttpError(503, "Site database is not ready yet");
+  }
   return site;
 };
 
@@ -31,7 +34,7 @@ const getActiveManagedSite = async (siteId, req) => {
     throw new HttpError(403, "This login is not assigned to the requested site");
   }
   const [[site]] = await db.query(
-    `SELECT s.id, s.userId, s.status, s.expiresAt, s.dbName,
+    `SELECT s.id, s.userId, s.status, s.expiresAt, s.dbName, s.provisionStatus,
             pay.status AS paymentStatus,
             s.expiresAt > CURRENT_TIMESTAMP AS notExpired
        FROM sites s
@@ -42,6 +45,9 @@ const getActiveManagedSite = async (siteId, req) => {
   if (!site) throw new HttpError(404, "Site not found");
   if (site.status !== "active" || site.paymentStatus !== "captured" || !site.notExpired) {
     throw new HttpError(403, "Site is inactive or expired");
+  }
+  if (site.provisionStatus !== "ready" || !site.dbName) {
+    throw new HttpError(503, "Site database is not ready yet");
   }
   return site;
 };

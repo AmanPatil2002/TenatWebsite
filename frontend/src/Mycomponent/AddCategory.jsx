@@ -45,6 +45,7 @@ const BRAND = {
  *  - `group` : subheader used to group the dropdown into sections
  * Ordered by domain so the dropdown reads naturally.
  * ------------------------------------------------------------------ */
+
 const PACK_CATALOG = [
   // --- Education -------------------------------------------------
   { key: "school",         label: "School / Education",     group: "Education" },
@@ -299,9 +300,9 @@ function CategoryForm({
             inputLabel: { shrink: true },
           }}
         >
-          <MenuItem value="">
+          {/* <MenuItem value="">
             <em>None</em>
-          </MenuItem>
+          </MenuItem> */}
 
           {legacyValue && (
             <ListSubheader sx={{ bgcolor: "background.paper" }}>
@@ -534,17 +535,6 @@ export default function AddCategory() {
         {/* Page header */}
         <Box sx={{ mb: { xs: 3, md: 4 }, textAlign: "center" }}>
           <Typography
-            variant="overline"
-            sx={{
-              display: "block",
-              fontWeight: 700,
-              letterSpacing: "0.12em",
-              color: BRAND.indigo,
-            }}
-          >
-            Catalog
-          </Typography>
-          <Typography
             component="h1"
             variant="h4"
             sx={{
@@ -733,11 +723,8 @@ export default function AddCategory() {
                   >
                     <TableHead>
                       <TableRow>
-                        <TableCell sx={{ minWidth: 180, ...headCellSx }}>
+                        <TableCell sx={{ minWidth: 100, ...headCellSx }}>
                           Name
-                        </TableCell>
-                        <TableCell sx={{ minWidth: 180, ...headCellSx }}>
-                          Tag
                         </TableCell>
                         <TableCell
                           align="right"
@@ -782,36 +769,6 @@ export default function AddCategory() {
                               {c.name}
                             </Typography>
                             <PackChip packKey={c.packKey} />
-                          </TableCell>
-
-                          <TableCell sx={{ verticalAlign: "middle", py: 1.5 }}>
-                            {c.tag ? (
-                              <Chip
-                                size="small"
-                                label={c.tag}
-                                sx={{
-                                  maxWidth: "100%",
-                                  height: "auto",
-                                  bgcolor: alpha(BRAND.indigo, 0.08),
-                                  color: BRAND.indigo,
-                                  fontWeight: 600,
-                                  fontSize: "0.72rem",
-                                  "& .MuiChip-label": {
-                                    display: "block",
-                                    whiteSpace: "normal",
-                                    overflowWrap: "anywhere",
-                                    py: 0.5,
-                                  },
-                                }}
-                              />
-                            ) : (
-                              <Typography
-                                variant="caption"
-                                sx={{ color: BRAND.muted }}
-                              >
-                                No tag
-                              </Typography>
-                            )}
                           </TableCell>
 
                           <TableCell

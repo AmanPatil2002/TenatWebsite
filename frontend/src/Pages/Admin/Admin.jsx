@@ -35,7 +35,7 @@ import PeopleIcon from "@mui/icons-material/People";
 import RateReviewIcon from "@mui/icons-material/RateReview";
 import LogoutIcon from "@mui/icons-material/Logout";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
-import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
+import PaymentIcon from "@mui/icons-material/Payment";
 import ReorderIcon from "@mui/icons-material/Reorder";
 import BugReportOutlinedIcon from "@mui/icons-material/BugReportOutlined";
 import EditIcon from "@mui/icons-material/Edit";
@@ -46,13 +46,13 @@ const FULL_WIDTH = 260;
 const MINI_WIDTH = 76;
 
 const BRAND = {
-  indigo: "#4f46e5",
-  indigoDeep: "#3730a3",
+  indigo: "#0284c7",
+  indigoDeep: "#0369a1",
   ink: "#0f172a",
   muted: "#64748b",
   sidebar: "#0f172a",
-  sidebarHover: "rgba(255,255,255,0.06)",
-  sidebarActive: "rgba(99,102,241,0.18)",
+  sidebarHover: "rgba(238, 223, 223, 0.06)",
+  sidebarActive: "rgba(2,132,199,0.18)",
 };
 
 const menuGroups = [
@@ -102,7 +102,7 @@ const menuGroups = [
       },
       {
         text: "View Payment",
-        icon: <RateReviewIcon />,
+        icon: <PaymentIcon />,
         path: "/admin/invoice",
       },
     ],
@@ -110,11 +110,6 @@ const menuGroups = [
   {
     label: "Administration",
     items: [
-      {
-        text: "Site Admin Access",
-        icon: <ManageAccountsIcon />,
-        path: "/admin/site-admins",
-      },
       {
         text: "Bug Reports",
         icon: <BugReportOutlinedIcon />,
@@ -134,13 +129,20 @@ export default function Admin() {
 
   const isSmallScreen = useMediaQuery(theme.breakpoints.down("md"));
 
-  const [collapsed, setCollapsed] = useState(isSmallScreen);
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    setCollapsed(isSmallScreen);
-  }, [isSmallScreen]);
+    if (isSmallScreen) {
+      setMobileOpen(false);
+    }
+  }, [isSmallScreen, location.pathname]);
 
-  const drawerWidth = collapsed ? MINI_WIDTH : FULL_WIDTH;
+  const drawerWidth = isSmallScreen
+    ? FULL_WIDTH
+    : collapsed
+      ? MINI_WIDTH
+      : FULL_WIDTH;
   const [email, setEmail] = useState(localStorage.getItem("email"));
   const [profileOpen, setProfileOpen] = useState(false);
 
@@ -168,8 +170,8 @@ export default function Admin() {
         position="fixed"
         elevation={0}
         sx={{
-          width: `calc(100% - ${drawerWidth}px)`,
-          ml: `${drawerWidth}px`,
+          width: { xs: "100%", md: `calc(100% - ${drawerWidth}px)` },
+          ml: { xs: 0, md: `${drawerWidth}px` },
           bgcolor: "background.paper",
           color: BRAND.ink,
           borderBottom: "1px solid",
@@ -184,14 +186,28 @@ export default function Admin() {
           <IconButton
             color="inherit"
             edge="start"
-            onClick={() => setCollapsed((prev) => !prev)}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            onClick={() =>
+              isSmallScreen ? setMobileOpen((p) => !p) : setCollapsed((p) => !p)
+            }
+            aria-label={
+              isSmallScreen
+                ? "Open sidebar"
+                : collapsed
+                  ? "Expand sidebar"
+                  : "Collapse sidebar"
+            }
             sx={{
               borderRadius: 2,
               "&:hover": { bgcolor: alpha(BRAND.indigo, 0.08) },
             }}
           >
-            {collapsed ? <MenuIcon /> : <MenuOpenIcon />}
+            {isSmallScreen ? (
+              <MenuIcon />
+            ) : collapsed ? (
+              <MenuIcon />
+            ) : (
+              <MenuOpenIcon />
+            )}
           </IconButton>
 
           <Box sx={{ flexGrow: 1, minWidth: 0 }}>
@@ -301,15 +317,18 @@ export default function Admin() {
 
       {/* ----------------------------- DRAWER ----------------------------- */}
       <Drawer
-        variant="permanent"
+        variant={isSmallScreen ? "temporary" : "permanent"}
+        open={isSmallScreen ? mobileOpen : true}
+        onClose={() => setMobileOpen(false)}
+        ModalProps={{ keepMounted: true }}
         sx={{
-          width: drawerWidth,
+          width: { xs: 0, md: drawerWidth },
           flexShrink: 0,
           transition: theme.transitions.create("width", {
             duration: theme.transitions.duration.shorter,
           }),
           "& .MuiDrawer-paper": {
-            width: drawerWidth,
+            width: isSmallScreen ? FULL_WIDTH : drawerWidth,
             boxSizing: "border-box",
             overflowX: "hidden",
             bgcolor: BRAND.sidebar,
@@ -333,10 +352,11 @@ export default function Admin() {
           <Box
             sx={{
               height: 72,
-              px: collapsed ? 0 : 2.5,
+              px: !isSmallScreen && collapsed ? 0 : 2.5,
               display: "flex",
               alignItems: "center",
-              justifyContent: collapsed ? "center" : "flex-start",
+              justifyContent:
+                !isSmallScreen && collapsed ? "center" : "flex-start",
               gap: 1.25,
               borderBottom: `1px solid ${alpha("#fff", 0.08)}`,
               flexShrink: 0,
@@ -356,7 +376,7 @@ export default function Admin() {
             >
               <AdminPanelSettingsIcon sx={{ fontSize: 22 }} />
             </Box>
-            {!collapsed && (
+            {(isSmallScreen || !collapsed) && (
               <Box sx={{ minWidth: 0 }}>
                 <Typography
                   sx={{
@@ -393,14 +413,14 @@ export default function Admin() {
               overflowX: "hidden",
               "&::-webkit-scrollbar": { width: 4 },
               "&::-webkit-scrollbar-thumb": {
-                bgcolor: alpha("#fff", 0.12),
+                bgcolor: alpha("#fff", 0.2), // was 0.12 — more visible
                 borderRadius: 3,
               },
             }}
           >
             {menuGroups.map((group, gi) => (
               <Box key={group.label} sx={{ mb: 1 }}>
-                {!collapsed && (
+                {(isSmallScreen || !collapsed) && (
                   <Typography
                     sx={{
                       px: 2,
@@ -408,20 +428,21 @@ export default function Admin() {
                       fontSize: "0.68rem",
                       fontWeight: 700,
                       letterSpacing: "0.1em",
-                      color: alpha("#fff", 0.4),
+                      color: alpha("#fff", 0.6), // was 0.4 — better contrast
                       textTransform: "uppercase",
                     }}
                   >
                     {group.label}
                   </Typography>
                 )}
-                {collapsed && gi > 0 && (
+                {!isSmallScreen && collapsed && gi > 0 && (
                   <Divider
-                    sx={{ my: 1, mx: 1.5, borderColor: alpha("#fff", 0.08) }}
+                    sx={{ my: 1, mx: 1.5, borderColor: alpha("#fff", 0.1) }}
                   />
                 )}
                 {group.items.map((item) => {
                   const isActive = location.pathname === item.path;
+                  const showLabel = isSmallScreen || !collapsed;
 
                   return (
                     <ListItem
@@ -430,27 +451,33 @@ export default function Admin() {
                       sx={{ display: "block", mb: 0.25 }}
                     >
                       <Tooltip
-                        title={collapsed ? item.text : ""}
+                        title={!showLabel ? item.text : ""}
                         placement="right"
                         arrow
                       >
                         <ListItemButton
                           selected={isActive}
-                          onClick={() => navigate(item.path)}
+                          onClick={() => {
+                            navigate(item.path);
+                            if (isSmallScreen) setMobileOpen(false);
+                          }}
                           sx={{
                             borderRadius: 2,
                             minHeight: 42,
-                            justifyContent: collapsed ? "center" : "flex-start",
-                            px: collapsed ? 1 : 1.75,
+                            justifyContent: showLabel ? "flex-start" : "center",
+                            px: showLabel ? 1.75 : 1,
                             mx: 0.5,
-                            color: alpha("#fff", 0.72),
+                            color: alpha("#fff", 0.85), // was 0.72 — clearer text
                             transition: "all 0.15s ease",
                             "& .MuiListItemIcon-root": {
-                              color: alpha("#fff", 0.55),
+                              color: alpha("#fff", 0.7), // was 0.55
                               minWidth: 0,
-                              mr: collapsed ? 0 : 1.5,
+                              mr: showLabel ? 1.5 : 0,
                               justifyContent: "center",
                               transition: "color 0.15s ease",
+                            },
+                            "& .MuiListItemText-primary": {
+                              color: "inherit", // keep text tied to button color
                             },
                             "&:hover": {
                               bgcolor: BRAND.sidebarHover,
@@ -461,23 +488,20 @@ export default function Admin() {
                               bgcolor: BRAND.sidebarActive,
                               color: "#fff",
                               boxShadow: `inset 3px 0 0 ${BRAND.indigo}`,
-                              "& .MuiListItemIcon-root": {
-                                color: "#a5b4fc",
-                              },
-                              "&:hover": {
-                                bgcolor: alpha(BRAND.indigo, 0.25),
-                              },
+                              "& .MuiListItemIcon-root": { color: "#a5b4fc" },
+                              "&:hover": { bgcolor: alpha(BRAND.indigo, 0.25) },
                             },
                           }}
                         >
                           <ListItemIcon>{item.icon}</ListItemIcon>
-                          {!collapsed && (
+                          {showLabel && (
                             <ListItemText
                               primary={item.text}
                               primaryTypographyProps={{
                                 fontSize: "0.875rem",
                                 fontWeight: isActive ? 600 : 500,
                                 noWrap: true,
+                                color: "inherit", // <-- was missing; ensures correct font color
                               }}
                             />
                           )}
@@ -498,37 +522,47 @@ export default function Admin() {
               flexShrink: 0,
             }}
           >
-            <Tooltip title={collapsed ? "Logout" : ""} placement="right" arrow>
+            <Tooltip
+              title={!isSmallScreen && collapsed ? "Logout" : ""}
+              placement="right"
+              arrow
+            >
               <ListItemButton
-                onClick={handleLogout}
+                onClick={() => {
+                  handleLogout();
+                  if (isSmallScreen) setMobileOpen(false);
+                }}
                 sx={{
                   borderRadius: 2,
                   minHeight: 42,
-                  justifyContent: collapsed ? "center" : "flex-start",
-                  px: collapsed ? 1 : 1.75,
-                  color: "#f87171",
+                  justifyContent:
+                    isSmallScreen || !collapsed ? "flex-start" : "center",
+                  px: isSmallScreen || !collapsed ? 1.75 : 1,
+                  color: "#f87171", // base red (text + icon)
                   "& .MuiListItemIcon-root": {
-                    color: "#f87171",
+                    color: "inherit", // follows button color
                     minWidth: 0,
-                    mr: collapsed ? 0 : 1.5,
+                    mr: isSmallScreen || !collapsed ? 1.5 : 0,
                     justifyContent: "center",
+                    transition: "color 0.15s ease",
                   },
                   "&:hover": {
                     bgcolor: alpha("#ef4444", 0.12),
-                    color: "#fca5a5",
-                    "& .MuiListItemIcon-root": { color: "#fca5a5" },
+                    color: "#fca5a5", // lighter red on hover
                   },
                 }}
               >
                 <ListItemIcon>
                   <LogoutIcon />
                 </ListItemIcon>
-                {!collapsed && (
+                {(isSmallScreen || !collapsed) && (
                   <ListItemText
                     primary="Logout"
                     primaryTypographyProps={{
                       fontSize: "0.875rem",
                       fontWeight: 600,
+                      color: "inherit", 
+                      noWrap: true,
                     }}
                   />
                 )}
@@ -547,21 +581,34 @@ export default function Admin() {
           p: { xs: 2, sm: 3, md: 4 },
           mt: 8,
           bgcolor: "#f8fafc",
-          minHeight: "calc(100vh - 64px)",
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
         }}
       >
-        {outlet ?? (
-          <Box>
-            {location.pathname === "/admin" ? (
-              <AdminDashboard />
-            ) : (
-              <Typography variant="h5" component="h1" fontWeight="bold">
-                {allMenuItems.find((item) => item.path === location.pathname)
-                  ?.text ?? "Admin Dashboard"}
-              </Typography>
-            )}
-          </Box>
-        )}
+        <Box sx={{ maxWidth: 1280, mx: "auto", width: "100%" }}>
+          {outlet ?? (
+            <Box>
+              {location.pathname === "/admin" ? (
+                <AdminDashboard />
+              ) : (
+                <Typography
+                  variant="h5"
+                  component="h1"
+                  sx={{
+                    fontWeight: 800,
+                    color: BRAND.ink,
+                    letterSpacing: "-0.02em",
+                    mb: 3,
+                  }}
+                >
+                  {allMenuItems.find((item) => item.path === location.pathname)
+                    ?.text ?? "Admin Dashboard"}
+                </Typography>
+              )}
+            </Box>
+          )}
+        </Box>
       </Box>
     </Box>
   );

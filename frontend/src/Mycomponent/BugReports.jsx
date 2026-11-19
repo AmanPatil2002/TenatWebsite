@@ -211,12 +211,11 @@ export default function BugReports() {
     >
       <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
         <Stack spacing={1.5}>
-          <Stack
-            direction="row"
-            justifyContent="space-between"
-            alignItems="flex-start"
-            spacing={1.5}
-          >
+        <Stack
+          direction="row"
+          spacing={1.5}
+          sx={{ justifyContent: "space-between", alignItems: "flex-start" }}
+        >
             <Box sx={{ minWidth: 0, flex: 1 }}>
               <Typography
                 variant="caption"
@@ -305,54 +304,65 @@ export default function BugReports() {
         <Stack
           direction={{ xs: "column", md: "row" }}
           spacing={2}
-          alignItems={{ xs: "stretch", md: "center" }}
-          justifyContent="space-between"
+          sx={{
+            alignItems: { xs: "stretch", md: "center" },
+            justifyContent: "space-between",
+          }}
         >
           <Stack
             direction={{ xs: "column", sm: "row" }}
             spacing={2}
             sx={{ flex: 1 }}
           >
-            <FormControl size="small" sx={{ minWidth: 180 }}>
-              <InputLabel id="bug-status-filter">Status</InputLabel>
-              <Select
-                labelId="bug-status-filter"
-                value={statusFilter}
-                label="Status"
-                onChange={(event) => {
-                  setLoading(true);
-                  setStatusFilter(event.target.value);
-                  setPage(0);
-                }}
-              >
-                <MenuItem value="">All statuses</MenuItem>
-                {STATUSES.map((status) => (
-                  <MenuItem key={status} value={status}>
-                    {statusLabel(status)}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl size="small" sx={{ minWidth: 180 }}>
-              <InputLabel id="bug-severity-filter">Severity</InputLabel>
-              <Select
-                labelId="bug-severity-filter"
-                value={severityFilter}
-                label="Severity"
-                onChange={(event) => {
-                  setLoading(true);
-                  setSeverityFilter(event.target.value);
-                  setPage(0);
-                }}
-              >
-                <MenuItem value="">All severities</MenuItem>
-                {SEVERITIES.map((severity) => (
-                  <MenuItem key={severity} value={severity}>
-                    {statusLabel(severity)}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <Grid container spacing={2} sx={{ flex: 1 }}>
+              {/* Status Filter */}
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel id="bug-status-filter">Status</InputLabel>
+                  <Select
+                    labelId="bug-status-filter"
+                    value={statusFilter}
+                    label="Status"
+                    onChange={(event) => {
+                      setLoading(true);
+                      setStatusFilter(event.target.value);
+                      setPage(0);
+                    }}
+                  >
+                    <MenuItem value="">All statuses</MenuItem>
+                    {STATUSES.map((status) => (
+                      <MenuItem key={status} value={status}>
+                        {statusLabel(status)}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              {/* Severity Filter */}
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel id="bug-severity-filter">Severity</InputLabel>
+                  <Select
+                    labelId="bug-severity-filter"
+                    value={severityFilter}
+                    label="Severity"
+                    onChange={(event) => {
+                      setLoading(true);
+                      setSeverityFilter(event.target.value);
+                      setPage(0);
+                    }}
+                  >
+                    <MenuItem value="">All severities</MenuItem>
+                    {SEVERITIES.map((severity) => (
+                      <MenuItem key={severity} value={severity}>
+                        {statusLabel(severity)}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
           </Stack>
           <Button
             variant="outlined"
@@ -371,16 +381,17 @@ export default function BugReports() {
       </Paper>
 
       {loading ? (
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            minHeight: 260,
-          }}
-        >
-          <CircularProgress />
-        </Box>
+          <Stack
+            direction="column"
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              minHeight: 260,
+            }}
+          >
+            <CircularProgress />
+          </Stack>
       ) : reports.length === 0 ? (
         <Paper
           variant="outlined"
@@ -457,7 +468,7 @@ export default function BugReports() {
                         {report.title}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        #{report.id} · {statusLabel(report.type)}
+                        {statusLabel(report.type)}
                       </Typography>
                     </TableCell>
                     <TableCell sx={{ py: 1.75 }}>
@@ -541,7 +552,19 @@ export default function BugReports() {
         fullScreen={fullScreenDialog}
       >
         <DialogTitle sx={{ fontWeight: 700, pr: 6 }}>
-          Review Report #{selectedReport?.id}
+          <Stack spacing={1.5}>
+            <Typography
+              variant="h6"
+              fontWeight={600}
+              sx={{
+                overflowWrap: "anywhere",
+                lineHeight: 1.35,
+                textAlign: "center",
+              }}
+            >
+              Review Report # {selectedReport?.id}
+            </Typography>
+          </Stack>
         </DialogTitle>
         <DialogContent dividers>
           {selectedReport && (
@@ -553,26 +576,28 @@ export default function BugReports() {
                     fontWeight={600}
                     sx={{ overflowWrap: "anywhere", lineHeight: 1.35 }}
                   >
-                    {selectedReport.title}
+                    Title : {selectedReport.title}
                   </Typography>
                   <Typography
                     sx={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}
                   >
-                    {selectedReport.description}
+                    Description : {selectedReport.description}
                   </Typography>
                   <Divider />
                   <Typography variant="body2" color="text.secondary">
                     <strong>From:</strong> {selectedReport.reporterName} (
                     {selectedReport.reporterEmail})
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    <strong>Site:</strong>{" "}
-                    {selectedReport.siteName || "Platform"}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    <strong>Submitted:</strong>{" "}
-                    {formatDate(selectedReport.createdAt)}
-                  </Typography>
+                  <Stack direction="row" spacing={5} flexWrap="wrap" useFlexGap>
+                    <Typography variant="body2" color="text.secondary">
+                      <strong>Site:</strong>{" "}
+                      {selectedReport.siteName || "Platform"}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      <strong>Submitted:</strong>{" "}
+                      {formatDate(selectedReport.createdAt)}
+                    </Typography>
+                  </Stack>
                   {selectedReport.screenshotUrl && selectedScreenshotHref && (
                     <Box sx={{ mt: 1 }}>
                       <Typography

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTheme } from "@mui/material/styles";
 import axios from "axios";
 import {
   Alert,
@@ -38,6 +39,7 @@ import DesktopWindowsIcon from "@mui/icons-material/DesktopWindows";
 import TabletMacIcon from "@mui/icons-material/TabletMac";
 import PhoneIphoneIcon from "@mui/icons-material/PhoneIphone";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import { alpha } from "@mui/material/styles";
 
 /* ------------------------------ helpers ------------------------------ */
 
@@ -110,6 +112,8 @@ const getPageKey = (page, index) =>
 
 function PhotoSlider({ photos, alt = "Template" }) {
   const [index, setIndex] = useState(0);
+  const theme = useTheme();
+  const primary = theme.palette.primary.main;
 
   useEffect(() => {
     setIndex(0);
@@ -134,7 +138,7 @@ function PhotoSlider({ photos, alt = "Template" }) {
           borderRadius: 2,
           border: "1px solid",
           borderColor: "divider",
-          bgcolor: "#eef2f7",
+          bgcolor: alpha(primary, 0.04),
           aspectRatio: "16 / 9",
           display: "flex",
           alignItems: "center",
@@ -162,8 +166,8 @@ function PhotoSlider({ photos, alt = "Template" }) {
                 top: "50%",
                 left: 8,
                 transform: "translateY(-50%)",
-                bgcolor: "rgba(255,255,255,0.85)",
-                "&:hover": { bgcolor: "#fff" },
+                bgcolor: alpha(theme.palette.common.white, 0.85),
+                "&:hover": { bgcolor: theme.palette.common.white },
               }}
             >
               <ArrowBackIosNewIcon fontSize="small" />
@@ -176,8 +180,8 @@ function PhotoSlider({ photos, alt = "Template" }) {
                 top: "50%",
                 right: 8,
                 transform: "translateY(-50%)",
-                bgcolor: "rgba(255,255,255,0.85)",
-                "&:hover": { bgcolor: "#fff" },
+                bgcolor: alpha(theme.palette.common.white, 0.85),
+                "&:hover": { bgcolor: theme.palette.common.white },
               }}
             >
               <ArrowForwardIosIcon fontSize="small" />
@@ -187,8 +191,8 @@ function PhotoSlider({ photos, alt = "Template" }) {
                 position: "absolute",
                 bottom: 8,
                 right: 12,
-                bgcolor: "rgba(0,0,0,0.6)",
-                color: "#fff",
+                bgcolor: alpha(theme.palette.common.black, 0.6),
+                color: theme.palette.common.white,
                 px: 1,
                 py: 0.25,
                 borderRadius: 1,
@@ -327,7 +331,7 @@ function ThemePagePreview({
         role="tabpanel"
         aria-labelledby={`preview-tab-${selectedKey}`}
         sx={{
-          bgcolor: "#eef1f5",
+          // bgcolor: alpha(theme.palette.primary.main, 0.03),
           borderRadius: 2,
           p: { xs: 0.5, sm: 1.5 },
           overflowX: "auto",
@@ -362,9 +366,15 @@ function ThemePagePreview({
 
 export default function Template() {
   const navigate = useNavigate();
-
-  const [templates, setTemplates] = useState([]);
+  const theme = useTheme();
+  const background = theme.palette.background.default;
+  const paper = theme.palette.background.paper;
+  const primary = theme.palette.primary.main;
+  const textPrimary = theme.palette.text.primary;
+  const textSecondary = theme.palette.text.secondary;
+  const divider = theme.palette.divider;
   const [categories, setCategories] = useState([]);
+  const [templates, setTemplates] = useState([]);
   const [categoryId, setCategoryId] = useState("");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("newest");
@@ -577,12 +587,13 @@ export default function Template() {
     : [];
 
   return (
-    <Box sx={{ bgcolor: "#f7f8fb", minHeight: "100vh", pb: 8 }}>
+    <Box sx={{ bgcolor: background, minHeight: "100vh", pb: 8 }}>
       {/* Header */}
       <Box
         sx={{
-          bgcolor: "#fff",
-          borderBottom: "1px solid #e5e7eb",
+          bgcolor: paper,
+          borderBottom: 1,
+          borderColor: divider,
           py: { xs: 4, md: 6 },
         }}
       >
@@ -591,11 +602,11 @@ export default function Template() {
             variant="h3"
             fontWeight={750}
             gutterBottom
-            sx={{ fontSize: { xs: "2rem", md: "3rem" } }}
+            sx={{ fontSize: { xs: "2rem", md: "3rem" }, color: textPrimary }}
           >
             {activeCategory?.name || "Website templates"}
           </Typography>
-          <Typography color="text.secondary" sx={{ maxWidth: 700, mb: 3 }}>
+          <Typography color={textSecondary} sx={{ maxWidth: 700, mb: 3 }}>
             {(typeof activeCategory?.content === "string" &&
               activeCategory.content) ||
               "Browse published templates, preview their pages and themes, then purchase one to create your own site."}
@@ -645,13 +656,13 @@ export default function Template() {
           </Alert>
         )}
 
-        <Grid container spacing={3} alignItems="flex-start">
+        <Grid container spacing={3} sx={{ alignItems: "flex-start" }}>
           <Grid size={{ xs: 12, md: 3 }}>
             <Paper
               variant="outlined"
               sx={{ p: 2, position: { md: "sticky" }, top: { md: 20 } }}
             >
-              <Typography variant="overline" color="text.secondary">
+              <Typography variant="overline" color={textSecondary}>
                 Categories
               </Typography>
               <Stack
@@ -718,7 +729,11 @@ export default function Template() {
                 : `${visible.length} template${visible.length === 1 ? "" : "s"}`}
             </Typography>
 
-            <Grid container spacing={{ xs: 2, md: 3 }} alignItems="stretch">
+            <Grid
+              container
+              spacing={{ xs: 2, md: 3 }}
+              sx={{ alignItems: "stretch" }}
+            >
               {loading
                 ? Array.from({ length: 6 }).map((_, i) => (
                     <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={i}>
@@ -764,7 +779,7 @@ export default function Template() {
                             sx={{
                               height: 190,
                               objectFit: "cover",
-                              bgcolor: "#eef2f7",
+                              bgcolor: alpha(primary, 0.04),
                             }}
                           />
                           <CardContent sx={{ flexGrow: 1, width: "100%" }}>
@@ -844,7 +859,7 @@ export default function Template() {
 
             <DialogContent
               dividers
-              sx={{ bgcolor: "#f7f8fb", px: { xs: 1, sm: 2, md: 3 } }}
+              sx={{ bgcolor: alpha(primary, 0.02), px: { xs: 1, sm: 2, md: 3 } }}
             >
               {detailLoading ? (
                 <Box
@@ -950,7 +965,7 @@ export default function Template() {
                       <Grid
                         container
                         spacing={{ xs: 2, md: 3 }}
-                        alignItems="flex-start"
+                        sx={{ alignItems: "flex-start" }}
                       >
                         <Grid size={{ xs: 12, md: 3 }}>
                           <Paper
@@ -997,14 +1012,14 @@ export default function Template() {
                                         px: 1.5,
                                         py: 0.5,
                                         borderRadius: 1,
-                                        bgcolor: theme.background || "#fff",
-                                        color: theme.color || "#111",
+                                        bgcolor: theme.background || paper,
+                                        color: theme.color || textPrimary,
                                         border: active
                                           ? "2px solid"
                                           : "1px solid",
                                         borderColor: active
-                                          ? "primary.main"
-                                          : "divider",
+                                          ? primary
+                                          : divider,
                                         display: "flex",
                                         alignItems: "center",
                                         justifyContent: "space-between",

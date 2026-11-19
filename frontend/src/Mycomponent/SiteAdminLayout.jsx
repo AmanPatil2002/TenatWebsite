@@ -24,7 +24,6 @@ import {
   useTheme,
 } from "@mui/material";
 
-
 /* ------------------------------------------------------------------ */
 /*  Inline SVG icons — no MUI icon imports, no tree-shaking issues     */
 /* ------------------------------------------------------------------ */
@@ -94,6 +93,13 @@ const BrandingIcon = (p) => (
     <path d="M8 16h8" />
   </SvgIcon>
 );
+const ThemeIcon = (p) => (
+  <SvgIcon {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 2a10 10 0 1 0 0 20" />
+    <path d="M12 2v20" />
+  </SvgIcon>
+);
 const DataIcon = (p) => (
   <SvgIcon {...p}>
     <ellipse cx="12" cy="5" rx="8" ry="3" />
@@ -152,9 +158,19 @@ export default function SiteAdminLayout() {
   const location = useLocation();
   const theme = useTheme();
   const isSmallScreen = useMediaQuery(theme.breakpoints.down("md"));
-  const [collapsedOverride, setCollapsedOverride] = useState(null);
-  const collapsed = collapsedOverride ?? isSmallScreen;
-  const drawerWidth = collapsed ? MINI_WIDTH : FULL_WIDTH;
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isSmallScreen) setMobileOpen(false);
+  }, [isSmallScreen, location.pathname]);
+
+  const drawerWidth = isSmallScreen
+    ? FULL_WIDTH
+    : collapsed
+      ? MINI_WIDTH
+      : FULL_WIDTH;
+  const navCompact = !isSmallScreen && collapsed;
 
   const token = localStorage.getItem("siteAdminToken");
   const siteBasePath = `/site-admin/${siteId}`;
@@ -177,8 +193,23 @@ export default function SiteAdminLayout() {
 
   const reloadSite = useCallback(async () => {
     try {
-      const { data } = await axios.get(`${baseUrl}/pages`, authConfig);
-      setSite(data);
+      // 1. Load base site data (pages, etc.)
+      const pagesRes = await axios.get(`${baseUrl}/pages`, authConfig);
+      const siteData = pagesRes.data;
+
+      // 2. Fetch the effective theme from the dedicated theme endpoint
+      // This ensures we get the correct colors (default or custom)
+      const themeRes = await axios.get(`${baseUrl}/theme`, authConfig);
+
+      // 3. Merge theme into the site object
+      setSite({
+        ...siteData,
+        ...themeRes.data,
+      });
+
+      // Set pages separately if they are in siteData.pages
+      setPages(Array.isArray(siteData.pages) ? siteData.pages : []);
+
       setError("");
     } catch (requestError) {
       if (requestError.response?.status === 401) {
@@ -203,17 +234,53 @@ export default function SiteAdminLayout() {
 
   const pages = Array.isArray(site?.pages) ? site.pages : [];
   const siteName = site?.siteName || localStorage.getItem("siteAdminSiteName");
-  
 
   const menuItems = [
-    { text: "Dashboard", icon: <DashboardIcon size={20} />, path: `${siteBasePath}/panel` },
-    { text: "Manage pages", icon: <PagesIcon size={20} />, path: `${siteBasePath}/manage` },
-    { text: "Employees", icon: <EmployeesIcon size={20} />, path: `${siteBasePath}/employees` },
-    { text: "News", icon: <NewsIcon size={20} />, path: `${siteBasePath}/news` },
-    { text: "Gallery", icon: <GalleryIcon size={20} />, path: `${siteBasePath}/gallery` },
-    { text: "Slider", icon: <SliderIcon size={20} />, path: `${siteBasePath}/slider` },
-    { text: "Header & footer", icon: <BrandingIcon size={20} />, path: `${siteBasePath}/header-footer` },
-    { text: "Site data", icon: <DataIcon size={20} />, path: `${siteBasePath}/data` },
+    {
+      text: "Dashboard",
+      icon: <DashboardIcon size={20} />,
+      path: `${siteBasePath}/panel`,
+    },
+    {
+      text: "Manage pages",
+      icon: <PagesIcon size={20} />,
+      path: `${siteBasePath}/manage`,
+    },
+    {
+      text: "Theme",
+      icon: <ThemeIcon size={20} />,
+      path: `${siteBasePath}/theme`,
+    },
+    {
+      text: "Employees",
+      icon: <EmployeesIcon size={20} />,
+      path: `${siteBasePath}/employees`,
+    },
+    {
+      text: "News",
+      icon: <NewsIcon size={20} />,
+      path: `${siteBasePath}/news`,
+    },
+    {
+      text: "Gallery",
+      icon: <GalleryIcon size={20} />,
+      path: `${siteBasePath}/gallery`,
+    },
+    {
+      text: "Slider",
+      icon: <SliderIcon size={20} />,
+      path: `${siteBasePath}/slider`,
+    },
+    {
+      text: "Header & footer",
+      icon: <BrandingIcon size={20} />,
+      path: `${siteBasePath}/header-footer`,
+    },
+    {
+      text: "Site data",
+      icon: <DataIcon size={20} />,
+      path: `${siteBasePath}/data`,
+    },
     // ...recordItems,
   ];
 
@@ -228,14 +295,14 @@ export default function SiteAdminLayout() {
   const extraItems = menuItems.slice(7);
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#f7f8fc" }}>
+    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#f7f8fc"}}>
       {/* ---------------- AppBar ---------------- */}
       <AppBar
         position="fixed"
         elevation={0}
         sx={{
-          width: `calc(100% - ${drawerWidth}px)`,
-          ml: `${drawerWidth}px`,
+          width: { xs: "100%", md: `calc(100% - ${drawerWidth}px)` },
+          ml: { xs: 0, md: `${drawerWidth}px` },
           bgcolor: "background.paper",
           color: "text.primary",
           borderBottom: `1px solid ${theme.palette.divider}`,
@@ -246,8 +313,16 @@ export default function SiteAdminLayout() {
         <Toolbar sx={{ minHeight: 68, px: { xs: 1.5, sm: 2.5 } }}>
           <IconButton
             edge="start"
-            onClick={() => setCollapsedOverride(!collapsed)}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            onClick={() =>
+              isSmallScreen ? setMobileOpen((p) => !p) : setCollapsed((p) => !p)
+            }
+            aria-label={
+              isSmallScreen
+                ? "Open sidebar"
+                : navCompact
+                  ? "Expand sidebar"
+                  : "Collapse sidebar"
+            }
             sx={{
               mr: 1.5,
               color: "text.secondary",
@@ -255,17 +330,26 @@ export default function SiteAdminLayout() {
               "&:hover": { bgcolor: alpha(theme.palette.primary.main, 0.08) },
             }}
           >
-            {collapsed ? <MenuIcon size={20} /> : <MenuOpenIcon size={20} />}
+            {isSmallScreen ? (
+              <MenuIcon size={20} />
+            ) : navCompact ? (
+              <MenuIcon size={20} />
+            ) : (
+              <MenuOpenIcon size={20} />
+            )}
           </IconButton>
 
           <Stack spacing={0.25} sx={{ flexGrow: 1, minWidth: 0 }}>
-            
             <Typography variant="subtitle1" fontWeight={700} noWrap>
               {currentItem?.text || "Dashboard"}
             </Typography>
           </Stack>
 
-          <Stack direction="row" alignItems="center" spacing={{ xs: 1, sm: 1.5 }}>
+          <Stack
+            direction="row"
+            spacing={{ xs: 1, sm: 1.5 }}
+            sx={{ alignItems: "center" }}
+          >
             <Button
               size="small"
               variant="contained"
@@ -287,16 +371,18 @@ export default function SiteAdminLayout() {
         </Toolbar>
       </AppBar>
 
-
       {/* ---------------- Drawer ---------------- */}
       <Drawer
-        variant="permanent"
+        variant={isSmallScreen ? "temporary" : "permanent"}
+        open={isSmallScreen ? mobileOpen : true}
+        onClose={() => setMobileOpen(false)}
+        ModalProps={{ keepMounted: true }}
         sx={{
-          width: drawerWidth,
+          width: { xs: 0, md: drawerWidth },
           flexShrink: 0,
           transition,
           "& .MuiDrawer-paper": {
-            width: drawerWidth,
+            width: isSmallScreen ? FULL_WIDTH : drawerWidth,
             boxSizing: "border-box",
             overflowX: "hidden",
             transition,
@@ -305,15 +391,15 @@ export default function SiteAdminLayout() {
           },
         }}
       >
-        <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+        <Box sx={{ height: "100%", display: "flex", flexDirection: "column",paddingTop: 1 }}>
           {/* Brand / site identity */}
-          <Box
+          <Stack
+            direction="row"
             sx={{
-              minHeight: 68,
-              display: "flex",
               alignItems: "center",
               justifyContent: collapsed ? "center" : "flex-start",
-              px: collapsed ? 0 : 2.5,
+              minHeight: 68,
+              px: navCompact ? 0 : 2.5,
               borderBottom: `1px solid ${theme.palette.divider}`,
             }}
           >
@@ -332,9 +418,14 @@ export default function SiteAdminLayout() {
             >
               <PagesIcon size={22} />
             </Box>
-            {!collapsed && (
+            {!navCompact && (
               <Box sx={{ ml: 1.5, minWidth: 0 }}>
-                <Typography variant="subtitle2" fontWeight={800} noWrap letterSpacing="-0.01em">
+                <Typography
+                  variant="subtitle2"
+                  fontWeight={800}
+                  noWrap
+                  letterSpacing="-0.01em"
+                >
                   {siteName || "My Site"}
                 </Typography>
                 <Typography
@@ -346,7 +437,7 @@ export default function SiteAdminLayout() {
                 </Typography>
               </Box>
             )}
-          </Box>
+          </Stack>
 
           {/* Nav */}
           <List sx={{ px: 1.5, py: 2, flexGrow: 1, overflowY: "auto" }}>
@@ -370,7 +461,11 @@ export default function SiteAdminLayout() {
             {contentItems.map((item) => {
               const selected = location.pathname === item.path;
               return (
-                <ListItem key={item.text} disablePadding sx={{ display: "block", mb: 0.5 }}>
+                <ListItem
+                  key={item.text}
+                  disablePadding
+                  sx={{ display: "block", mb: 0.5 }}
+                >
                   <Tooltip title={collapsed ? item.text : ""} placement="right">
                     <ListItemButton
                       selected={selected}
@@ -379,7 +474,6 @@ export default function SiteAdminLayout() {
                         position: "relative",
                         borderRadius: 2,
                         minHeight: 44,
-                        justifyContent: collapsed ? "center" : "flex-start",
                         px: collapsed ? 1 : 1.5,
                         color: "text.secondary",
                         "&::before": selected
@@ -395,16 +489,25 @@ export default function SiteAdminLayout() {
                             }
                           : {},
                         "&:hover": {
-                          backgroundColor: alpha(theme.palette.primary.main, 0.06),
+                          backgroundColor: alpha(
+                            theme.palette.primary.main,
+                            0.06,
+                          ),
                           color: "text.primary",
                           "& .MuiListItemIcon-root": { color: "primary.main" },
                         },
                         "&.Mui-selected": {
-                          backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                          backgroundColor: alpha(
+                            theme.palette.primary.main,
+                            0.1,
+                          ),
                           color: "primary.main",
                           "& .MuiListItemIcon-root": { color: "primary.main" },
                           "&:hover": {
-                            backgroundColor: alpha(theme.palette.primary.main, 0.14),
+                            backgroundColor: alpha(
+                              theme.palette.primary.main,
+                              0.14,
+                            ),
                           },
                         },
                       }}
@@ -413,8 +516,7 @@ export default function SiteAdminLayout() {
                         sx={{
                           minWidth: 0,
                           mr: collapsed ? 0 : 1.5,
-                          justifyContent: "center",
-                          color: "inherit",
+                                                    color: "inherit",
                         }}
                       >
                         {item.icon}
@@ -422,14 +524,21 @@ export default function SiteAdminLayout() {
                       {!collapsed && (
                         <ListItemText
                           primary={item.text}
-                          primaryTypographyProps={{
-                            fontSize: 14,
-                            fontWeight: selected ? 700 : 500,
+                          slotProps={{
+                            primary: {
+                              sx: {
+                                fontSize: 14,
+                                fontWeight: selected ? 700 : 500,
+                              },
+                            },
                           }}
                         />
                       )}
                       {!collapsed && selected && (
-                        <ChevronIcon size={14} color={theme.palette.primary.main} />
+                        <ChevronIcon
+                          size={14}
+                          color={theme.palette.primary.main}
+                        />
                       )}
                     </ListItemButton>
                   </Tooltip>
@@ -461,8 +570,15 @@ export default function SiteAdminLayout() {
                 {extraItems.map((item) => {
                   const selected = location.pathname === item.path;
                   return (
-                    <ListItem key={item.text} disablePadding sx={{ display: "block", mb: 0.5 }}>
-                      <Tooltip title={collapsed ? item.text : ""} placement="right">
+                    <ListItem
+                      key={item.text}
+                      disablePadding
+                      sx={{ display: "block", mb: 0.5 }}
+                    >
+                      <Tooltip
+                        title={collapsed ? item.text : ""}
+                        placement="right"
+                      >
                         <ListItemButton
                           selected={selected}
                           onClick={() => navigate(item.path)}
@@ -470,7 +586,6 @@ export default function SiteAdminLayout() {
                             position: "relative",
                             borderRadius: 2,
                             minHeight: 44,
-                            justifyContent: collapsed ? "center" : "flex-start",
                             px: collapsed ? 1 : 1.5,
                             color: "text.secondary",
                             "&::before": selected
@@ -486,16 +601,29 @@ export default function SiteAdminLayout() {
                                 }
                               : {},
                             "&:hover": {
-                              backgroundColor: alpha(theme.palette.primary.main, 0.06),
+                              backgroundColor: alpha(
+                                theme.palette.primary.main,
+                                0.06,
+                              ),
                               color: "text.primary",
-                              "& .MuiListItemIcon-root": { color: "primary.main" },
+                              "& .MuiListItemIcon-root": {
+                                color: "primary.main",
+                              },
                             },
                             "&.Mui-selected": {
-                              backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                              backgroundColor: alpha(
+                                theme.palette.primary.main,
+                                0.1,
+                              ),
                               color: "primary.main",
-                              "& .MuiListItemIcon-root": { color: "primary.main" },
+                              "& .MuiListItemIcon-root": {
+                                color: "primary.main",
+                              },
                               "&:hover": {
-                                backgroundColor: alpha(theme.palette.primary.main, 0.14),
+                                backgroundColor: alpha(
+                                  theme.palette.primary.main,
+                                  0.14,
+                                ),
                               },
                             },
                           }}
@@ -504,8 +632,7 @@ export default function SiteAdminLayout() {
                             sx={{
                               minWidth: 0,
                               mr: collapsed ? 0 : 1.5,
-                              justifyContent: "center",
-                              color: "inherit",
+                                                            color: "inherit",
                             }}
                           >
                             {item.icon}
@@ -513,9 +640,13 @@ export default function SiteAdminLayout() {
                           {!collapsed && (
                             <ListItemText
                               primary={item.text}
-                              primaryTypographyProps={{
-                                fontSize: 14,
-                                fontWeight: selected ? 700 : 500,
+                              slotProps={{
+                                primary: {
+                                  sx: {
+                                    fontSize: 14,
+                                    fontWeight: selected ? 700 : 500,
+                                  },
+                                },
                               }}
                             />
                           )}
@@ -539,9 +670,17 @@ export default function SiteAdminLayout() {
                   border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}`,
                 }}
               >
-                <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.5 }}>
+                <Stack
+                  direction="row"
+                  spacing={0.75}
+                  sx={{ alignItems: "center", mb: 0.5 }}
+                >
                   <GlobeIcon size={14} color={theme.palette.primary.main} />
-                  <Typography variant="caption" fontWeight={700} color="primary.main">
+                  <Typography
+                    variant="caption"
+                    fontWeight={700}
+                    color="primary.main"
+                  >
                     Your site is live
                   </Typography>
                 </Stack>
@@ -562,13 +701,14 @@ export default function SiteAdminLayout() {
                   sx={{
                     borderRadius: 2,
                     minHeight: 44,
-                    justifyContent: collapsed ? "center" : "flex-start",
                     px: collapsed ? 1 : 1.5,
                     color: "text.secondary",
                     "&:hover": {
                       backgroundColor: alpha(theme.palette.error.main, 0.08),
                       color: theme.palette.error.main,
-                      "& .MuiListItemIcon-root": { color: theme.palette.error.main },
+                      "& .MuiListItemIcon-root": {
+                        color: theme.palette.error.main,
+                      },
                     },
                   }}
                 >
@@ -576,8 +716,7 @@ export default function SiteAdminLayout() {
                     sx={{
                       minWidth: 0,
                       mr: collapsed ? 0 : 1.5,
-                      justifyContent: "center",
-                      color: "inherit",
+                                            color: "inherit",
                     }}
                   >
                     <LogoutIcon size={20} />
@@ -585,7 +724,9 @@ export default function SiteAdminLayout() {
                   {!collapsed && (
                     <ListItemText
                       primary="Sign out"
-                      primaryTypographyProps={{ fontSize: 14, fontWeight: 500 }}
+                      slotProps={{
+                        primary: { sx: { fontSize: 14, fontWeight: 500 } },
+                      }}
                     />
                   )}
                 </ListItemButton>

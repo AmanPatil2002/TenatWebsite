@@ -138,7 +138,11 @@ function Section({ number, title, hint, children, last = false }) {
         borderBottom: last ? "none" : "1px solid #E3E6EB",
       }}
     >
-      <Stack direction="row" spacing={1.75} alignItems="flex-start" sx={{ mb: 2.5 }}>
+      <Stack
+        direction="row"
+        spacing={1.75}
+        sx={{ alignItems: "flex-start", mb: 2.5 }}
+      >
         <Box
           sx={{
             width: 26,
@@ -157,11 +161,19 @@ function Section({ number, title, hint, children, last = false }) {
           {number}
         </Box>
         <Box>
-          <Typography variant="subtitle1" fontWeight={700} lineHeight={1.3}>
+          <Typography
+            variant="subtitle1"
+            fontWeight={700}
+            sx={{ lineHeight: 1.3 }}
+          >
             {title}
           </Typography>
           {hint && (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ mt: 0.25 }}
+            >
               {hint}
             </Typography>
           )}
@@ -174,38 +186,83 @@ function Section({ number, title, hint, children, last = false }) {
 
 function SummaryRow({ label, caption, value, muted = false }) {
   return (
-    <Stack direction="row" justifyContent="space-between" alignItems="baseline" spacing={2}>
+    <Box
+      sx={{
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 1fr) auto",
+        alignItems: "start",
+        columnGap: 2,
+        width: "100%",
+      }}
+    >
+      {/* Left: Label and caption */}
       <Box sx={{ minWidth: 0 }}>
         <Typography
           variant="body2"
           color={muted ? "text.secondary" : "text.primary"}
-          sx={{ overflowWrap: "anywhere" }}
+          sx={{
+            fontWeight: 400,
+            overflowWrap: "anywhere",
+          }}
         >
           {label}
         </Typography>
+
         {caption && (
-          <Typography variant="caption" color="text.secondary">
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{
+              display: "block",
+              mt: 0.35,
+              lineHeight: "1.5",
+            }}
+          >
             {caption}
           </Typography>
         )}
       </Box>
+
+      {/* Right: Price or value */}
       <Typography
         variant="body2"
         fontWeight={600}
         color={muted ? "text.secondary" : "text.primary"}
-        sx={{ whiteSpace: "nowrap", ...numeric }}
+        sx={{
+          whiteSpace: "nowrap",
+          textAlign: "right",
+          ...numeric,
+        }}
       >
         {value}
       </Typography>
-    </Stack>
+    </Box>
   );
 }
-
 function TrustItem({ icon, children }) {
   return (
-    <Stack direction="row" spacing={1} alignItems="center" sx={{ color: "text.secondary" }}>
-      {icon}
-      <Typography variant="caption">{children}</Typography>
+    <Stack
+      direction="row"
+      spacing={1}
+      alignItems="center"
+      justifyContent="center"
+      sx={{
+        color: "text.secondary",
+        width: "100%",
+        textAlign: "center",
+      }}
+    >
+      <Box sx={{ display: "flex", flexShrink: 0 }}>{icon}</Box>
+
+      <Typography
+        variant="caption"
+        sx={{
+          textAlign: "center",
+          lineHeight: 1.6,
+        }}
+      >
+        {children}
+      </Typography>
     </Stack>
   );
 }
@@ -236,7 +293,10 @@ export default function Payment() {
           ...page,
           pageKey: getId(page.pagesId ?? page.pageId ?? page.id),
           pagePrice: Number(page.pagePrice ?? page.price ?? 0),
-          isDefault: isDefaultPage(page),
+          isDefault:
+            page.isDefault == null
+              ? isDefaultPage(page)
+              : toFlag(page.isDefault),
         }))
         .filter((page) => page.pageKey !== null)
         .sort((a, b) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0)),
@@ -473,7 +533,10 @@ export default function Payment() {
       <Box sx={{ bgcolor: PAGE_BG, minHeight: "100vh" }}>
         <Container maxWidth="sm" sx={{ py: { xs: 4, md: 10 } }}>
           <Paper variant="outlined" sx={{ ...cardSx, p: { xs: 3, md: 5 } }}>
-            <Stack alignItems="center" spacing={1.5} sx={{ textAlign: "center", mb: 4 }}>
+            <Stack
+              spacing={1.5}
+              sx={{ alignItems: "center", textAlign: "center", mb: 4 }}
+            >
               <Box
                 sx={{
                   width: 72,
@@ -489,7 +552,10 @@ export default function Payment() {
               <Typography variant="h5" fontWeight={700}>
                 Payment successful
               </Typography>
-              <Typography color="text.secondary" sx={{ maxWidth: 380 }}>
+              <Typography
+                color="text.secondary"
+                sx={{ maxWidth: 380, textAlign: "center" }}
+              >
                 Your website has been created. You can view and manage it in My
                 Sites.
               </Typography>
@@ -506,9 +572,9 @@ export default function Payment() {
                 <Stack
                   key={label}
                   direction="row"
-                  justifyContent="space-between"
                   spacing={2}
                   sx={{
+                    justifyContent: "space-between",
                     px: 2.5,
                     py: 1.5,
                     borderTop: i === 0 ? "none" : "1px solid #E3E6EB",
@@ -520,7 +586,11 @@ export default function Payment() {
                   <Typography
                     variant="body2"
                     fontWeight={600}
-                    sx={{ overflowWrap: "anywhere", textAlign: "right", ...numeric }}
+                    sx={{
+                      overflowWrap: "anywhere",
+                      textAlign: "right",
+                      ...numeric,
+                    }}
                   >
                     {value}
                   </Typography>
@@ -528,21 +598,11 @@ export default function Payment() {
               ))}
             </Box>
 
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ mt: 4 }}>
-              <Button
-                fullWidth
-                variant="contained"
-                size="large"
-                disableElevation
-                sx={{ py: 1.3, fontWeight: 600, textTransform: "none" }}
-                onClick={() =>
-                  success.siteId != null
-                    ? navigate(`/mysite/${success.siteId}`)
-                    : navigate("/mysite")
-                }
-              >
-                View your site
-              </Button>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={1.5}
+              sx={{ mt: 4 }}
+            >
               <Button
                 fullWidth
                 variant="outlined"
@@ -574,13 +634,15 @@ export default function Payment() {
         </Button>
 
         <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="flex-end"
-          flexWrap="wrap"
-          useFlexGap
           spacing={1}
-          sx={{ mb: 3.5 }}
+          sx={{
+            mb: 3.5,
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "flex-end",
+            flexWrap: "wrap",
+            gap: 1,
+          }}
         >
           <Box>
             <Typography variant="h4" fontWeight={800} letterSpacing="-0.02em">
@@ -590,20 +652,23 @@ export default function Payment() {
               Pick a theme, add any extra pages, and review your order.
             </Typography>
           </Box>
-          <Stack direction="row" spacing={0.75} alignItems="center" sx={{ color: "text.secondary" }}>
-            <LockOutlinedIcon sx={{ fontSize: 16 }} />
-            <Typography variant="body2">Secure checkout</Typography>
-          </Stack>
         </Stack>
 
         {error && (
-          <Alert severity="error" sx={{ mb: 3, borderRadius: 1.5 }} onClose={() => setError("")}>
+          <Alert
+            severity="error"
+            sx={{ mb: 3, borderRadius: 1.5 }}
+            onClose={() => setError("")}
+          >
             {error}
           </Alert>
         )}
 
         {!template ? (
-          <Paper variant="outlined" sx={{ ...cardSx, p: 5, textAlign: "center" }}>
+          <Paper
+            variant="outlined"
+            sx={{ ...cardSx, p: 5, textAlign: "center" }}
+          >
             <Typography variant="h6" fontWeight={700} gutterBottom>
               No template selected
             </Typography>
@@ -620,9 +685,9 @@ export default function Payment() {
             </Button>
           </Paper>
         ) : (
-          <Grid container spacing={3} alignItems="flex-start">
+          <Grid container spacing={3} sx={{ alignItems: "flex-start" }}>
             {/* ------------------------- LEFT: steps ------------------------- */}
-            <Grid size={{ xs: 12, md: 7.5 }}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <Paper variant="outlined" sx={{ ...cardSx, overflow: "hidden" }}>
                 <Section
                   number={1}
@@ -641,7 +706,7 @@ export default function Payment() {
                         setThemeId(e.target.value);
                       }}
                     >
-                      <Grid container spacing={1.5}>
+                      <Grid container spacing={1.5} sx={{ flexWrap: "wrap" }}>
                         {themes.map((theme) => {
                           const value = String(theme.themeId ?? theme.id);
                           const selected = value === String(themeId);
@@ -666,14 +731,19 @@ export default function Payment() {
                                   px: 1.5,
                                   py: 1.25,
                                   border: "1.5px solid",
-                                  borderColor: selected ? "primary.main" : "#E3E6EB",
+                                  borderColor: selected
+                                    ? "primary.main"
+                                    : "#E3E6EB",
                                   borderRadius: 1.5,
                                   bgcolor: selected
                                     ? (t) => alpha(t.palette.primary.main, 0.05)
                                     : "#fff",
-                                  transition: "border-color .15s, background-color .15s",
+                                  transition:
+                                    "border-color .15s, background-color .15s",
                                   "&:hover": {
-                                    borderColor: selected ? "primary.main" : "#C5CAD3",
+                                    borderColor: selected
+                                      ? "primary.main"
+                                      : "#C5CAD3",
                                   },
                                   "& .MuiFormControlLabel-label": {
                                     flex: 1,
@@ -684,8 +754,7 @@ export default function Payment() {
                                   <Stack
                                     direction="row"
                                     spacing={1.25}
-                                    alignItems="center"
-                                    sx={{ width: "100%" }}
+                                    sx={{ alignItems: "center", width: "100%" }}
                                   >
                                     <Box
                                       aria-hidden
@@ -695,7 +764,8 @@ export default function Payment() {
                                         flexShrink: 0,
                                         borderRadius: 1,
                                         border: "1px solid #E3E6EB",
-                                        backgroundColor: theme.background || "#fff",
+                                        backgroundColor:
+                                          theme.background || "#fff",
                                         color: theme.color || "#111",
                                         display: "grid",
                                         placeItems: "center",
@@ -752,7 +822,9 @@ export default function Payment() {
                   ) : (
                     <Stack spacing={1.25}>
                       {selectableExtraPages.map((page) => {
-                        const checked = additionalPageIds.includes(page.pageKey);
+                        const checked = additionalPageIds.includes(
+                          page.pageKey,
+                        );
                         return (
                           <FormControlLabel
                             key={page.pageKey}
@@ -774,9 +846,12 @@ export default function Payment() {
                               bgcolor: checked
                                 ? (t) => alpha(t.palette.primary.main, 0.05)
                                 : "#fff",
-                              transition: "border-color .15s, background-color .15s",
+                              transition:
+                                "border-color .15s, background-color .15s",
                               "&:hover": {
-                                borderColor: checked ? "primary.main" : "#C5CAD3",
+                                borderColor: checked
+                                  ? "primary.main"
+                                  : "#C5CAD3",
                               },
                               "& .MuiFormControlLabel-label": {
                                 flex: 1,
@@ -786,9 +861,11 @@ export default function Payment() {
                             label={
                               <Stack
                                 direction="row"
-                                justifyContent="space-between"
-                                alignItems="center"
                                 spacing={2}
+                                sx={{
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                }}
                               >
                                 <Typography variant="body2" fontWeight={600}>
                                   {pageTitle(page)}
@@ -813,7 +890,7 @@ export default function Payment() {
             </Grid>
 
             {/* ---------------------- RIGHT: order summary ---------------------- */}
-            <Grid size={{ xs: 12, md: 4.5 }}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <Paper
                 variant="outlined"
                 sx={{
@@ -823,71 +900,94 @@ export default function Payment() {
                   top: { md: 24 },
                 }}
               >
-                {template.thumbnailUrl && (
-                  <Box
-                    component="img"
-                    src={template.thumbnailUrl}
-                    alt={template.name || "Template preview"}
-                    sx={{
-                      display: "block",
-                      width: "100%",
-                      height: 170,
-                      objectFit: "cover",
-                      borderBottom: "1px solid #E3E6EB",
-                    }}
-                  />
-                )}
-
-                <Box sx={{ p: 3 }}>
-                  <Typography variant="overline" color="text.secondary" sx={{ lineHeight: 1.5 }}>
-                    Order summary
-                  </Typography>
-
-                  <Typography variant="h6" fontWeight={700} lineHeight={1.3}>
-                    {template.name || "Website template"}
-                  </Typography>
-
-                  <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
-                    {template.language && (
-                      <Chip size="small" label={template.language} sx={{ bgcolor: "#EEF0F4", fontWeight: 500 }} />
-                    )}
-                    {template.validityDays && (
-                      <Chip
-                        size="small"
-                        label={`Valid for ${template.validityDays} days`}
-                        sx={{ bgcolor: "#EEF0F4", fontWeight: 500 }}
-                      />
-                    )}
-                  </Stack>
-
-                  {template.shortDescription && (
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
-                      {template.shortDescription}
+                <Box
+                  sx={{
+                    p: { xs: 2.5, sm: 3 },
+                    width: "100%",
+                    boxSizing: "border-box",
+                  }}
+                >
+                  {/* Header */}
+                  <Box sx={{ textAlign: "center" }}>
+                    <Typography
+                      variant="overline"
+                      color="primary.main"
+                      sx={{
+                        lineHeight: 1.5,
+                        letterSpacing: 1.2,
+                        fontWeight: 600,
+                      }}
+                    >
+                      Order Summary
                     </Typography>
-                  )}
+
+                    <Typography
+                      variant="h6"
+                      fontWeight={700}
+                      sx={{ lineHeight: "1.3" }}
+                    >
+                      {template.name || "Website template"}
+                    </Typography>
+
+                    {template.validityDays && (
+                      <>
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ mt: 1 }}
+                        >
+                          If purchased today, valid until{" "}
+                          {new Date(
+                            Date.now() +
+                              template.validityDays * 24 * 60 * 60 * 1000,
+                          ).toLocaleDateString("en-IN", {
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                          })}
+                        </Typography>
+
+                        <Chip
+                          size="small"
+                          label={`Valid for ${template.validityDays} days`}
+                          sx={{
+                            mt: 0.5,
+                            bgcolor: "#EEF0F4",
+                            fontWeight: 500,
+                            height: 24,
+                          }}
+                        />
+                      </>
+                    )}
+                  </Box>
 
                   <Divider sx={{ my: 2.5 }} />
 
-                  <Stack spacing={1.5}>
+                  {/* Price Breakdown */}
+                  <Stack spacing={2} sx={{ width: "100%" }}>
+                    {/* Template */}
                     <SummaryRow
                       label="Template"
                       caption={
                         defaultPages.length > 0
-                          ? `Includes ${defaultPages.length} default page${defaultPages.length > 1 ? "s" : ""}`
+                          ? `Includes ${defaultPages.length} default page${
+                              defaultPages.length > 1 ? "s" : ""
+                            }`
                           : undefined
                       }
                       value={formatPrice(templatePrice, currency)}
                     />
 
+                    {/* Selected Theme */}
                     {selectedTheme && (
                       <SummaryRow
                         label="Theme"
-                        caption={selectedTheme.name || undefined}
-                        value="Included"
+                        value={selectedTheme.name || undefined}
                         muted
                       />
                     )}
 
+                    {/* Selected Additional Pages */}
                     {selectedExtras.map((page) => (
                       <SummaryRow
                         key={page.pageKey}
@@ -896,6 +996,7 @@ export default function Payment() {
                       />
                     ))}
 
+                    {/* No Additional Pages */}
                     {selectedExtras.length === 0 && (
                       <SummaryRow label="Additional pages" value="None" muted />
                     )}
@@ -903,21 +1004,43 @@ export default function Payment() {
 
                   <Divider sx={{ my: 2.5 }} />
 
-                  <Stack direction="row" justifyContent="space-between" alignItems="center">
-                    <Typography fontWeight={700}>Total</Typography>
-                    <Stack direction="row" spacing={1} alignItems="center">
+                  {/* Total */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      width: "100%",
+                      gap: 2,
+                    }}
+                  >
+                    <Typography variant="body1" fontWeight={700}>
+                      Total
+                    </Typography>
+
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      sx={{ alignItems: "center", flexShrink: 0 }}
+                    >
                       {quoteLoading && <CircularProgress size={14} />}
+
                       <Typography
                         variant="h5"
                         fontWeight={800}
-                        letterSpacing="-0.01em"
-                        sx={numeric}
+                        letterSpacing="-0.02em"
+                        sx={{
+                          whiteSpace: "nowrap",
+                          textAlign: "right",
+                          ...numeric,
+                        }}
                       >
                         {formatPrice(total, currency)}
                       </Typography>
                     </Stack>
-                  </Stack>
+                  </Box>
 
+                  {/* Payment Button */}
                   <Button
                     fullWidth
                     variant="contained"
@@ -950,11 +1073,25 @@ export default function Payment() {
                           : "Select a theme to continue"}
                   </Button>
 
-                  <Stack spacing={1} sx={{ mt: 2.5 }}>
-                    <TrustItem icon={<BoltOutlinedIcon sx={{ fontSize: 16 }} />}>
+                  {/* Trust Information */}
+                  <Stack
+                    spacing={1.25}
+                    alignItems="center"
+                    justifyContent="center"
+                    sx={{
+                      mt: 2.5,
+                      width: "100%",
+                    }}
+                  >
+                    <TrustItem
+                      icon={<BoltOutlinedIcon sx={{ fontSize: 16 }} />}
+                    >
                       Your website is created as soon as the order is placed.
                     </TrustItem>
-                    <TrustItem icon={<VerifiedUserOutlinedIcon sx={{ fontSize: 16 }} />}>
+
+                    <TrustItem
+                      icon={<VerifiedUserOutlinedIcon sx={{ fontSize: 16 }} />}
+                    >
                       The final price is calculated and verified on the server.
                     </TrustItem>
                   </Stack>

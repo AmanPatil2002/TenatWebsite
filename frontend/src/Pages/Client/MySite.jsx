@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTheme } from "@mui/material/styles";
 import axios from "axios";
 import {
   Alert,
@@ -24,30 +25,30 @@ const API_URL = (
 ).replace(/\/+$/, "");
 const PLACEHOLDER_IMG = "https://placehold.co/600x340?text=No+Preview";
 
-const BRAND = {
-  indigo: "#4f46e5",
-  indigoDeep: "#3730a3",
-  ink: "#0f172a",
-  muted: "#64748b",
-};
-
 const getToken = () =>
   localStorage.getItem("token") ||
   localStorage.getItem("authToken") ||
   localStorage.getItem("accessToken");
 
-const statusStyles = {
-  active: { label: "Active", color: "#16a34a", bg: "rgba(22,163,74,0.10)" },
-  inactive: { label: "Inactive", color: "#64748b", bg: "rgba(100,116,139,0.10)" },
-  expired: { label: "Expired", color: "#dc2626", bg: "rgba(220,38,38,0.10)" },
-  pending: { label: "Pending", color: "#f59e0b", bg: "rgba(245,158,11,0.12)" },
-};
+const statusStyles = (theme) => ({
+  active: { label: "Active", color: theme.palette.success.main, bg: alpha(theme.palette.success.main, 0.10) },
+  inactive: { label: "Inactive", color: theme.palette.text.muted, bg: alpha(theme.palette.text.muted, 0.10) },
+  expired: { label: "Expired", color: theme.palette.error.main, bg: alpha(theme.palette.error.main, 0.10) },
+  pending: { label: "Pending", color: theme.palette.warning.main, bg: alpha(theme.palette.warning.main, 0.12) },
+});
 
 const MySite = () => {
   const navigate = useNavigate();
+  const theme = useTheme();
+  const primary = theme.palette.primary.main;
+  const primaryDark = theme.palette.primary.dark;
+  const textPrimary = theme.palette.text.primary;
+  const textMuted = theme.palette.text.muted;
   const [sites, setSites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const styles = statusStyles(theme);
 
   useEffect(() => {
     const token = getToken();
@@ -98,8 +99,7 @@ const MySite = () => {
       sx={{
         minHeight: "100vh",
         py: { xs: 4, md: 7 },
-        background:
-          "linear-gradient(160deg, #f8fafc 0%, #eef2ff 45%, #f0fdfa 100%)",
+        background: `linear-gradient(160deg, ${theme.palette.background.default} 0%, ${alpha(theme.palette.primary.main, 0.04)} 45%, ${alpha(theme.palette.info.main, 0.04)} 100%)`,
       }}
     >
       <Container maxWidth="lg">
@@ -111,7 +111,7 @@ const MySite = () => {
               display: "block",
               fontWeight: 700,
               letterSpacing: "0.12em",
-              color: BRAND.indigo,
+              color: primary,
             }}
           >
             Workspace
@@ -122,7 +122,7 @@ const MySite = () => {
             sx={{
               fontWeight: 800,
               letterSpacing: "-0.02em",
-              color: BRAND.ink,
+              color: textPrimary,
               mt: 0.5,
             }}
           >
@@ -153,7 +153,7 @@ const MySite = () => {
                   <Skeleton
                     variant="rounded"
                     height={380}
-                    sx={{ borderRadius: 3, bgcolor: alpha(BRAND.indigo, 0.06) }}
+                    sx={{ borderRadius: 3, bgcolor: alpha(primary, 0.06) }}
                   />
                 </Grid>
               ))
@@ -165,7 +165,7 @@ const MySite = () => {
                 const unusableReason = usable
                   ? ""
                   : `Site is ${status ?? "inactive"} and cannot be opened.`;
-                const style = statusStyles[status] || statusStyles.inactive;
+                const style = styles[status] || styles.inactive;
 
                 return (
                   <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={String(site.id)}>
@@ -243,7 +243,7 @@ const MySite = () => {
                             variant="h6"
                             sx={{
                               fontWeight: 700,
-                              color: BRAND.ink,
+                              color: textPrimary,
                               lineHeight: 1.3,
                               overflowWrap: "anywhere",
                             }}
@@ -252,7 +252,7 @@ const MySite = () => {
                           </Typography>
                           <Typography
                             variant="body2"
-                            sx={{ color: BRAND.muted, fontWeight: 500 }}
+                            sx={{ color: textMuted, fontWeight: 500 }}
                           >
                             {site.templateName}
                           </Typography>
@@ -269,13 +269,13 @@ const MySite = () => {
                             >
                               <Typography
                                 variant="caption"
-                                sx={{ color: BRAND.muted, fontWeight: 600 }}
+                                sx={{ color: textMuted, fontWeight: 600 }}
                               >
                                 Purchased
                               </Typography>
                               <Typography
                                 variant="body2"
-                                sx={{ color: BRAND.ink, fontWeight: 500 }}
+                                sx={{ color: textPrimary, fontWeight: 500 }}
                               >
                                 {formatDate(site.startsAt)}
                               </Typography>
@@ -289,7 +289,7 @@ const MySite = () => {
                             >
                               <Typography
                                 variant="caption"
-                                sx={{ color: BRAND.muted, fontWeight: 600 }}
+                                sx={{ color: textMuted, fontWeight: 600 }}
                               >
                                 Expires
                               </Typography>
@@ -298,8 +298,8 @@ const MySite = () => {
                                 sx={{
                                   fontWeight: 600,
                                   color: expiringSoon
-                                    ? "warning.main"
-                                    : BRAND.ink,
+                                    ? theme.palette.warning.main
+                                    : textPrimary,
                                 }}
                               >
                                 {formatDate(site.expiresAt)}
@@ -326,15 +326,15 @@ const MySite = () => {
                                   textTransform: "none",
                                   fontWeight: 700,
                                   py: 1,
-                                  bgcolor: BRAND.indigo,
-                                  boxShadow: `0 6px 16px ${alpha(BRAND.indigo, 0.22)}`,
+                                  bgcolor: primary,
+                                  boxShadow: `0 6px 16px ${alpha(primary, 0.22)}`,
                                   "&:hover": {
-                                    bgcolor: BRAND.indigoDeep,
-                                    boxShadow: `0 8px 20px ${alpha(BRAND.indigo, 0.30)}`,
+                                    bgcolor: primaryDark,
+                                    boxShadow: `0 8px 20px ${alpha(primary, 0.30)}`,
                                   },
                                   "&.Mui-disabled": {
-                                    bgcolor: alpha(BRAND.indigo, 0.12),
-                                    color: alpha(BRAND.indigo, 0.4),
+                                    bgcolor: alpha(primary, 0.12),
+                                    color: alpha(primary, 0.4),
                                     boxShadow: "none",
                                   },
                                 }}
@@ -360,11 +360,11 @@ const MySite = () => {
                                   textTransform: "none",
                                   fontWeight: 600,
                                   py: 1,
-                                  borderColor: alpha(BRAND.indigo, 0.35),
-                                  color: BRAND.indigo,
+                                  borderColor: alpha(primary, 0.35),
+                                  color: primary,
                                   "&:hover": {
-                                    borderColor: BRAND.indigo,
-                                    bgcolor: alpha(BRAND.indigo, 0.04),
+                                    borderColor: primary,
+                                    bgcolor: alpha(primary, 0.04),
                                   },
                                 }}
                               >
@@ -384,39 +384,37 @@ const MySite = () => {
               <Box
                 sx={{
                   textAlign: "center",
-                  py: 10,
+                  py: { xs: 5, md: 7 },
                   px: 3,
+                  maxWidth: 480,
+                  mx: "auto",
+                  bgcolor: "background.paper",
                   borderRadius: 3,
                   border: "1px dashed",
-                  borderColor: alpha(BRAND.indigo, 0.25),
-                  bgcolor: alpha(BRAND.indigo, 0.03),
+                  borderColor: "divider",
                 }}
               >
-                <Typography
-                  variant="h6"
-                  sx={{ fontWeight: 700, color: BRAND.ink }}
-                  gutterBottom
-                >
-                  No sites found
+                <Typography variant="body1" color="text.secondary" sx={{ mb: 1, fontWeight: 600 }}>
+                  No sites yet
                 </Typography>
-                <Typography
-                  color="text.secondary"
-                  sx={{ mb: 3, maxWidth: 400, mx: "auto" }}
-                >
-                  Buy a template to get your own theme and pages.
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                  You haven't purchased any templates yet. Explore our library to get started.
                 </Typography>
                 <Button
                   variant="contained"
+                  size="large"
                   onClick={() => navigate("/templates")}
                   sx={{
                     borderRadius: 2,
                     textTransform: "none",
                     fontWeight: 700,
-                    px: 3,
-                    py: 1.1,
-                    bgcolor: BRAND.indigo,
-                    boxShadow: `0 8px 20px ${alpha(BRAND.indigo, 0.25)}`,
-                    "&:hover": { bgcolor: BRAND.indigoDeep },
+                    py: 1,
+                    bgcolor: primary,
+                    boxShadow: `0 6px 16px ${alpha(primary, 0.22)}`,
+                    "&:hover": {
+                      bgcolor: primaryDark,
+                      boxShadow: `0 8px 20px ${alpha(primary, 0.30)}`,
+                    },
                   }}
                 >
                   Browse templates

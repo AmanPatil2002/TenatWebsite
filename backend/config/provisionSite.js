@@ -164,6 +164,7 @@ const qualifyDdl = (siteId, base, ddl, dbNameFromSite) => {
 
 async function provisionSiteDatabase(siteId) {
   const id = safeId(siteId);
+  let preserveReadyStatus = false;
   try {
     const rows = await q(
       `SELECT s.name AS siteName, u.name AS userName,
@@ -180,10 +181,25 @@ async function provisionSiteDatabase(siteId) {
     }
     const { siteName, userName, packKey } = rows[0];
 
-    const existing = await q("SELECT dbName FROM sites WHERE id = ?", [id]);
-    const generatedDbName =
+    const existing = await q(
+      "SELECT dbName, provisionStatus FROM sites WHERE id = ?",
+      [id],
+    );
+    preserveReadyStatus =
+      existing[0]?.provisionStatus === "ready" && Boolean(existing[0]?.dbName);
+    let generatedDbName =
       existing[0]?.dbName ||
       (await generateUniqueDbName(userName, siteName, id));
+
+    await q(
+      "UPDATE sites SET dbName = COALESCE(dbName, ?) WHERE id = ?",
+      [generatedDbName, id],
+    );
+    const reservedSite = await q("SELECT dbName FROM sites WHERE id = ?", [id]);
+    generatedDbName = reservedSite[0]?.dbName;
+    if (!generatedDbName) {
+      throw new Error("Could not reserve a database name for the site");
+    }
 
     // Safety: if the MySQL database already exists and belongs to a
     // different site, refuse to touch it
@@ -205,7 +221,10 @@ async function provisionSiteDatabase(siteId) {
 
     // Build the table list: common + category-specific pack
     const tables = [...packs.common()];
-    if (packKey && typeof packs[packKey] === "function") {
+    if (packKey) {
+      if (typeof packs[packKey] !== "function") {
+        throw new Error(`Unknown site data pack: ${packKey}`);
+      }
       tables.push(...packs[packKey]());
     }
 
@@ -267,6 +286,12 @@ async function provisionSiteDatabase(siteId) {
     );
 
     await q(
+      `INSERT IGNORE INTO ${tn(id, "sitethemes", generatedDbName)} (siteId)
+       VALUES (?)`,
+      [id],
+    );
+
+    await q(
       "UPDATE sites SET dbName=?, provisionStatus='ready', provisionError=NULL WHERE id=?",
       [generatedDbName, id],
     );
@@ -278,8 +303,11 @@ async function provisionSiteDatabase(siteId) {
     console.error(`Provisioning error for site ${id}:`, err.message);
     try {
       await q(
-        "UPDATE sites SET provisionStatus='failed', provisionError=? WHERE id=?",
-        [String(err.message).slice(0, 500), id],
+        `UPDATE sites
+            SET provisionStatus = CASE WHEN ? THEN 'ready' ELSE 'failed' END,
+                provisionError = ?
+          WHERE id = ?`,
+        [preserveReadyStatus, String(err.message).slice(0, 500), id],
       );
     } catch (statusError) {
       console.error(
