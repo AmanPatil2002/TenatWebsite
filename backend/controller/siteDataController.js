@@ -1,6 +1,9 @@
 const db = require('../config/db').promise();
 const { tn } = require('../config/provisionSite');
+const { getActiveManagedSite } = require('./site/access');
 const packs = require('../config/packs');
+const { assertWritable } = require('../../frontend/src/config/readOnlyTables');
+const { DERIVED_FIELDS } = require('../../frontend/src/config/readOnlyTables');
 const SYSTEM_COLUMNS = new Set(['id', 'createdAt', 'updatedAt']);
 
 const ID_PATTERN = /^[1-9]\d{0,19}$/;
@@ -14,66 +17,14 @@ const sendError = (res, error) => {
   return res.status(500).json({ message: 'Could not access site data' });
 };
 
-const requireOwnedSite = async (siteId, userId) => {
+const requireManagedSite = async (siteId, req) => {
   if (!isId(siteId)) {
     const error = new Error('Invalid site id');
     error.status = 400;
     throw error;
   }
-  const [[site]] = await db.query(
-    `SELECT s.id, s.dbName, s.provisionStatus
-       FROM sites s
-       JOIN payments p ON p.id = s.paymentId AND p.status = 'captured'
-      WHERE s.id = ? AND s.userId = ?
-        AND s.status = 'active' AND s.expiresAt > CURRENT_TIMESTAMP`,
-    [siteId, userId],
-  );
-  if (!site) {
-    const error = new Error('Site not found, unavailable, or not owned by this user');
-    error.status = 403;
-    throw error;
-  }
-  if (site.provisionStatus !== 'ready' || !site.dbName) {
-    const error = new Error('Site database is not ready yet');
-    error.status = 503;
-    throw error;
-  }
-  return site.dbName;
-};
-
-const requireManagedSite = async (siteId, req) => {
-  if (req.siteAdmin) {
-    if (String(req.siteAdmin.siteId) !== String(siteId)) {
-      const error = new Error('This login is not assigned to the requested site');
-      error.status = 403;
-      throw error;
-    }
-    if (!isId(siteId)) {
-      const error = new Error('Invalid site id');
-      error.status = 400;
-      throw error;
-    }
-    const [[site]] = await db.query(
-      `SELECT s.id, s.dbName, s.provisionStatus
-         FROM sites s
-         JOIN payments p ON p.id = s.paymentId AND p.status = 'captured'
-        WHERE s.id = ? AND s.status = 'active'
-          AND s.expiresAt > CURRENT_TIMESTAMP`,
-      [siteId],
-    );
-    if (!site) {
-      const error = new Error('Site is not provisioned or is unavailable');
-      error.status = 403;
-      throw error;
-    }
-    if (site.provisionStatus !== 'ready' || !site.dbName) {
-      const error = new Error('Site database is not ready yet');
-      error.status = 503;
-      throw error;
-    }
-    return site.dbName;
-  }
-  return await requireOwnedSite(siteId, req.user.userId);
+  const site = await getActiveManagedSite(siteId, req);
+  return site;
 };
 
 const parseEnumValues = (columnType) =>
@@ -180,7 +131,7 @@ const readInput = (body, columns) => {
 exports.schema = async (req, res) => {
   try {
     const siteId = req.params.siteId;
-    const dbName = await requireManagedSite(siteId, req);
+    const site = await requireManagedSite(siteId, req);
     const [rows] = await db.query(
       `SELECT st.baseName, c.COLUMN_NAME AS name, c.DATA_TYPE AS dataType,
               c.COLUMN_TYPE AS columnType, c.IS_NULLABLE AS isNullable,
@@ -198,7 +149,7 @@ exports.schema = async (req, res) => {
           AND k.REFERENCED_TABLE_NAME IS NOT NULL
         WHERE st.siteId = ?
         ORDER BY st.baseName, c.ORDINAL_POSITION`,
-      [dbName, siteId],
+      [site.dbName, siteId],
     );
     const commonTables = new Set(packs.common().map(([name]) => name));
     const resources = {};
@@ -233,10 +184,10 @@ exports.sections = async (req, res) => {
 exports.list = async (req, res) => {
   const { siteId, resource } = req.params;
   try {
-    const dbName = await requireManagedSite(siteId, req);
-    await requireResourceTable(siteId, resource, dbName);
+    const site = await requireManagedSite(siteId, req);
+    await requireResourceTable(siteId, resource, site.dbName);
     const [rows] = await db.query(
-      `SELECT * FROM ${tn(siteId, resource, dbName)} ORDER BY id DESC`,
+      `SELECT * FROM ${tn(siteId, resource, site.dbName)} ORDER BY id DESC`,
     );
     return res.json(rows);
   } catch (error) {
@@ -247,18 +198,25 @@ exports.list = async (req, res) => {
 exports.create = async (req, res) => {
   const { siteId, resource } = req.params;
   try {
-    const dbName = await requireManagedSite(siteId, req);
-    const columns = await requireResourceTable(siteId, resource, dbName);
+    const site = await requireManagedSite(siteId, req);
+    const vertical = site.packKey;
+    // Enforce read-only / status-only table restrictions
+    assertWritable(vertical, resource, 'create', req.body);
+
+    const columns = await requireResourceTable(siteId, resource, site.dbName);
     const data = readInput(req.body, columns);
     if (!Object.keys(data).length) {
       return res.status(400).json({ message: 'No editable fields were provided' });
     }
     const [result] = await db.query(
-      `INSERT INTO ${tn(siteId, resource, dbName)} SET ?`,
+      `INSERT INTO ${tn(siteId, resource, site.dbName)} SET ?`,
       [data],
     );
     return res.status(201).json({ id: result.insertId });
   } catch (error) {
+    if (error.message.includes('read-only') || error.message.includes('status-only') || error.message.includes('allows only')) {
+      return res.status(403).json({ message: error.message });
+    }
     return sendError(res, error);
   }
 };
@@ -267,19 +225,23 @@ exports.update = async (req, res) => {
   const { siteId, resource, id } = req.params;
   if (!isId(id)) return res.status(400).json({ message: 'Invalid record id' });
   try {
-    const dbName = await requireManagedSite(siteId, req);
-    const columns = await requireResourceTable(siteId, resource, dbName);
+    const site = await requireManagedSite(siteId, req);
+    const vertical = site.packKey;
+    // Enforce read-only / status-only table restrictions
+    assertWritable(vertical, resource, 'update', req.body);
+
+    const columns = await requireResourceTable(siteId, resource, site.dbName);
     const data = readInput(req.body, columns);
     if (!Object.keys(data).length) {
       return res.status(400).json({ message: 'No editable fields were provided' });
     }
     const [result] = await db.query(
-      `UPDATE ${tn(siteId, resource, dbName)} SET ? WHERE id = ?`,
+      `UPDATE ${tn(siteId, resource, site.dbName)} SET ? WHERE id = ?`,
       [data, id],
     );
     if (result.affectedRows === 0) {
       const [[record]] = await db.query(
-        `SELECT id FROM ${tn(siteId, resource, dbName)} WHERE id = ? LIMIT 1`,
+        `SELECT id FROM ${tn(siteId, resource, site.dbName)} WHERE id = ? LIMIT 1`,
         [id],
       );
       if (!record) {
@@ -288,6 +250,9 @@ exports.update = async (req, res) => {
     }
     return res.json({ message: 'Updated' });
   } catch (error) {
+    if (error.message.includes('read-only') || error.message.includes('status-only') || error.message.includes('allows only') || error.message.includes('Invalid status')) {
+      return res.status(403).json({ message: error.message });
+    }
     return sendError(res, error);
   }
 };
@@ -296,10 +261,14 @@ exports.remove = async (req, res) => {
   const { siteId, resource, id } = req.params;
   if (!isId(id)) return res.status(400).json({ message: 'Invalid record id' });
   try {
-    const dbName = await requireManagedSite(siteId, req);
-    await requireResourceTable(siteId, resource, dbName);
+    const site = await requireManagedSite(siteId, req);
+    const vertical = site.packKey;
+    // Enforce read-only / status-only table restrictions
+    assertWritable(vertical, resource, 'delete', req.body);
+
+    await requireResourceTable(siteId, resource, site.dbName);
     const [result] = await db.query(
-      `DELETE FROM ${tn(siteId, resource, dbName)} WHERE id = ?`,
+      `DELETE FROM ${tn(siteId, resource, site.dbName)} WHERE id = ?`,
       [id],
     );
     if (result.affectedRows === 0) {
@@ -307,6 +276,9 @@ exports.remove = async (req, res) => {
     }
     return res.json({ message: 'Deleted' });
   } catch (error) {
+    if (error.message.includes('read-only') || error.message.includes('status-only') || error.message.includes('allows only')) {
+      return res.status(403).json({ message: error.message });
+    }
     return sendError(res, error);
   }
 };

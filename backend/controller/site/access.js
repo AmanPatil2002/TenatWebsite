@@ -1,6 +1,6 @@
 const db = require("../../config/db").promise();
 const { HttpError } = require("../../utils/tx");
-const { tn } = require("../../config/provisionSite");
+const { tn, ensureSiteDatabase } = require("../../config/provisionSite");
 
 const isId = (value) => {
   if (typeof value === "number" && !Number.isSafeInteger(value)) return false;
@@ -8,12 +8,33 @@ const isId = (value) => {
     BigInt(value) <= 18446744073709551615n;
 };
 
+const ensureReadySiteDatabase = async (siteId, site) => {
+  if (site.provisionStatus !== "ready" || !site.dbName) {
+    throw new HttpError(503, "Site database is not ready yet");
+  }
+  try {
+    site.dbName = await ensureSiteDatabase(
+      siteId,
+      site.dbName,
+      site.packKey,
+      site.provisionStatus,
+    );
+    return site;
+  } catch (error) {
+    console.error(`Could not repair site database ${siteId}:`, error);
+    throw new HttpError(503, "Site database schema could not be repaired");
+  }
+};
+
 const getActiveOwnedSite = async (siteId, userId) => {
   const [[site]] = await db.query(
     `SELECT s.id, s.userId, s.status, s.expiresAt, s.dbName, s.provisionStatus,
+            c.packKey,
             pay.status AS paymentStatus,
             s.expiresAt > CURRENT_TIMESTAMP AS notExpired
        FROM sites s
+       JOIN template t ON t.templateId = s.templateId
+       JOIN categories c ON c.categoryId = t.categoryId
        JOIN payments pay ON pay.id = s.paymentId
       WHERE s.id = ? AND s.userId = ?`,
     [siteId, userId],
@@ -22,10 +43,7 @@ const getActiveOwnedSite = async (siteId, userId) => {
   if (site.status !== "active" || site.paymentStatus !== "captured" || !site.notExpired) {
     throw new HttpError(403, "Site is inactive or expired");
   }
-  if (site.provisionStatus !== "ready" || !site.dbName) {
-    throw new HttpError(503, "Site database is not ready yet");
-  }
-  return site;
+  return ensureReadySiteDatabase(siteId, site);
 };
 
 const getActiveManagedSite = async (siteId, req) => {
@@ -35,9 +53,12 @@ const getActiveManagedSite = async (siteId, req) => {
   }
   const [[site]] = await db.query(
     `SELECT s.id, s.userId, s.status, s.expiresAt, s.dbName, s.provisionStatus,
+            c.packKey,
             pay.status AS paymentStatus,
             s.expiresAt > CURRENT_TIMESTAMP AS notExpired
        FROM sites s
+       JOIN template t ON t.templateId = s.templateId
+       JOIN categories c ON c.categoryId = t.categoryId
        JOIN payments pay ON pay.id = s.paymentId
       WHERE s.id = ?`,
     [siteId],
@@ -46,10 +67,7 @@ const getActiveManagedSite = async (siteId, req) => {
   if (site.status !== "active" || site.paymentStatus !== "captured" || !site.notExpired) {
     throw new HttpError(403, "Site is inactive or expired");
   }
-  if (site.provisionStatus !== "ready" || !site.dbName) {
-    throw new HttpError(503, "Site database is not ready yet");
-  }
-  return site;
+  return ensureReadySiteDatabase(siteId, site);
 };
 
 const readSiteHeader = async (siteId, dbName) => {

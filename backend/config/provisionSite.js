@@ -72,14 +72,17 @@ const generateDbName = (userName, siteName, siteId, suffix = "") => {
   return dbname.slice(0, 64);
 };
 
-// Check if database exists in MySQL
-const databaseExists = async (dbName) => {
+const getExistingDatabaseName = async (dbName) => {
   const result = await q(
     "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?",
     [dbName],
   );
-  return result.length > 0;
+  return result[0]?.SCHEMA_NAME || null;
 };
+
+// Check if database exists in MySQL
+const databaseExists = async (dbName) =>
+  Boolean(await getExistingDatabaseName(dbName));
 
 // Check if a database name is already assigned to another site
 const isDbNameTaken = async (dbName, excludeSiteId = null) => {
@@ -122,15 +125,107 @@ const generateUniqueDbName = async (userName, siteName, siteId) => {
 };
 
 // Check if a table exists in a database
-const tableExists = async (dbName, tableName) => {
+const tableExists = async (dbName, tableName, schemaName) => {
+  const actualSchemaName = schemaName || (await getExistingDatabaseName(dbName));
+  if (!actualSchemaName) return false;
   const result = await q(
     `SELECT TABLE_NAME
        FROM information_schema.TABLES
       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?`,
-    [dbName, tableName],
+    [actualSchemaName, tableName],
   );
   return result.length > 0;
 };
+
+const siteTablesForPack = (packKey) => {
+  const tables = [...packs.common()];
+  if (packKey) {
+    if (typeof packs[packKey] !== "function") {
+      throw new Error(`Unknown site data pack: ${packKey}`);
+    }
+    tables.push(...packs[packKey]());
+  }
+  return tables;
+};
+
+const findMissingSiteTables = async (siteId, dbName, packKey) => {
+  const expected = [...new Set(siteTablesForPack(packKey).map(([name]) => name))];
+  const actualSchemaName = dbName
+    ? await getExistingDatabaseName(dbName)
+    : null;
+  if (!actualSchemaName) {
+    return { tables: expected, registered: expected };
+  }
+
+  const [presentRows, registeredRows] = await Promise.all([
+    q(
+      `SELECT TABLE_NAME
+         FROM information_schema.TABLES
+        WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN (?)`,
+      [actualSchemaName, expected],
+    ),
+    q(
+      "SELECT baseName FROM sitetables WHERE siteId = ? AND baseName IN (?)",
+      [siteId, expected],
+    ),
+  ]);
+  const present = new Set(presentRows.map(({ TABLE_NAME }) => TABLE_NAME));
+  const registered = new Set(registeredRows.map(({ baseName }) => baseName));
+  return {
+    tables: expected.filter((name) => !present.has(name)),
+    registered: expected.filter((name) => !registered.has(name)),
+  };
+};
+
+const siteRepairs = new Map();
+
+async function ensureSiteDatabase(siteId, dbName, packKey, provisionStatus) {
+  const id = safeId(siteId);
+  const currentRepair = siteRepairs.get(id);
+  if (currentRepair) return currentRepair;
+
+  const repair = (async () => {
+    const missing = await findMissingSiteTables(id, dbName, packKey);
+    if (
+      provisionStatus !== "ready" ||
+      missing.tables.length > 0 ||
+      missing.registered.length > 0
+    ) {
+      await provisionSiteDatabase(id);
+    }
+
+    const rows = await q(
+      "SELECT dbName, provisionStatus FROM sites WHERE id = ?",
+      [id],
+    );
+    const site = rows[0];
+    if (!site || site.provisionStatus !== "ready" || !site.dbName) {
+      throw new Error("Site database provisioning did not complete");
+    }
+    const actualDbName = await getExistingDatabaseName(site.dbName);
+    if (!actualDbName) {
+      throw new Error("Site database does not exist after provisioning");
+    }
+    const remaining = await findMissingSiteTables(
+      id,
+      actualDbName,
+      packKey,
+    );
+    if (remaining.tables.length || remaining.registered.length) {
+      throw new Error(
+        `Site database schema is incomplete; missing tables: ${remaining.tables.join(", ")}`,
+      );
+    }
+    return actualDbName;
+  })();
+
+  siteRepairs.set(id, repair);
+  try {
+    return await repair;
+  } finally {
+    if (siteRepairs.get(id) === repair) siteRepairs.delete(id);
+  }
+}
 
 const dbName = (siteId, dbNameFromSite) => {
   // If dbName already exists in site record, use it (for lookups)
@@ -186,7 +281,9 @@ async function provisionSiteDatabase(siteId) {
       [id],
     );
     preserveReadyStatus =
-      existing[0]?.provisionStatus === "ready" && Boolean(existing[0]?.dbName);
+      existing[0]?.provisionStatus === "ready" &&
+      Boolean(existing[0]?.dbName) &&
+      (await databaseExists(existing[0].dbName));
     let generatedDbName =
       existing[0]?.dbName ||
       (await generateUniqueDbName(userName, siteName, id));
@@ -218,15 +315,13 @@ async function provisionSiteDatabase(siteId) {
       `CREATE DATABASE IF NOT EXISTS \`${escapeIdent(generatedDbName)}\`
          CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci`,
     );
+    const actualDbName = await getExistingDatabaseName(generatedDbName);
+    if (!actualDbName) {
+      throw new Error("The site database could not be found after creation");
+    }
 
     // Build the table list: common + category-specific pack
-    const tables = [...packs.common()];
-    if (packKey) {
-      if (typeof packs[packKey] !== "function") {
-        throw new Error(`Unknown site data pack: ${packKey}`);
-      }
-      tables.push(...packs[packKey]());
-    }
+    const tables = siteTablesForPack(packKey);
 
     for (const [base, ddl] of tables) {
       if (!/^[a-z][a-z0-9_]*$/.test(base)) {
@@ -236,7 +331,7 @@ async function provisionSiteDatabase(siteId) {
         throw new Error(`Invalid table definition: ${base}`);
       }
 
-      if (!(await tableExists(generatedDbName, base))) {
+      if (!(await tableExists(generatedDbName, base, actualDbName))) {
         await q(qualifyDdl(id, base, ddl, generatedDbName));
       } else {
         console.log(
@@ -251,10 +346,10 @@ async function provisionSiteDatabase(siteId) {
     }
 
     // Verify required tables exist
-    if (!(await tableExists(generatedDbName, "pages"))) {
+    if (!(await tableExists(generatedDbName, "pages", actualDbName))) {
       throw new Error("Failed to create required table: pages");
     }
-    if (!(await tableExists(generatedDbName, "headers"))) {
+    if (!(await tableExists(generatedDbName, "headers", actualDbName))) {
       throw new Error("Failed to create required table: headers");
     }
 
@@ -344,4 +439,5 @@ module.exports = {
   isDbNameTaken,
   tableExists,
   qualifyDdl,
+  ensureSiteDatabase,
 };

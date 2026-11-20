@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import axios from "axios";
+import { useTablePermissions } from "../hooks/useTablePermissions";
 import {
   Alert,
   Avatar,
@@ -993,7 +994,9 @@ function ImageUrlField({ spec, value, onChange, onBlur, error }) {
 /* ------------------------------------------------------------------ */
 export default function SiteAdminData() {
   const theme = useTheme();
-  const { baseUrl, authConfig } = useOutletContext();
+  const { baseUrl, authConfig, site } = useOutletContext();
+
+  const vertical = site?.packKey || '';
 
   const [resources, setResources] = useState([]);
   const [resourceSchemas, setResourceSchemas] = useState({});
@@ -1030,6 +1033,9 @@ export default function SiteAdminData() {
   const config = resourceConfigs[selectedResource];
   const resourceColor = config?.color || theme.palette.primary.main;
   const resourceUrl = `${baseUrl}/data/${selectedResource}`;
+
+  // Table permissions hook
+  const tablePermissions = useTablePermissions(vertical, selectedResource);
 
   /* ---------------- FK options ---------------- */
   const fetchFkOptions = useCallback(async () => {
@@ -1423,7 +1429,7 @@ export default function SiteAdminData() {
           </Stack>
         </Box>
         <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-          {config && (
+          {config && tablePermissions.canCreate && (
             <Button
               variant="contained"
               startIcon={<AddIcon />}
@@ -1432,6 +1438,24 @@ export default function SiteAdminData() {
             >
               Add {config.singular}
             </Button>
+          )}
+          {config && tablePermissions.isReadOnly && (
+            <Chip
+              label="Read-only table"
+              variant="outlined"
+              size="small"
+              color="warning"
+              sx={{ fontWeight: 600 }}
+            />
+          )}
+          {config && tablePermissions.isStatusOnly && (
+            <Chip
+              label="Status-only table"
+              variant="outlined"
+              size="small"
+              color="info"
+              sx={{ fontWeight: 600 }}
+            />
           )}
         </Stack>
       </Stack>
@@ -1714,30 +1738,34 @@ export default function SiteAdminData() {
                           );
                         })}
                         <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
-                          <Tooltip title="Edit">
-                            <IconButton
-                              size="small"
-                              aria-label={`Edit record ${row.id}`}
-                              onClick={() => openEditRecord(row)}
-                            >
-                              <EditIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Delete">
-                            <IconButton
-                              size="small"
-                              color="error"
-                              aria-label={`Delete record ${row.id}`}
-                              disabled={deletingId === row.id}
-                              onClick={() => deleteRecord(row)}
-                            >
-                              {deletingId === row.id ? (
-                                <CircularProgress size={18} />
-                              ) : (
-                                <DeleteIcon fontSize="small" />
-                              )}
-                            </IconButton>
-                          </Tooltip>
+                          {config && tablePermissions.canUpdate && (
+                            <Tooltip title="Edit">
+                              <IconButton
+                                size="small"
+                                aria-label={`Edit record ${row.id}`}
+                                onClick={() => openEditRecord(row)}
+                              >
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          {config && tablePermissions.canDelete && (
+                            <Tooltip title="Delete">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                aria-label={`Delete record ${row.id}`}
+                                disabled={deletingId === row.id}
+                                onClick={() => deleteRecord(row)}
+                              >
+                                {deletingId === row.id ? (
+                                  <CircularProgress size={18} />
+                                ) : (
+                                  <DeleteIcon fontSize="small" />
+                                )}
+                              </IconButton>
+                            </Tooltip>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1786,30 +1814,34 @@ export default function SiteAdminData() {
                             </Typography>
                           </Stack>
                           <Stack direction="row" spacing={0.5}>
-                            <Tooltip title="Edit">
-                              <IconButton
-                                size="small"
-                                aria-label={`Edit record ${row.id}`}
-                                onClick={() => openEditRecord(row)}
-                              >
-                                <EditIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Delete">
-                              <IconButton
-                                size="small"
-                                color="error"
-                                aria-label={`Delete record ${row.id}`}
-                                disabled={deletingId === row.id}
-                                onClick={() => deleteRecord(row)}
-                              >
-                                {deletingId === row.id ? (
-                                  <CircularProgress size={16} />
-                                ) : (
-                                  <DeleteIcon fontSize="small" />
-                                )}
-                              </IconButton>
-                            </Tooltip>
+                            {config && tablePermissions.canUpdate && (
+                              <Tooltip title="Edit">
+                                <IconButton
+                                  size="small"
+                                  aria-label={`Edit record ${row.id}`}
+                                  onClick={() => openEditRecord(row)}
+                                >
+                                  <EditIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                            {config && tablePermissions.canDelete && (
+                              <Tooltip title="Delete">
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  aria-label={`Delete record ${row.id}`}
+                                  disabled={deletingId === row.id}
+                                  onClick={() => deleteRecord(row)}
+                                >
+                                  {deletingId === row.id ? (
+                                    <CircularProgress size={16} />
+                                  ) : (
+                                    <DeleteIcon fontSize="small" />
+                                  )}
+                                </IconButton>
+                              </Tooltip>
+                            )}
                           </Stack>
                         </Stack>
                         {selectedColumns.map((column) => {

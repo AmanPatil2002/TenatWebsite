@@ -7,7 +7,6 @@ import {
   Button,
   Card,
   CardContent,
-  Chip,
   CircularProgress,
   Divider,
   Grid,
@@ -199,61 +198,152 @@ const RESOURCE_META = {
 
 const RESOURCE_ORDER = [
   // Common
-  "headers", "pages", "news", "galleries", "slider", "employees",
+  "headers",
+  "pages",
+  "news",
+  "galleries",
+  "slider",
+  "employees",
   // School
-  "teachers", "classes", "students",
+  "teachers",
+  "classes",
+  "students",
   // Medical
-  "departments", "doctors",
+  "departments",
+  "doctors",
   // E-commerce
-  "productcategories", "products",
+  "productcategories",
+  "products",
   // Restaurant
-  "menucategories", "menuitems", "reservations",
+  "menucategories",
+  "menuitems",
+  "reservations",
   // Hotel
-  "roomtypes", "rooms", "bookings",
+  "roomtypes",
+  "rooms",
+  "bookings",
   // Real Estate
-  "propertytypes", "properties", "agents",
+  "propertytypes",
+  "properties",
+  "agents",
   // Gym
-  "trainers", "membershipplans", "members",
+  "trainers",
+  "membershipplans",
+  "members",
   // Blog
-  "blogcategories", "blogposts", "comments",
+  "blogcategories",
+  "blogposts",
+  "comments",
   // Portfolio
-  "projectcategories", "projects", "testimonials",
+  "projectcategories",
+  "projects",
+  "testimonials",
   // Event Management
-  "eventtypes", "events", "registrations",
+  "eventtypes",
+  "events",
+  "registrations",
   // NGO
-  "causes", "donations", "volunteers",
+  "causes",
+  "donations",
+  "volunteers",
   // Spa
-  "servicecategories", "services", "appointments",
+  "servicecategories",
+  "services",
+  "appointments",
   // Law Firm
-  "practiceareas", "attorneys", "caseinquiries",
+  "practiceareas",
+  "attorneys",
+  "caseinquiries",
   // Agriculture
-  "farmproducts", "farminquiries", "farmorders", "farmorderitems",
+  "farmproducts",
+  "farminquiries",
+  "farmorders",
+  "farmorderitems",
   // Consulting
-  "consultingservices", "consultants", "consultationrequests", "proposals", "engagements",
+  "consultingservices",
+  "consultants",
+  "consultationrequests",
+  "proposals",
+  "engagements",
   // Petcare
-  "petservices", "veterinarians", "petappointments", "petrecords", "petpayments",
+  "petservices",
+  "veterinarians",
+  "petappointments",
+  "petrecords",
+  "petpayments",
   // Daycare
-  "daycareprograms", "caregivers", "admissionenquiries", "enrollments", "daycarepayments",
+  "daycareprograms",
+  "caregivers",
+  "admissionenquiries",
+  "enrollments",
+  "daycarepayments",
   // Dental
-  "dentalservices", "dentists", "dentalappointments", "dentalpatients", "treatmentplans", "dentalpayments",
+  "dentalservices",
+  "dentists",
+  "dentalappointments",
+  "dentalpatients",
+  "treatmentplans",
+  "dentalpayments",
   // Mobile Apps
-  "appcategories", "mobileapps", "appreviews", "downloads", "apppurchases",
+  "appcategories",
+  "mobileapps",
+  "appreviews",
+  "downloads",
+  "apppurchases",
   // Interior Design
-  "designservices", "designprojects", "designinquiries", "sitevisits", "moodboards",
+  "designservices",
+  "designprojects",
+  "designinquiries",
+  "sitevisits",
+  "moodboards",
   // Music
-  "artists", "albums", "tracks", "eventshows",
+  "artists",
+  "albums",
+  "tracks",
+  "eventshows",
   // Streaming
-  "genres", "movies", "subscriptionplans", "watchlist", "episodes", "subscriptions", "watchhistory",
+  "genres",
+  "movies",
+  "subscriptionplans",
+  "watchlist",
+  "episodes",
+  "subscriptions",
+  "watchhistory",
   // Gaming
-  "gamecategories", "games", "teams", "tournaments", "players", "teamrosters", "matches", "matchresults",
+  "gamecategories",
+  "games",
+  "teams",
+  "tournaments",
+  "players",
+  "teamrosters",
+  "matches",
+  "matchresults",
   // Jewelry
-  "jewelrycategories", "jewelryproducts", "jewelryinquiries", "goldrates", "jewelryorders", "jewelryorderitems",
+  "jewelrycategories",
+  "jewelryproducts",
+  "jewelryinquiries",
+  "goldrates",
+  "jewelryorders",
+  "jewelryorderitems",
   // Furniture
-  "furniturecategories", "furnitureproducts", "customorders", "furnitureorders", "furnitureorderitems", "deliveries",
+  "furniturecategories",
+  "furnitureproducts",
+  "customorders",
+  "furnitureorders",
+  "furnitureorderitems",
+  "deliveries",
   // Grocery
-  "grocerycategories", "groceryproducts", "deliveryslots", "groceryorders", "groceryorderitems",
+  "grocerycategories",
+  "groceryproducts",
+  "deliveryslots",
+  "groceryorders",
+  "groceryorderitems",
   // Cafe
-  "cafecategories", "cafeitems", "tablebookings", "cafeorders", "cafeorderitems",
+  "cafecategories",
+  "cafeitems",
+  "tablebookings",
+  "cafeorders",
+  "cafeorderitems",
 ];
 
 /* ------------------------------------------------------------------ */
@@ -286,15 +376,6 @@ const PagesIcon = (props) => (
     <path d="M4 4h10l6 6v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
     <path d="M14 4v6h6" />
     <path d="M8 13h8M8 17h5" />
-  </SvgIcon>
-);
-
-const EmployeesIcon = (props) => (
-  <SvgIcon {...props}>
-    <circle cx="9" cy="8" r="3.2" />
-    <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
-    <path d="M16 5.2a3.2 3.2 0 0 1 0 5.6" />
-    <path d="M17.5 14.2a6 6 0 0 1 4 5.8" />
   </SvgIcon>
 );
 
@@ -485,23 +566,11 @@ export default function SiteAdminDashboard() {
     siteBasePath,
   } = useOutletContext();
 
-  const [employees, setEmployees] = useState(null);
   const [resourceCounts, setResourceCounts] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [employeesError, setEmployeesError] = useState("");
   const [countsError, setCountsError] = useState("");
 
   /* -------------------- data fetchers -------------------- */
-  const fetchEmployees = useCallback(
-    async (signal) => {
-      const { data } = await axios.get(`${baseUrl}/employees`, {
-        ...authConfig,
-        signal,
-      });
-      return Array.isArray(data) ? data : [];
-    },
-    [authConfig, baseUrl],
-  );
 
   const fetchResourceCounts = useCallback(
     async (signal) => {
@@ -545,19 +614,6 @@ export default function SiteAdminDashboard() {
   useEffect(() => {
     const controller = new AbortController();
 
-    fetchEmployees(controller.signal)
-      .then((data) => {
-        if (!controller.signal.aborted) setEmployees(data);
-      })
-      .catch((error) => {
-        if (!controller.signal.aborted) {
-          setEmployees([]);
-          setEmployeesError(
-            error.response?.data?.message || "Could not load site employees.",
-          );
-        }
-      });
-
     fetchResourceCounts(controller.signal)
       .then((counts) => {
         if (!controller.signal.aborted) setResourceCounts(counts);
@@ -572,13 +628,7 @@ export default function SiteAdminDashboard() {
       });
 
     return () => controller.abort();
-  }, [fetchEmployees, fetchResourceCounts]);
-
-  /* -------------------- derived values -------------------- */
-  const employeesLoading = employees === null;
-  const activeEmployees = (employees || []).filter(
-    (employee) => employee.status === "active",
-  ).length;
+  }, [fetchResourceCounts]);
 
   // Only resources the admin has actually populated (count > 0),
   // sorted by RESOURCE_ORDER for a stable layout.
@@ -602,20 +652,16 @@ export default function SiteAdminDashboard() {
   /* -------------------- refresh handler -------------------- */
   const refresh = async () => {
     setRefreshing(true);
-    setEmployeesError("");
     setCountsError("");
     try {
-      const [, employeeData, countsData] = await Promise.all([
+      const [, countsData] = await Promise.all([
         reloadSite(),
-        fetchEmployees(),
         fetchResourceCounts(),
       ]);
-      setEmployees(employeeData);
-      setResourceCounts(countsData);
+      setResourceCounts(countsData ?? {});
     } catch (error) {
       const msg =
         error.response?.data?.message || "Could not refresh dashboard.";
-      setEmployeesError(msg);
       setCountsError(msg);
     } finally {
       setRefreshing(false);
@@ -651,9 +697,9 @@ export default function SiteAdminDashboard() {
         <Button
           variant="outlined"
           onClick={refresh}
-          disabled={employeesLoading || refreshing}
+          disabled={refreshing}
           startIcon={
-            employeesLoading || refreshing ? (
+            refreshing ? (
               <CircularProgress size={16} thickness={5} />
             ) : (
               <RefreshIcon size={18} />
@@ -662,10 +708,8 @@ export default function SiteAdminDashboard() {
           sx={{
             borderRadius: 2,
             alignSelf: { xs: "stretch", sm: "auto" },
-            // ✅ removed alignItems: "center" — it was doing nothing useful here
-            // Button content is already vertically centered by default
-            whiteSpace: "nowrap", // ✅ prevents "Refresh" from wrapping on narrow screens
-            minWidth: "fit-content", // ✅ keeps button from shrinking awkwardly
+            whiteSpace: "nowrap",
+            minWidth: "fit-content",
           }}
         >
           Refresh
@@ -673,12 +717,11 @@ export default function SiteAdminDashboard() {
       </Stack>
 
       {siteError && <Alert severity="error">{siteError}</Alert>}
-      {employeesError && <Alert severity="error">{employeesError}</Alert>}
       {countsError && <Alert severity="error">{countsError}</Alert>}
 
       {/* ---------- KPI cards ---------- */}
       <Grid container spacing={2}>
-        <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
+        <Grid size={{ xs: 12, sm: 6, lg: 6 }}>
           <SummaryCard
             title="Pages"
             value={pages.length}
@@ -687,23 +730,10 @@ export default function SiteAdminDashboard() {
             icon={<PagesIcon size={22} />}
           />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-          <SummaryCard
-            title="Employees"
-            value={employeesLoading ? "…" : employees.length}
-            caption={
-              employeesLoading
-                ? "Loading employees"
-                : `${activeEmployees} active`
-            }
-            accent={theme.palette.success.main}
-            icon={<EmployeesIcon size={22} />}
-          />
-        </Grid>
 
         {/* Only show a Data KPI when the admin has actually added records */}
         {!countsLoading && populatedResources.length > 0 && (
-          <Grid size={{ xs: 12, sm: 12, lg: 4 }}>
+          <Grid size={{ xs: 12, sm: 6, lg: 6 }}>
             <SummaryCard
               title="Data records"
               value={totalRecords}
@@ -850,11 +880,11 @@ export default function SiteAdminDashboard() {
               </Button>
             </Stack>
             <Divider sx={{ mb: 2.5 }} />
-            <Grid container spacing={2}>
+            <Grid container spacing={1}>
               {populatedResources.map(([name, count]) => {
                 const meta = RESOURCE_META[name];
                 return (
-                  <Grid key={name} size={{ xs: 12, sm: 6, md: 4 }}>
+                  <Grid key={name} size={{ xs: 6, sm: 4, md: 3 }}>
                     <Card
                       variant="outlined"
                       onClick={goToData}
@@ -897,16 +927,6 @@ export default function SiteAdminDashboard() {
                               {count}
                             </Typography>
                           </Box>
-                          <Chip
-                            label={`${count} record${count === 1 ? "" : "s"}`}
-                            size="small"
-                            variant="outlined"
-                            sx={{
-                              borderColor: alpha(meta.color, 0.4),
-                              color: meta.color,
-                              fontWeight: 600,
-                            }}
-                          />
                         </Stack>
                       </CardContent>
                     </Card>

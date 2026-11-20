@@ -9,6 +9,22 @@ require.cache[dbPath] = {
   loaded: true,
   exports: {
     promise: () => ({ query: (...args) => queryHandler(...args) }),
+    query(sql, params, callback) {
+      let rows = [];
+      if (sql.includes("information_schema.SCHEMATA")) {
+        rows = [{ SCHEMA_NAME: "tenant7" }];
+      } else if (sql.includes("information_schema.TABLES")) {
+        const names = Array.isArray(params[1]) ? params[1] : [params[1]];
+        rows = names.map((TABLE_NAME) => ({ TABLE_NAME }));
+      } else if (sql.includes("SELECT baseName FROM sitetables")) {
+        rows = require("../config/packs")
+          .common()
+          .map(([baseName]) => ({ baseName }));
+      } else if (sql.includes("SELECT dbName, provisionStatus FROM sites")) {
+        rows = [{ dbName: "tenant7", provisionStatus: "ready" }];
+      }
+      callback(null, rows);
+    },
   },
 };
 
@@ -28,7 +44,16 @@ const response = () => ({
 });
 
 const ownedSite = [
-  [{ id: 7, dbName: "tenant7", provisionStatus: "ready" }],
+  [{
+    id: 7,
+    userId: 3,
+    status: "active",
+    dbName: "tenant7",
+    provisionStatus: "ready",
+    packKey: null,
+    paymentStatus: "captured",
+    notExpired: 1,
+  }],
   [],
 ];
 const studentColumns = [
@@ -58,6 +83,7 @@ test("schema metadata reflects pack tables and rejects system fields in CRUD", a
   const queries = [];
   queryHandler = async (sql) => {
     queries.push(sql);
+    if (sql.includes("SELECT s.id, s.userId")) return ownedSite;
     if (sql.includes("SELECT s.id, s.dbName")) return ownedSite;
     if (sql.includes("SELECT st.baseName")) {
       return [
@@ -112,6 +138,7 @@ test("schema metadata reflects pack tables and rejects system fields in CRUD", a
   assert.equal(queries.some((sql) => sql.startsWith("UPDATE ")), false);
 
   queryHandler = async (sql) => {
+    if (sql.includes("SELECT s.id, s.userId")) return ownedSite;
     if (sql.includes("SELECT s.id, s.dbName")) return ownedSite;
     if (sql.includes("SELECT id FROM sitetables")) return [[{ id: 1 }], []];
     if (sql.includes("FROM information_schema.COLUMNS")) {
@@ -145,6 +172,7 @@ test("page access waits for failed or pending site provisioning", async () => {
         notExpired: 1,
         provisionStatus: "failed",
         dbName: null,
+        packKey: null,
       },
     ],
     [],

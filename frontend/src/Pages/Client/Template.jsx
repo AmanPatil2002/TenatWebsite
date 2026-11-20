@@ -66,6 +66,7 @@ const getArray = (response) => {
   if (Array.isArray(data?.data)) return data.data;
   if (Array.isArray(data?.templates)) return data.templates;
   if (Array.isArray(data?.categories)) return data.categories;
+  if (Array.isArray(data?.sites)) return data.sites;
   return [];
 };
 
@@ -105,8 +106,47 @@ const isDefaultFlag = (item) =>
   item?.isDefault === 1 || item?.isDefault === true || item?.isDefault === "1";
 
 // One consistent id for a page (list keys, tabs and preview all use this)
-const getPageKey = (page, index) =>
-  String(page?.pageId ?? page?.pagesId ?? page?.id ?? `page-${index}`);
+const getPageKey = (page, index) => {
+  const id = page?.pageId ?? page?.pagesId ?? page?.id;
+  if (id !== undefined && id !== null && String(id).trim() !== "") {
+    return String(id);
+  }
+  return `page-${Number.isFinite(Number(index)) ? Number(index) : 0}`;
+};
+
+// Normalize the HTML field of a page — the backend can use any of these names.
+const getPageHtml = (page) => {
+  if (!page) return "";
+  const candidates = [
+    page.page,
+    page.content,
+    page.html,
+    page.pageContent,
+    page.pageHtml,
+    page.body,
+    page.markup,
+  ];
+  for (const value of candidates) {
+    if (typeof value === "string" && value.trim()) return value;
+  }
+  return "";
+};
+
+// Normalize the pages array of a template — different endpoints may use
+// different wrappers.
+const normalizePages = (template) => {
+  if (!template) return [];
+  const candidates = [
+    template.pages,
+    template.templatePages,
+    template.pagesList,
+    template.template_pages,
+  ];
+  for (const list of candidates) {
+    if (Array.isArray(list)) return list;
+  }
+  return [];
+};
 
 /* ---------------------------- Photo slider ---------------------------- */
 
@@ -255,12 +295,17 @@ function ThemePagePreview({
   const background = theme?.background || "#ffffff";
   const color = theme?.color || "#222222";
 
-  const keys = pages.map(getPageKey);
+  const keys = useMemo(() => pages.map(getPageKey), [pages]);
   const selectedKey = keys.includes(activePageKey)
     ? activePageKey
     : keys[0] || "";
-  const activePage = pages.find((p, i) => getPageKey(p, i) === selectedKey);
-  const html = activePage?.page ?? "";
+
+  const activePage = useMemo(() => {
+    const index = keys.indexOf(selectedKey);
+    return index >= 0 ? pages[index] : pages[0];
+  }, [keys, selectedKey, pages]);
+
+  const html = getPageHtml(activePage);
 
   const srcDoc = useMemo(
     () => `<!DOCTYPE html>
@@ -318,7 +363,7 @@ function ThemePagePreview({
             <Tab
               key={key}
               value={key}
-              label={page.title || "Untitled page"}
+              label={page.title || page.name || "Untitled page"}
               id={`preview-tab-${key}`}
               aria-controls="preview-panel"
             />
@@ -331,7 +376,6 @@ function ThemePagePreview({
         role="tabpanel"
         aria-labelledby={`preview-tab-${selectedKey}`}
         sx={{
-          // bgcolor: alpha(theme.palette.primary.main, 0.03),
           borderRadius: 2,
           p: { xs: 0.5, sm: 1.5 },
           overflowX: "auto",
@@ -515,9 +559,9 @@ export default function Template() {
         `${API}/templates/${template.templateId}`,
       );
       if (requestId !== detailRequestRef.current) return;
-      const full = response?.data ?? template;
-      setSelected(full);
-      setPreviewThemeId(pickDefaultTheme(full));
+      const payload = response?.data?.data ?? response?.data ?? template;
+      setSelected(payload);
+      setPreviewThemeId(pickDefaultTheme(payload));
     } catch (err) {
       if (requestId !== detailRequestRef.current) return;
       setDetailError(
@@ -556,18 +600,21 @@ export default function Template() {
 
   /* derived detail data */
   const selectedThemes = Array.isArray(selected?.themes) ? selected.themes : [];
+
   const selectedPages = useMemo(
     () =>
-      (Array.isArray(selected?.pages) ? selected.pages : [])
+      normalizePages(selected)
         .slice()
         .sort((a, b) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0)),
     [selected],
   );
+
   const sliderPhotos = useMemo(() => {
     const photos = parsePhotos(selected?.photos);
     if (photos.length) return photos;
     return selected?.thumbnailUrl ? [selected.thumbnailUrl] : [];
   }, [selected]);
+
   const previewTheme =
     selectedThemes.find((t) => String(t.themeId) === String(previewThemeId)) ||
     selectedThemes[0];
@@ -847,7 +894,11 @@ export default function Template() {
                 <Button
                   variant="contained"
                   sx={{ flexShrink: 0 }}
-                  disabled={detailLoading || isPurchased(selected.templateId)}
+                  disabled={
+                    detailLoading ||
+                    selected.templateId == null ||
+                    isPurchased(selected.templateId)
+                  }
                   onClick={goBuy}
                 >
                   {isPurchased(selected.templateId)
@@ -859,7 +910,10 @@ export default function Template() {
 
             <DialogContent
               dividers
-              sx={{ bgcolor: alpha(primary, 0.02), px: { xs: 1, sm: 2, md: 3 } }}
+              sx={{
+                bgcolor: alpha(primary, 0.02),
+                px: { xs: 1, sm: 2, md: 3 },
+              }}
             >
               {detailLoading ? (
                 <Box
@@ -985,18 +1039,18 @@ export default function Template() {
                                   pr: 0.5,
                                 }}
                               >
-                                {selectedThemes.map((theme, i) => {
+                                {selectedThemes.map((themeItem, i) => {
                                   const active =
-                                    String(theme.themeId) ===
+                                    String(themeItem.themeId) ===
                                     String(previewTheme?.themeId);
                                   return (
                                     <Box
-                                      key={theme.themeId ?? i}
+                                      key={themeItem.themeId ?? i}
                                       role="button"
                                       tabIndex={0}
                                       aria-pressed={active}
                                       onClick={() =>
-                                        setPreviewThemeId(theme.themeId)
+                                        setPreviewThemeId(themeItem.themeId)
                                       }
                                       onKeyDown={(e) => {
                                         if (
@@ -1004,7 +1058,9 @@ export default function Template() {
                                           e.key === " "
                                         ) {
                                           e.preventDefault();
-                                          setPreviewThemeId(theme.themeId);
+                                          setPreviewThemeId(
+                                            themeItem.themeId,
+                                          );
                                         }
                                       }}
                                       sx={{
@@ -1012,14 +1068,12 @@ export default function Template() {
                                         px: 1.5,
                                         py: 0.5,
                                         borderRadius: 1,
-                                        bgcolor: theme.background || paper,
-                                        color: theme.color || textPrimary,
+                                        bgcolor: themeItem.background || paper,
+                                        color: themeItem.color || textPrimary,
                                         border: active
                                           ? "2px solid"
                                           : "1px solid",
-                                        borderColor: active
-                                          ? primary
-                                          : divider,
+                                        borderColor: active ? primary : divider,
                                         display: "flex",
                                         alignItems: "center",
                                         justifyContent: "space-between",
@@ -1032,9 +1086,9 @@ export default function Template() {
                                         fontWeight={700}
                                         noWrap
                                       >
-                                        {theme.name || `Theme ${i + 1}`}
+                                        {themeItem.name || `Theme ${i + 1}`}
                                       </Typography>
-                                      {isDefaultFlag(theme) && (
+                                      {isDefaultFlag(themeItem) && (
                                         <Chip
                                           size="small"
                                           color="primary"

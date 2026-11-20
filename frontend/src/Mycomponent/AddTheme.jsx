@@ -513,7 +513,7 @@ export default function AddTheme() {
           "linear-gradient(160deg, #f8fafc 0%, #eef2ff 45%, #f0fdfa 100%)",
       }}
     >
-      <Box sx={{ maxWidth: 1280, mx: "auto", px: { xs: 2, sm: 3 } }}>
+      <Box sx={{ maxWidth: 1300, mx: "auto", px: { xs: 2, sm: 3 } }}>
         {/* Page header */}
         <Box sx={{ mb: { xs: 3, md: 4 }, textAlign: "center" }}>
           <Typography

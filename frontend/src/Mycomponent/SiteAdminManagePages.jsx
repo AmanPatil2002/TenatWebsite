@@ -61,12 +61,7 @@ const EditIcon = (p) => (
     <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
   </SvgIcon>
 );
-const PaletteIcon = (p) => (
-  <SvgIcon {...p}>
-    <circle cx="12" cy="12" r="9" />
-    <circle cx="12" cy="12" r="3" />
-  </SvgIcon>
-);
+
 const SaveIcon = (p) => (
   <SvgIcon {...p}>
     <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
@@ -89,7 +84,8 @@ const DeleteIcon = (p) => (
 );
 
 export default function SiteAdminManagePages() {
-  const { site, pages, setPages, setSite, baseUrl, authConfig, API_URL } = useOutletContext();
+  const { site, pages, setPages, setSite, baseUrl, authConfig, API_URL } =
+    useOutletContext();
   const theme = useTheme();
 
   const [loading, setLoading] = useState(false);
@@ -186,35 +182,14 @@ export default function SiteAdminManagePages() {
   }, [pagesUrl, authConfig]);
 
   const previewHtml = (rawHtml, pageTitle) => {
-    // 1. Build the base hydrated HTML
-    let hydratedHtml = buildPageBody({
+    // Build the base hydrated HTML — no editor-only placeholder block.
+    return buildPageBody({
       html: rawHtml,
       pageTitle,
       slides: sliders,
       galleries: galleryItems,
       siteData,
     });
-
-    // 2. Build visual placeholders for the editor
-    const sliderPreview = `<div style="background:#f0f9ff; border:1px solid #bae6fd; padding:10px; margin:10px 0;"><strong>Slider Data:</strong> ${sliders.length} slides. Use <code>[[slider]]</code>.</div>`;
-    const galleryPreview = `<div style="background:#f0fdf4; border:1px solid #bbf7d0; padding:10px; margin:10px 0;"><strong>Gallery Data:</strong> ${galleryItems.length} items.</div>`;
-
-    const dataPreviews = Object.entries(siteData).map(([key, items]) => `
-      <div style="background:#fefce8; border:1px solid #fde68a; padding:10px; margin:10px 0;">
-        <strong>Data: [[${key}]]</strong> (${items.length} items)
-        <ul style="font-size: 0.8rem; margin: 5px 0;">${items.slice(0, 3).map(i => `<li>${i.name || i.title || 'Item'}</li>`).join('')}${items.length > 3 ? '<li>...</li>' : ''}</ul>
-      </div>
-    `).join('');
-
-    // 3. Inject into the HTML, appended at the end
-    return hydratedHtml + `
-      <div style="margin-top:40px; border-top: 2px dashed #999; padding-top:20px;">
-        <h4 style="color:#666; margin-bottom:10px;">Data Placeholders (Visible in Editor)</h4>
-        ${sliderPreview}
-        ${galleryPreview}
-        ${dataPreviews}
-      </div>
-    `;
   };
   useEffect(() => {
     if (site && editorRef.current) {
@@ -453,7 +428,7 @@ export default function SiteAdminManagePages() {
             alignItems: "start",
           }}
         >
-          {/* ---------------- Sidebar: theme, resources + pages ---------------- */}
+          {/* ---------------- Sidebar:  pages ---------------- */}
           <Stack
             spacing={2}
             sx={{
@@ -462,108 +437,6 @@ export default function SiteAdminManagePages() {
               pr: { md: 0.5 },
             }}
           >
-            {/* Theme card */}
-            {site && (
-              <Paper
-                variant="outlined"
-                sx={{ p: 2.5, borderRadius: 3, minWidth: 0 }}
-              >
-                <Stack
-                  direction="row"
-                  spacing={1}
-                  sx={{ mb: 1.5, alignItems: "center" }}
-                >
-                  <Box
-                    sx={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 1.5,
-                      display: "grid",
-                      placeItems: "center",
-                      bgcolor: alpha(theme.palette.primary.main, 0.1),
-                      color: "primary.main",
-                    }}
-                  >
-                    <PaletteIcon size={17} />
-                  </Box>
-                  <Typography fontWeight={700} variant="subtitle2">
-                    Active theme
-                  </Typography>
-                </Stack>
-
-                <Typography fontWeight={700} noWrap>
-                  {site.themeName || "Purchased theme"}
-                </Typography>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  display="block"
-                  sx={{ mt: 0.5, mb: 2 }}
-                >
-                  Applied to all pages on this site.
-                </Typography>
-
-                <Divider sx={{ mb: 2 }} />
-
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  fontWeight={600}
-                  display="block"
-                  sx={{
-                    textTransform: "uppercase",
-                    letterSpacing: ".06em",
-                    fontSize: 10.5,
-                    mb: 1,
-                  }}
-                >
-                  Colors
-                </Typography>
-                <Stack spacing={1}>
-                  <Stack direction="row" sx={{ alignItems: "center" }} spacing={1.25}>
-                    <Box
-                      sx={{
-                        width: 26,
-                        height: 26,
-                        borderRadius: 1,
-                        bgcolor: site.background || "#ffffff",
-                        border: `1px solid ${theme.palette.divider}`,
-                        flexShrink: 0,
-                      }}
-                    />
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Background
-                      </Typography>
-                      <Typography variant="body2" fontFamily="monospace" noWrap>
-                        {site.background || "#ffffff"}
-                      </Typography>
-                    </Box>
-                  </Stack>
-                  <Stack direction="row" sx={{ alignItems: "center" }} spacing={1.25}>
-                    <Box
-                      sx={{
-                        width: 26,
-                        height: 26,
-                        borderRadius: 1,
-                        bgcolor: site.color || "#222222",
-                        border: `1px solid ${theme.palette.divider}`,
-                        flexShrink: 0,
-                      }}
-                    />
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Text
-                      </Typography>
-                      <Typography variant="body2" fontFamily="monospace" noWrap>
-                        {site.color || "#222222"}
-                      </Typography>
-                    </Box>
-                  </Stack>
-                </Stack>
-              </Paper>
-            )}
-
             {/* Pages list card */}
             <Paper
               variant="outlined"
@@ -571,7 +444,11 @@ export default function SiteAdminManagePages() {
             >
               <Stack
                 direction="row"
-                sx={{ mb: 1, alignItems: "center", justifyContent: "space-between" }}
+                sx={{
+                  mb: 1,
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
               >
                 <Typography variant="h6" fontWeight={700}>
                   Pages
@@ -835,17 +712,9 @@ export default function SiteAdminManagePages() {
                   }}
                 >
                   <CKEditor
-                    key={
-                      creating
-                        ? "new"
-                        : selectedId +
-                          ":" +
-                          sliders.length +
-                          ":" +
-                          galleryItems.length
-                    }
+                    key={creating ? "new" : selectedId}
                     editorUrl="https://cdn.ckeditor.com/4.22.1/standard-all/ckeditor.js"
-                    initData={creating ? "" : previewHtml(content, title)}
+                    initData={creating ? "" : content}
                     onBeforeLoad={(CKEDITOR) => {
                       if (CKEDITOR.plugins.get("localvideo")) return;
 
@@ -1032,7 +901,10 @@ export default function SiteAdminManagePages() {
               <Stack
                 direction={{ xs: "column", sm: "row" }}
                 spacing={1.5}
-                sx={{ justifyContent: "space-between", alignItems: { xs: "stretch", sm: "center" } }}
+                sx={{
+                  justifyContent: "space-between",
+                  alignItems: { xs: "stretch", sm: "center" },
+                }}
               >
                 <Typography variant="caption" color="text.secondary">
                   {creating

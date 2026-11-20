@@ -316,7 +316,7 @@ const getOne = (admin) => async (req, res) => {
     if (!rows.length) return res.status(404).json({ message: "Template not found" });
     const template = templateRows(rows)[0];
     const [pages] = await db.query(
-      `SELECT tp.pagesId, p.title, tp.isDefault,
+      `SELECT tp.pagesId, p.title, p.page, tp.isDefault,
               IF(tp.isDefault = 1, 0, p.pagePrice) AS pagePrice,
               tp.sortOrder
          FROM templatepages tp

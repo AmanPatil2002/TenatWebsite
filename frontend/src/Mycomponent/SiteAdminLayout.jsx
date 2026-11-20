@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import {
   AppBar,
-  Avatar,
   Box,
   Button,
   CircularProgress,
@@ -25,7 +24,7 @@ import {
 } from "@mui/material";
 
 /* ------------------------------------------------------------------ */
-/*  Inline SVG icons — no MUI icon imports, no tree-shaking issues     */
+/*  Inline SVG icons                                                   */
 /* ------------------------------------------------------------------ */
 const SvgIcon = ({ children, size = 20, color = "currentColor" }) => (
   <Box
@@ -175,14 +174,22 @@ export default function SiteAdminLayout() {
   const token = localStorage.getItem("siteAdminToken");
   const siteBasePath = `/site-admin/${siteId}`;
   const baseUrl = `${API_URL}/sites/client-admin/${siteId}`;
+
   const authConfig = useMemo(
-    () => ({ headers: { Authorization: `Bearer ${token}` } }),
+    () =>
+      token
+        ? { headers: { Authorization: `Bearer ${token}` } }
+        : { headers: {} },
     [token],
   );
 
   const [site, setSite] = useState(null);
+  const [pages, setPages] = useState([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Track the latest in-flight request so we can cancel stale ones.
+  const requestRef = useRef(null);
 
   const signOut = useCallback(() => {
     localStorage.removeItem("siteAdminToken");
@@ -192,47 +199,99 @@ export default function SiteAdminLayout() {
   }, [navigate]);
 
   const reloadSite = useCallback(async () => {
+    // Cancel any previous in-flight load.
+    if (requestRef.current) requestRef.current.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
+
     try {
-      // 1. Load base site data (pages, etc.)
-      const pagesRes = await axios.get(`${baseUrl}/pages`, authConfig);
-      const siteData = pagesRes.data;
-
-      // 2. Fetch the effective theme from the dedicated theme endpoint
-      // This ensures we get the correct colors (default or custom)
-      const themeRes = await axios.get(`${baseUrl}/theme`, authConfig);
-
-      // 3. Merge theme into the site object
-      setSite({
-        ...siteData,
-        ...themeRes.data,
+      // 1. Site + pages
+      const pagesRes = await axios.get(`${baseUrl}/pages`, {
+        ...authConfig,
+        signal: controller.signal,
       });
 
-      // Set pages separately if they are in siteData.pages
-      setPages(Array.isArray(siteData.pages) ? siteData.pages : []);
+      // Normalise both response shapes:
+      //   { siteName, categoryName, ..., pages: [...] }  OR  [ ...pages ]
+      const raw = pagesRes.data;
+      const isArray = Array.isArray(raw);
+      const siteMeta = isArray ? {} : raw || {};
+      const pageList = isArray
+        ? raw
+        : Array.isArray(raw?.pages)
+          ? raw.pages
+          : [];
 
+      // 2. Theme — treat failure as non-fatal (fall back to site meta)
+      let themeData = {};
+      try {
+        const themeRes = await axios.get(`${baseUrl}/theme`, {
+          ...authConfig,
+          signal: controller.signal,
+        });
+        themeData = themeRes.data || {};
+      } catch (themeError) {
+        if (axios.isCancel(themeError)) return;
+        if (themeError.response?.status === 401) {
+          signOut();
+          return;
+        }
+        // Non-fatal — keep going with siteMeta only.
+        console.warn("Theme fetch failed:", themeError?.message);
+      }
+
+      if (controller.signal.aborted) return;
+
+      setSite({
+        ...siteMeta,
+        ...themeData,
+        pages: pageList,
+      });
+      setPages(pageList);
       setError("");
     } catch (requestError) {
+      if (axios.isCancel(requestError)) return;
+
       if (requestError.response?.status === 401) {
         signOut();
         return;
       }
-      setError(
-        requestError.response?.data?.message || "Could not load site details.",
-      );
+
+      console.error("reloadSite failed:", requestError);
+
+      const message =
+        requestError.response?.data?.message ||
+        requestError.message ||
+        "Could not load site details.";
+      setError(message);
     } finally {
-      setInitialLoading(false);
+      if (!controller.signal.aborted) setInitialLoading(false);
     }
   }, [authConfig, baseUrl, signOut]);
 
+  // Redirect to login when no token is present.
   useEffect(() => {
     if (!token) navigate(`${siteBasePath}/login`, { replace: true });
   }, [token, navigate, siteBasePath]);
 
+  // Load site data once per token/site. Do NOT depend on location.pathname —
+  // site metadata doesn't change per route, and refetching on every nav was
+  // re-triggering the error banner.
   useEffect(() => {
-    if (token) reloadSite();
-  }, [token, reloadSite, location.pathname]);
+    if (!token) {
+      setInitialLoading(false);
+      return;
+    }
 
-  const pages = Array.isArray(site?.pages) ? site.pages : [];
+    setInitialLoading(true);
+    reloadSite();
+
+    return () => {
+      if (requestRef.current) requestRef.current.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, baseUrl]);
+
   const siteName = site?.siteName || localStorage.getItem("siteAdminSiteName");
 
   const menuItems = [
@@ -281,7 +340,6 @@ export default function SiteAdminLayout() {
       icon: <DataIcon size={20} />,
       path: `${siteBasePath}/data`,
     },
-    // ...recordItems,
   ];
 
   const currentItem = menuItems.find((i) => i.path === location.pathname);
@@ -290,12 +348,11 @@ export default function SiteAdminLayout() {
     duration: theme.transitions.duration.shorter,
   });
 
-  /* Content group: first "content" block, then optional record-specific block */
   const contentItems = menuItems.slice(0, 7);
   const extraItems = menuItems.slice(7);
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#f7f8fc"}}>
+    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#f7f8fc" }}>
       {/* ---------------- AppBar ---------------- */}
       <AppBar
         position="fixed"
@@ -362,7 +419,10 @@ export default function SiteAdminLayout() {
                 fontWeight: 600,
                 px: 2,
                 display: { xs: "none", sm: "inline-flex" },
-                boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.25)}`,
+                boxShadow: `0 4px 12px ${alpha(
+                  theme.palette.primary.main,
+                  0.25,
+                )}`,
               }}
             >
               View site
@@ -391,7 +451,14 @@ export default function SiteAdminLayout() {
           },
         }}
       >
-        <Box sx={{ height: "100%", display: "flex", flexDirection: "column",paddingTop: 1 }}>
+        <Box
+          sx={{
+            height: "100%",
+            display: "flex",
+            flexDirection: "column",
+            paddingTop: 1,
+          }}
+        >
           {/* Brand / site identity */}
           <Stack
             direction="row"
@@ -413,7 +480,10 @@ export default function SiteAdminLayout() {
                 background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
                 color: "#fff",
                 flexShrink: 0,
-                boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.3)}`,
+                boxShadow: `0 6px 16px ${alpha(
+                  theme.palette.primary.main,
+                  0.3,
+                )}`,
               }}
             >
               <PagesIcon size={22} />
@@ -516,7 +586,7 @@ export default function SiteAdminLayout() {
                         sx={{
                           minWidth: 0,
                           mr: collapsed ? 0 : 1.5,
-                                                    color: "inherit",
+                          color: "inherit",
                         }}
                       >
                         {item.icon}
@@ -632,7 +702,7 @@ export default function SiteAdminLayout() {
                             sx={{
                               minWidth: 0,
                               mr: collapsed ? 0 : 1.5,
-                                                            color: "inherit",
+                              color: "inherit",
                             }}
                           >
                             {item.icon}
@@ -659,7 +729,7 @@ export default function SiteAdminLayout() {
             )}
           </List>
 
-          {/* Bottom: plan chip + sign out */}
+          {/* Bottom: plan chip */}
           {!collapsed && (
             <Box sx={{ px: 2, pb: 1.5 }}>
               <Box
@@ -667,7 +737,10 @@ export default function SiteAdminLayout() {
                   p: 1.5,
                   borderRadius: 2,
                   bgcolor: alpha(theme.palette.primary.main, 0.06),
-                  border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}`,
+                  border: `1px solid ${alpha(
+                    theme.palette.primary.main,
+                    0.15,
+                  )}`,
                 }}
               >
                 <Stack
@@ -716,7 +789,7 @@ export default function SiteAdminLayout() {
                     sx={{
                       minWidth: 0,
                       mr: collapsed ? 0 : 1.5,
-                                            color: "inherit",
+                      color: "inherit",
                     }}
                   >
                     <LogoutIcon size={20} />
@@ -756,12 +829,15 @@ export default function SiteAdminLayout() {
             context={{
               site,
               pages,
+              setPages,
+              setSite,
               siteError: error,
               reloadSite,
               baseUrl,
               authConfig,
               siteBasePath,
               siteId,
+              API_URL, // <-- add this
             }}
           />
         )}

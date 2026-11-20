@@ -85,6 +85,8 @@ const PlayIcon = (p) => (
 const EMPTY_FORM = {
   title: "",
   imageUrl: "",
+  width:"1920",
+  height:"600",
   sortOrder: "0",
   status: "active",
 };
@@ -163,6 +165,8 @@ export default function SiteAdminSlider() {
     setForm({
       title: item.title || "",
       imageUrl: item.imageUrl || "",
+      width:item.width || "",
+      height:item.height || "",
       sortOrder: String(item.sortOrder ?? 0),
       status: item.status || "active",
     });
@@ -529,6 +533,31 @@ export default function SiteAdminSlider() {
               size="small"
               helperText="Optional — used as the slide's accessible label."
             />
+
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+              <TextField
+                label="Width"
+                type="number"
+                value={form.width}
+                onChange={updateField("width")}
+                slotProps={{ htmlInput: { min: 0, step: 1 } }}
+                fullWidth
+                size="small"
+                sx={{ flex: 1 }}
+                helperText="Width e.g 1920"
+              />
+              <TextField
+                label="height"
+                type="number"
+                value={form.height}
+                onChange={updateField("height")}
+                slotProps={{ htmlInput: { min: 0, step: 1 } }}
+                fullWidth
+                size="small"
+                sx={{ flex: 1 }}
+                helperText="height e.g 600"
+              />
+            </Stack>
 
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
               <TextField
