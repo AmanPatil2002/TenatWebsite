@@ -1,9 +1,13 @@
 const db = require('../config/db').promise();
 const { tn } = require('../config/provisionSite');
-const { getActiveManagedSite } = require('./site/access');
+const { getActiveManagedSite, getPublicSite } = require('./site/access');
 const packs = require('../config/packs');
-const { assertWritable } = require('../../frontend/src/config/readOnlyTables');
-const { DERIVED_FIELDS } = require('../../frontend/src/config/readOnlyTables');
+const { assertWritable } = require('../config/permissions');
+const {
+  DERIVED_FIELDS,
+  getTablePermission,
+  getStatusField,
+} = require('../config/readOnlyTables');
 const SYSTEM_COLUMNS = new Set(['id', 'createdAt', 'updatedAt']);
 
 const ID_PATTERN = /^[1-9]\d{0,19}$/;
@@ -162,7 +166,11 @@ exports.schema = async (req, res) => {
       resource.columns.push(toColumnMetadata(row));
     }
 
-    return res.json({ resources });
+    return res.json({
+      resources,
+      packKey: site.packKey,
+      vertical: site.packKey
+    });
   } catch (error) {
     return sendError(res, error);
   }
@@ -232,6 +240,15 @@ exports.update = async (req, res) => {
 
     const columns = await requireResourceTable(siteId, resource, site.dbName);
     const data = readInput(req.body, columns);
+    const statusField = getStatusField(vertical, resource);
+    if (statusField && Object.prototype.hasOwnProperty.call(data, statusField)) {
+      const statusColumn = columns.find((column) => column.name === statusField);
+      if (statusColumn?.enumValues?.length && !statusColumn.enumValues.includes(data[statusField])) {
+        return res.status(400).json({
+          message: `Invalid value '${data[statusField]}' for ${statusField}`,
+        });
+      }
+    }
     if (!Object.keys(data).length) {
       return res.status(400).json({ message: 'No editable fields were provided' });
     }
@@ -279,6 +296,197 @@ exports.remove = async (req, res) => {
     if (error.message.includes('read-only') || error.message.includes('status-only') || error.message.includes('allows only')) {
       return res.status(403).json({ message: error.message });
     }
+    return sendError(res, error);
+  }
+};
+
+const PUBLIC_PRIVATE_RESOURCE_NAMES = new Set([
+  'customers','addresses','carts','cartitems','wishlists','orderitems',
+  'jewelryorderitems','furnitureorderitems','groceryorderitems',
+  'cafeorderitems','farmorderitems','payments','petpayments',
+  'dentalpayments','daycarepayments','memberpayments','propertyfavorites',
+  'watchlist','watchhistory','downloads','tickets','donationreceipts',
+  'kycdocuments','casedocuments',
+  'attendance','examresults','feepayments','patients','prescriptions',
+  'doctoravailability','petrecords','petpayments','dentalpatients',
+  'treatmentplans','daycarepayments','memberpayments','transactions',
+  'apppurchases','kycdocuments','casedocuments',
+]);
+
+exports.publicSections = async (req, res) => {
+  try {
+    const site = await getPublicSite(req.params.siteId);
+    const [rows] = await db.query(
+      'SELECT baseName FROM sitetables WHERE siteId = ? ORDER BY baseName',
+      [req.params.siteId],
+    );
+    return res.json(
+      rows
+        .map(({ baseName }) => baseName)
+        .filter((name) =>
+          !PUBLIC_PRIVATE_RESOURCE_NAMES.has(name) &&
+          !['sitetables','sitethemes','headers','pages'].includes(name)
+        ),
+    );
+  } catch (error) {
+    return sendError(res, error);
+  }
+};
+
+exports.publicList = async (req, res) => {
+  const { siteId, resource } = req.params;
+  try {
+    if (
+      PUBLIC_PRIVATE_RESOURCE_NAMES.has(resource) ||
+      ['sitetables','sitethemes','headers','pages'].includes(resource)
+    ) {
+      return res.status(403).json({ message: 'This resource is private' });
+    }
+    const site = await getPublicSite(siteId);
+    await requireResourceTable(siteId, resource, site.dbName);
+    const [rows] = await db.query(
+      `SELECT * FROM ${tn(siteId, resource, site.dbName)} ORDER BY id DESC`,
+    );
+    const moderated = new Set([
+      'reviews','hotelreviews','productreviews','appreviews','comments',
+    ]);
+    const visible = moderated.has(resource)
+      ? rows.filter((row) => {
+          const approval =
+            row.isApproved !== undefined ? row.isApproved :
+            row.approved !== undefined ? row.approved :
+            row.status;
+          return approval === true ||
+            approval === 1 ||
+            approval === '1' ||
+            String(approval).toLowerCase() === 'approved';
+        })
+      : rows;
+    return res.json(visible);
+  } catch (error) {
+    return sendError(res, error);
+  }
+};
+
+const PUBLIC_BLOCKED_VIEW_TABLES = new Set([
+  'carts','cartitems','orderitems','jewelryorderitems','furnitureorderitems',
+  'groceryorderitems','cafeorderitems','farmorderitems','payments','petpayments',
+  'dentalpayments','daycarepayments','memberpayments','downloads','tickets',
+  'donationreceipts','kycdocuments','casedocuments','transactions','apppurchases',
+  'sitetables','sitethemes','headers','pages',
+]);
+
+const PUBLIC_RESOURCE_NAMES = new Set([
+  'appointments','reservations','orders','bookings','salonbookings',
+  'tablebookings','petappointments','dentalappointments','classbookings',
+  'registrations','propertyinquiries','propertyviewings','caseinquiries',
+  'leads','designinquiries','jewelryinquiries','farminquiries',
+  'consultationrequests','admissionenquiries','financeapplications',
+  'customorders','jewelryorders','furnitureorders','groceryorders',
+  'cafeorders','donations','volunteers','subscribers','subscriptions',
+  'reviews','hotelreviews','productreviews','appreviews','comments',
+]);
+
+const PUBLIC_PROTECTED_FIELDS = new Set([
+  'id','siteId','userId','createdAt','updatedAt',
+  'status','bookingStatus','orderStatus','paymentStatus',
+  'registrationStatus','approvalStatus','isApproved','approved',
+  'totalAmount','subtotal','taxAmount','shippingAmount','discountAmount',
+  'grandTotal','amount','lineTotal','price','salePrice',
+]);
+
+exports.publicSubmit = async (req, res) => {
+  const { siteId, resource } = req.params;
+  try {
+    const site = await getPublicSite(siteId);
+    const permission = getTablePermission(site.packKey, resource);
+
+    // Allow public submissions to status tables (forms) AND to view-only
+    // (read-only in admin) tables so that site-side forms (e.g. customer
+    // forms built in CKEditor) can insert rows into them.
+    const isSubmittable =
+      PUBLIC_RESOURCE_NAMES.has(resource) ||
+      (permission === 'view' &&
+        !PUBLIC_BLOCKED_VIEW_TABLES.has(resource));
+
+    if (!isSubmittable || (permission !== 'status' && permission !== 'view')) {
+      return res.status(403).json({ message: 'This resource does not accept public submissions' });
+    }
+
+    const columns = await requireResourceTable(siteId, resource, site.dbName);
+    const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body)
+      ? req.body
+      : {};
+
+    if (typeof body.website === 'string' && body.website.trim()) {
+      return res.status(400).json({ message: 'Submission rejected' });
+    }
+
+    const allowed = new Set(
+      columns
+        .filter((column) =>
+          column.editable &&
+          !PUBLIC_PROTECTED_FIELDS.has(column.name) &&
+          !column.references
+        )
+        .map((column) => column.name),
+    );
+
+    const unknown = Object.keys(body).filter((key) => key !== 'website' && !allowed.has(key));
+    if (unknown.length) {
+      return res.status(400).json({
+        message: `Unsupported field(s): ${unknown.join(', ')}`,
+      });
+    }
+
+    const data = {};
+    for (const column of columns) {
+      if (!allowed.has(column.name)) continue;
+      let value = body[column.name];
+
+      if (value === undefined || value === null || String(value).trim() === '') {
+        if (column.required) {
+          return res.status(400).json({ message: `${column.name} is required` });
+        }
+        continue;
+      }
+
+      if (typeof value === 'string') {
+        value = value.replace(/[^\t\n\r\x20-\x7E\u00A0-\uFFFF]/g, '').trim();
+        if (value.length > 2000) {
+          return res.status(400).json({ message: `${column.name} is too long` });
+        }
+      }
+
+      if (column.dataType === 'enum') {
+        if (!column.enumValues.includes(String(value))) {
+          return res.status(400).json({ message: `Invalid value for ${column.name}` });
+        }
+      } else if (['int','integer','bigint','tinyint','smallint','mediumint','decimal','numeric','float','double'].includes(column.dataType)) {
+        if (value === '' || Number.isNaN(Number(value))) {
+          return res.status(400).json({ message: `Invalid number for ${column.name}` });
+        }
+        value = Number(value);
+      } else if (/email/i.test(column.name) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value))) {
+        return res.status(400).json({ message: `Invalid email for ${column.name}` });
+      }
+
+      data[column.name] = value;
+    }
+
+    if (!Object.keys(data).length) {
+      return res.status(400).json({ message: 'No supported fields were provided' });
+    }
+
+    const [result] = await db.query(
+      `INSERT INTO ${tn(siteId, resource, site.dbName)} SET ?`,
+      [data],
+    );
+    return res.status(201).json({
+      id: result.insertId,
+      message: 'Submission received successfully',
+    });
+  } catch (error) {
     return sendError(res, error);
   }
 };

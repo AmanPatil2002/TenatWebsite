@@ -4,6 +4,7 @@ import {
   Alert,
   Box,
   Button,
+  ButtonBase,
   Checkbox,
   Chip,
   CircularProgress,
@@ -41,7 +42,7 @@ import {
   ImageOutlined,
   Refresh as RefreshIcon,
 } from "@mui/icons-material";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 const API_URL = (
   import.meta.env.VITE_API_URL || "http://localhost:5000"
@@ -83,6 +84,21 @@ const getId = (item) =>
   item?.id ?? item?.pagesId ?? item?.themeId ?? item?.categoryId;
 const getPageCategoryId = (page) =>
   page?.categoryId ?? page?.category_id ?? page?.pageCategoryId ?? null;
+
+const formatMoney = (value, currency = "INR") => {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return "—";
+
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: currency || "INR",
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return `${currency || "INR"} ${new Intl.NumberFormat().format(amount)}`;
+  }
+};
 
 const parsePhotos = (photos) => {
   if (Array.isArray(photos))
@@ -149,7 +165,7 @@ const EMPTY_FORM = {
 function SectionTitle({ children, hint }) {
   return (
     <Box sx={{ mb: 1.5 }}>
-      <Typography variant="subtitle2" fontWeight={700}>
+      <Typography component="h3" variant="subtitle2" fontWeight={700}>
         {children}
       </Typography>
       {hint && (
@@ -162,19 +178,20 @@ function SectionTitle({ children, hint }) {
 }
 
 function StatusChip({ status }) {
+  const normalizedStatus = status || "draft";
   const color =
-    status === "published"
+    normalizedStatus === "published"
       ? "success"
-      : status === "archived"
+      : normalizedStatus === "archived"
         ? "default"
         : "warning";
   return (
     <Chip
-      label={(status || "draft").toUpperCase()}
+      label={`${normalizedStatus.charAt(0).toUpperCase()}${normalizedStatus.slice(1)}`}
       color={color}
       size="small"
       variant="outlined"
-      sx={{ fontWeight: 700, letterSpacing: 0.4, minWidth: 92 }}
+      sx={{ fontWeight: 700, letterSpacing: 0.2, minWidth: 92 }}
     />
   );
 }
@@ -242,10 +259,13 @@ function ThumbnailField({ value, onChange, disabled }) {
         <Stack spacing={1}>
           <TextField
             label="Thumbnail Image URL"
+            name="thumbnailUrl"
+            type="url"
+            autoComplete="off"
             value={value || ""}
             onChange={(e) => onChange(e.target.value)}
             fullWidth
-            placeholder="https://example.com/thumbnail.jpg"
+            placeholder="https://example.com/thumbnail.jpg…"
             disabled={disabled}
           />
           {hasValue && (
@@ -288,7 +308,7 @@ function ThumbnailField({ value, onChange, disabled }) {
             />
           ) : (
             <Box sx={{ textAlign: "center", color: "text.disabled", p: 1 }}>
-              <ImageOutlined fontSize="large" />
+              <ImageOutlined fontSize="large" aria-hidden="true" />
               <Typography variant="caption" display="block">
                 {hasValue && imgError ? "Could not load image" : "No preview"}
               </Typography>
@@ -386,6 +406,8 @@ function PhotoUploader({ value = [], onChange, disabled = false }) {
 
       <input
         ref={inputRef}
+        id="template-photo-upload"
+        name="templatePhotos"
         hidden
         multiple
         type="file"
@@ -394,15 +416,11 @@ function PhotoUploader({ value = [], onChange, disabled = false }) {
         disabled={disabled || uploading}
       />
 
-      <Box
-        onClick={() => !disabled && !uploading && inputRef.current?.click()}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if ((e.key === "Enter" || e.key === " ") && !disabled && !uploading) {
-            inputRef.current?.click();
-          }
-        }}
+      <ButtonBase
+        component="label"
+        htmlFor="template-photo-upload"
+        disabled={disabled || uploading}
+        focusRipple
         sx={{
           mt: 1,
           border: "1.5px dashed",
@@ -410,15 +428,24 @@ function PhotoUploader({ value = [], onChange, disabled = false }) {
           borderRadius: 2,
           p: 2.5,
           textAlign: "center",
+          width: "100%",
+          minHeight: 132,
           cursor: disabled || uploading ? "not-allowed" : "pointer",
           bgcolor: "grey.50",
-          transition: "all 120ms ease",
+          transition:
+            "background-color 120ms ease, border-color 120ms ease",
           "&:hover": {
             bgcolor: disabled || uploading ? "grey.50" : "action.hover",
             borderColor: disabled || uploading ? "divider" : "primary.main",
           },
+          "&.Mui-focusVisible": {
+            outline: "3px solid",
+            outlineColor: "primary.light",
+            outlineOffset: 2,
+          },
         }}
       >
+        <Box>
         <Box
           sx={{
             display: "inline-flex",
@@ -439,15 +466,16 @@ function PhotoUploader({ value = [], onChange, disabled = false }) {
           )}
         </Box>
         <Typography variant="body2" fontWeight={600}>
-          {uploading ? "Uploading photos…" : "Click to upload photos"}
+          {uploading ? "Uploading Photos…" : "Upload Photos"}
         </Typography>
-        <Typography variant="caption" color="text.secondary">
+        <Typography variant="caption" color="text.secondary" display="block">
           PNG, JPG, WEBP · max 10 MB each
         </Typography>
-      </Box>
+        </Box>
+      </ButtonBase>
 
       {error && (
-        <Alert severity="error" sx={{ mt: 1.5 }}>
+        <Alert severity="error" sx={{ mt: 1.5 }} aria-live="polite">
           {error}
         </Alert>
       )}
@@ -488,19 +516,19 @@ function PhotoUploader({ value = [], onChange, disabled = false }) {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  px: 1,
-                  py: 0.25,
+                  pl: 1,
+                  minHeight: 44,
                 }}
               >
                 <Typography variant="caption" color="text.secondary" noWrap>
                   Photo {index + 1}
                 </Typography>
                 <IconButton
-                  size="small"
                   color="error"
                   aria-label={`Remove photo ${index + 1}`}
                   onClick={() => removePhoto(index)}
                   disabled={disabled || uploading}
+                  sx={{ minWidth: 44, minHeight: 44 }}
                 >
                   <DeleteOutlineOutlined fontSize="small" />
                 </IconButton>
@@ -510,8 +538,8 @@ function PhotoUploader({ value = [], onChange, disabled = false }) {
         </Box>
       )}
 
-      <FormHelperText>
-        {photos.length} photo{photos.length === 1 ? "" : "s"}
+      <FormHelperText aria-live="polite">
+        {photos.length} photo{photos.length === 1 ? "" : "s"} selected
       </FormHelperText>
     </Box>
   );
@@ -520,8 +548,6 @@ function PhotoUploader({ value = [], onChange, disabled = false }) {
 /* ------------------------------- Main page -------------------------------- */
 
 export default function ViewTemplate() {
-  const navigate = useNavigate();
-
   const [templates, setTemplates] = useState([]);
   const [categories, setCategories] = useState([]);
   const [themes, setThemes] = useState([]);
@@ -530,6 +556,7 @@ export default function ViewTemplate() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [openingTemplateId, setOpeningTemplateId] = useState(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -620,9 +647,9 @@ export default function ViewTemplate() {
   const openEdit = async (template) => {
     setError("");
     setNotice("");
-    setSaving(true);
+    const id = getTemplateId(template);
+    setOpeningTemplateId(id ?? null);
     try {
-      const id = getTemplateId(template);
       if (id == null) throw new Error("Template ID was not found.");
       const response = await axios.get(`${TEMPLATES_URL}/admin/${id}`, {
         headers: getHeaders(),
@@ -676,7 +703,7 @@ export default function ViewTemplate() {
         );
       }
     } finally {
-      setSaving(false);
+      setOpeningTemplateId(null);
     }
   };
 
@@ -884,11 +911,16 @@ export default function ViewTemplate() {
           >
             Admin · Templates
           </Typography>
-          <Typography variant="h4" fontWeight={700} sx={{ lineHeight: 1.2 }}>
+          <Typography
+            component="h1"
+            variant="h4"
+            fontWeight={700}
+            sx={{ lineHeight: 1.2, textWrap: "balance" }}
+          >
             Template Management
           </Typography>
           <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-            Edit and delete your website templates.
+            Review, edit, and manage website templates.
           </Typography>
         </Box>
 
@@ -899,34 +931,44 @@ export default function ViewTemplate() {
         >
           <Button
             variant="outlined"
-            startIcon={<RefreshIcon />}
+            startIcon={
+              loading ? <CircularProgress size={18} /> : <RefreshIcon />
+            }
             onClick={loadData}
             disabled={loading}
+            sx={{ minHeight: 44 }}
           >
-            Refresh
+            {loading ? "Refreshing…" : "Refresh Templates"}
           </Button>
           <Button
+            component={Link}
+            to="/admin/templates"
             variant="contained"
             startIcon={<AddIcon />}
-            onClick={() => navigate("/admin/templates")}
+            sx={{ minHeight: 44 }}
           >
             Add Template
           </Button>
         </Stack>
       </Box>
 
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2 }}>
-        {error && (
-          <Alert severity="error" onClose={() => setError("")}>
-            {error}
-          </Alert>
-        )}
-        {notice && (
-          <Alert severity="success" onClose={() => setNotice("")}>
-            {notice}
-          </Alert>
-        )}
-      </Box>
+      {(error || notice) && (
+        <Box
+          sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2 }}
+          aria-live="polite"
+        >
+          {error && (
+            <Alert severity="error" onClose={() => setError("")}>
+              {error}
+            </Alert>
+          )}
+          {notice && (
+            <Alert severity="success" onClose={() => setNotice("")}>
+              {notice}
+            </Alert>
+          )}
+        </Box>
+      )}
 
       {/* Table card */}
       <Paper variant="outlined" sx={{ borderRadius: 2, overflow: "hidden" }}>
@@ -940,8 +982,10 @@ export default function ViewTemplate() {
               gap: 2,
             }}
           >
-            <CircularProgress />
-            <Typography color="text.secondary">Loading templates…</Typography>
+            <CircularProgress aria-label="Loading templates" />
+            <Typography color="text.secondary" role="status">
+              Loading Templates…
+            </Typography>
           </Box>
         ) : templates.length === 0 ? (
           <Box sx={{ py: 8, px: 3, textAlign: "center" }}>
@@ -959,23 +1003,148 @@ export default function ViewTemplate() {
             >
               <ImageOutlined color="disabled" />
             </Box>
-            <Typography variant="h6" fontWeight={700}>
-              No templates found
+            <Typography component="h2" variant="h6" fontWeight={700}>
+              No Templates Found
             </Typography>
             <Typography color="text.secondary" sx={{ mt: 0.5, mb: 2 }}>
               Create a template using the Add Template page.
             </Typography>
             <Button
+              component={Link}
+              to="/admin/templates"
               variant="contained"
               startIcon={<AddIcon />}
-              onClick={() => navigate("/admin/templates")}
+              sx={{ minHeight: 44 }}
             >
               Add Template
             </Button>
           </Box>
         ) : (
-          <TableContainer sx={{ maxHeight: 640 }}>
-            <Table stickyHeader size="medium">
+          <>
+          <Box
+            sx={{
+              display: { xs: "grid", md: "none" },
+              gap: 1.5,
+              p: 1.5,
+            }}
+          >
+            {templates.map((template) => {
+              const id = getTemplateId(template);
+              const categoryId = getCategoryId(template);
+              const category = categories.find(
+                (item) =>
+                  String(item.categoryId ?? item.id) === String(categoryId),
+              );
+              const isOpening = String(openingTemplateId) === String(id);
+
+              return (
+                <Paper key={id ?? template.name} variant="outlined" sx={{ p: 2 }}>
+                  <Stack spacing={1.5}>
+                    <Box sx={{ display: "flex", gap: 1.5, minWidth: 0 }}>
+                      {template.thumbnailUrl ? (
+                        <Box
+                          component="img"
+                          src={template.thumbnailUrl}
+                          alt=""
+                          loading="lazy"
+                          width={80}
+                          height={60}
+                          sx={{
+                            width: 80,
+                            height: 60,
+                            objectFit: "cover",
+                            borderRadius: 1,
+                            flex: "0 0 auto",
+                            bgcolor: "action.hover",
+                          }}
+                        />
+                      ) : (
+                        <Box
+                          aria-hidden="true"
+                          sx={{
+                            width: 80,
+                            height: 60,
+                            borderRadius: 1,
+                            bgcolor: "action.hover",
+                            display: "grid",
+                            placeItems: "center",
+                            flex: "0 0 auto",
+                          }}
+                        >
+                          <ImageOutlined sx={{ color: "text.disabled" }} />
+                        </Box>
+                      )}
+                      <Box sx={{ minWidth: 0, flex: 1 }}>
+                        <Typography
+                          fontWeight={700}
+                          sx={{ overflowWrap: "anywhere" }}
+                        >
+                          {template.name || "Untitled Template"}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ overflowWrap: "anywhere" }}
+                        >
+                          {category?.name ||
+                            template.categoryName ||
+                            "Uncategorized"}
+                        </Typography>
+                      </Box>
+                    </Box>
+
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 1,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <Typography fontWeight={700} sx={{ fontVariantNumeric: "tabular-nums" }}>
+                        {formatMoney(template.price, template.currency)}
+                      </Typography>
+                      <StatusChip status={template.status} />
+                    </Box>
+
+                    <Stack direction="row" spacing={1}>
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        startIcon={
+                          isOpening ? (
+                            <CircularProgress size={18} />
+                          ) : (
+                            <EditIcon />
+                          )
+                        }
+                        onClick={() => openEdit(template)}
+                        disabled={openingTemplateId !== null || saving}
+                        sx={{ minHeight: 44 }}
+                      >
+                        {isOpening ? "Opening…" : "Edit"}
+                      </Button>
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        color="error"
+                        startIcon={<DeleteIcon />}
+                        onClick={() => openDelete(template)}
+                        disabled={openingTemplateId !== null || saving}
+                        sx={{ minHeight: 44 }}
+                      >
+                        Delete
+                      </Button>
+                    </Stack>
+                  </Stack>
+                </Paper>
+              );
+            })}
+          </Box>
+
+          <TableContainer sx={{ maxHeight: 640, display: { xs: "none", md: "block" } }}>
+            <Table stickyHeader size="medium" aria-label="Templates">
               <TableHead>
                 <TableRow>
                   <TableCell sx={{ width: "50%" }}>Template</TableCell>
@@ -1011,7 +1180,10 @@ export default function ViewTemplate() {
                             <Box
                               component="img"
                               src={template.thumbnailUrl}
-                              alt={template.name || "Template"}
+                              alt=""
+                              loading="lazy"
+                              width={64}
+                              height={48}
                               sx={{
                                 width: 64,
                                 height: 48,
@@ -1023,6 +1195,7 @@ export default function ViewTemplate() {
                             />
                           ) : (
                             <Box
+                              aria-hidden="true"
                               sx={{
                                 width: 64,
                                 height: 48,
@@ -1041,8 +1214,8 @@ export default function ViewTemplate() {
                             </Box>
                           )}
                           <Box sx={{ minWidth: 0 }}>
-                            <Typography fontWeight={600} noWrap>
-                              {template.name || "Untitled template"}
+                            <Typography fontWeight={600} noWrap title={template.name || "Untitled Template"}>
+                              {template.name || "Untitled Template"}
                             </Typography>
                             <Typography
                               variant="caption"
@@ -1058,9 +1231,8 @@ export default function ViewTemplate() {
                         </Box>
                       </TableCell>
                       <TableCell align="right">
-                        <Typography fontWeight={600}>
-                          {template.currency || "INR"}{" "}
-                          {Number(template.price || 0).toLocaleString("en-IN")}
+                        <Typography fontWeight={600} sx={{ fontVariantNumeric: "tabular-nums" }}>
+                          {formatMoney(template.price, template.currency)}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -1075,27 +1247,31 @@ export default function ViewTemplate() {
                             flexWrap: "wrap",
                           }}
                         >
-                          <Tooltip title="Edit">
+                          <Tooltip title="Edit Template">
                             <span>
                               <IconButton
-                                size="small"
                                 color="primary"
                                 onClick={() => openEdit(template)}
-                                disabled={saving}
-                                aria-label="Edit template"
+                                disabled={openingTemplateId !== null || saving}
+                                aria-label={`Edit ${template.name || "template"}`}
+                                sx={{ minWidth: 44, minHeight: 44 }}
                               >
-                                <EditIcon fontSize="small" />
+                                {String(openingTemplateId) === String(id) ? (
+                                  <CircularProgress size={20} />
+                                ) : (
+                                  <EditIcon fontSize="small" />
+                                )}
                               </IconButton>
                             </span>
                           </Tooltip>
-                          <Tooltip title="Delete">
+                          <Tooltip title="Delete Template">
                             <span>
                               <IconButton
-                                size="small"
                                 color="error"
                                 onClick={() => openDelete(template)}
-                                disabled={saving}
-                                aria-label="Delete template"
+                                disabled={openingTemplateId !== null || saving}
+                                aria-label={`Delete ${template.name || "template"}`}
+                                sx={{ minWidth: 44, minHeight: 44 }}
                               >
                                 <DeleteIcon fontSize="small" />
                               </IconButton>
@@ -1109,6 +1285,7 @@ export default function ViewTemplate() {
               </TableBody>
             </Table>
           </TableContainer>
+          </>
         )}
       </Paper>
 
@@ -1119,15 +1296,22 @@ export default function ViewTemplate() {
         fullWidth
         maxWidth="md"
         scroll="paper"
+        slotProps={{ paper: { sx: { m: { xs: 1, sm: 4 }, maxHeight: { xs: "calc(100% - 16px)", sm: "calc(100% - 64px)" } } } }}
       >
-        <Box component="form" onSubmit={saveTemplate}>
-          <DialogTitle sx={{ pr: 6 }}>
+        <Box component="form" onSubmit={saveTemplate} noValidate={false}>
+          <DialogTitle sx={{ pr: 7 }}>
             Edit Template
             <IconButton
               onClick={closeEdit}
               disabled={saving}
-              sx={{ position: "absolute", right: 8, top: 8 }}
-              aria-label="Close"
+              sx={{
+                position: "absolute",
+                right: 8,
+                top: 8,
+                minWidth: 44,
+                minHeight: 44,
+              }}
+              aria-label="Close Edit Template"
             >
               <CloseIcon fontSize="small" />
             </IconButton>
@@ -1142,6 +1326,8 @@ export default function ViewTemplate() {
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                   <TextField
                     label="Template Name"
+                    name="name"
+                    autoComplete="off"
                     value={form.name}
                     onChange={(e) => updateField("name", e.target.value)}
                     required
@@ -1152,6 +1338,7 @@ export default function ViewTemplate() {
                     <Select
                       labelId="edit-category-label"
                       label="Category"
+                      name="categoryId"
                       value={form.categoryId ?? ""}
                       onChange={(e) =>
                         updateField("categoryId", e.target.value)
@@ -1169,6 +1356,8 @@ export default function ViewTemplate() {
                   </FormControl>
                   <TextField
                     label="Short Description"
+                    name="shortDescription"
+                    autoComplete="off"
                     value={form.shortDescription}
                     onChange={(e) =>
                       updateField("shortDescription", e.target.value)
@@ -1179,6 +1368,8 @@ export default function ViewTemplate() {
                   />
                   <TextField
                     label="Description"
+                    name="description"
+                    autoComplete="off"
                     value={form.description}
                     onChange={(e) =>
                       updateField("description", e.target.value)
@@ -1221,7 +1412,9 @@ export default function ViewTemplate() {
                 <Box sx={grid3}>
                   <TextField
                     label="Price"
+                    name="price"
                     type="number"
+                    inputMode="decimal"
                     value={form.price}
                     onChange={(e) => updateField("price", e.target.value)}
                     inputProps={{ min: 0, step: "0.01" }}
@@ -1230,14 +1423,18 @@ export default function ViewTemplate() {
                   />
                   <TextField
                     label="Currency"
+                    name="currency"
+                    autoComplete="off"
                     value={form.currency}
                     onChange={(e) => updateField("currency", e.target.value)}
                     required
                     fullWidth
                   />
                   <TextField
-                    label="Validity (days)"
+                    label="Validity (Days)"
+                    name="validityDays"
                     type="number"
+                    inputMode="numeric"
                     value={form.validityDays}
                     onChange={(e) =>
                       updateField("validityDays", e.target.value)
@@ -1261,6 +1458,7 @@ export default function ViewTemplate() {
                   <InputLabel id="edit-themes-label">Themes</InputLabel>
                   <Select
                     labelId="edit-themes-label"
+                    name="themeIds"
                     multiple
                     value={form.themeIds}
                     label="Themes"
@@ -1393,8 +1591,8 @@ export default function ViewTemplate() {
 
                 {selectedThemeObjects.length > 0 && (
                   <Box sx={{ mt: 2 }}>
-                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                      Default theme
+                    <Typography component="h4" variant="subtitle2" sx={{ mb: 1 }}>
+                      Default Theme
                     </Typography>
                     <Box
                       sx={{
@@ -1411,17 +1609,11 @@ export default function ViewTemplate() {
                         const id = String(getId(theme));
                         const active = String(form.defaultThemeId) === id;
                         return (
-                          <Box
+                          <ButtonBase
                             key={id}
-                            role="button"
-                            tabIndex={0}
+                            aria-pressed={active}
+                            aria-label={`Set ${theme.name || `Theme ${id}`} as the default theme`}
                             onClick={() => updateField("defaultThemeId", id)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" || e.key === " ") {
-                                e.preventDefault();
-                                updateField("defaultThemeId", id);
-                              }
-                            }}
                             sx={{
                               display: "flex",
                               alignItems: "center",
@@ -1446,7 +1638,10 @@ export default function ViewTemplate() {
                                   ? "action.selected"
                                   : "action.hover",
                               },
-                              "&:focus-visible": {
+                              width: "100%",
+                              minHeight: 64,
+                              textAlign: "left",
+                              "&.Mui-focusVisible": {
                                 outline: "2px solid",
                                 outlineColor: "primary.main",
                                 outlineOffset: 2,
@@ -1479,7 +1674,7 @@ export default function ViewTemplate() {
                                 sx={{ height: 22, fontSize: 11 }}
                               />
                             )}
-                          </Box>
+                          </ButtonBase>
                         );
                       })}
                     </Box>
@@ -1498,8 +1693,8 @@ export default function ViewTemplate() {
                   variant="outlined"
                   sx={{ borderRadius: 2, overflow: "hidden" }}
                 >
-                  <TableContainer>
-                    <Table size="small">
+                  <TableContainer sx={{ overflowX: "auto" }}>
+                    <Table size="small" aria-label="Template Pages" sx={{ minWidth: 560 }}>
                       <TableHead>
                         <TableRow>
                           <TableCell padding="checkbox" sx={{ width: 64 }}>
@@ -1528,6 +1723,9 @@ export default function ViewTemplate() {
                                 <Checkbox
                                   checked={selected}
                                   onChange={() => togglePage(id)}
+                                  inputProps={{
+                                    "aria-label": `${selected ? "Remove" : "Include"} ${page.title || page.name || "untitled page"}`,
+                                  }}
                                 />
                               </TableCell>
                               <TableCell>
@@ -1536,18 +1734,22 @@ export default function ViewTemplate() {
                                 </Typography>
                               </TableCell>
                               <TableCell align="right">
-                                {price > 0
-                                  ? `${form.currency} ${price.toFixed(2)}`
-                                  : "Free"}
+                                <Typography variant="body2" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                                  {price > 0
+                                    ? formatMoney(price, form.currency)
+                                    : "Free"}
+                                </Typography>
                               </TableCell>
                               <TableCell align="center">
                                 <Switch
-                                  size="small"
                                   checked={isDefault}
                                   disabled={!selected}
                                   onChange={(e) =>
                                     setPageDefault(id, e.target.checked)
                                   }
+                                  inputProps={{
+                                    "aria-label": `Use ${page.title || page.name || "untitled page"} as a default page`,
+                                  }}
                                 />
                               </TableCell>
                             </TableRow>
@@ -1585,6 +1787,7 @@ export default function ViewTemplate() {
                     <Select
                       labelId="edit-status-label"
                       label="Status"
+                      name="status"
                       value={form.status}
                       onChange={(e) => updateField("status", e.target.value)}
                     >
@@ -1597,14 +1800,26 @@ export default function ViewTemplate() {
               </Box>
             </Stack>
           </DialogContent>
-          <DialogActions sx={{ px: 3, py: 2 }}>
-            <Button onClick={closeEdit} disabled={saving}>
+          <DialogActions
+            sx={{
+              px: { xs: 2, sm: 3 },
+              py: 2,
+              flexDirection: { xs: "column-reverse", sm: "row" },
+              "& > :not(style)": { m: { xs: 0, sm: undefined } },
+            }}
+          >
+            <Button
+              onClick={closeEdit}
+              disabled={saving}
+              sx={{ minHeight: 44, width: { xs: "100%", sm: "auto" } }}
+            >
               Cancel
             </Button>
             <Button
               type="submit"
               variant="contained"
               disabled={saving}
+              sx={{ minHeight: 44, width: { xs: "100%", sm: "auto" } }}
               startIcon={
                 saving ? (
                   <CircularProgress size={18} color="inherit" />
@@ -1620,27 +1835,50 @@ export default function ViewTemplate() {
       </Dialog>
 
       {/* ---------------------------- Delete dialog --------------------------- */}
-      <Dialog open={deleteOpen} onClose={closeDelete} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ pr: 6 }}>
+      <Dialog
+        open={deleteOpen}
+        onClose={closeDelete}
+        maxWidth="xs"
+        fullWidth
+        aria-describedby="delete-template-description"
+        slotProps={{ paper: { sx: { m: { xs: 2, sm: 4 } } } }}
+      >
+        <DialogTitle sx={{ pr: 7 }}>
           Delete Template?
           <IconButton
             onClick={closeDelete}
             disabled={saving}
-            sx={{ position: "absolute", right: 8, top: 8 }}
-            aria-label="Close"
+            sx={{
+              position: "absolute",
+              right: 8,
+              top: 8,
+              minWidth: 44,
+              minHeight: 44,
+            }}
+            aria-label="Close Delete Template Dialog"
           >
             <CloseIcon fontSize="small" />
           </IconButton>
         </DialogTitle>
         <DialogContent dividers>
-          <Typography>
-            Are you sure you want to delete{" "}
-            <strong>{selectedTemplate?.name || "this template"}</strong>? This
-            cannot be undone.
+          <Typography id="delete-template-description" sx={{ overflowWrap: "anywhere" }}>
+            Delete <strong>{selectedTemplate?.name || "this template"}</strong>?
+            This permanently removes the template and cannot be undone.
           </Typography>
         </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={closeDelete} disabled={saving}>
+        <DialogActions
+          sx={{
+            px: { xs: 2, sm: 3 },
+            py: 2,
+            flexDirection: { xs: "column-reverse", sm: "row" },
+            "& > :not(style)": { m: { xs: 0, sm: undefined } },
+          }}
+        >
+          <Button
+            onClick={closeDelete}
+            disabled={saving}
+            sx={{ minHeight: 44, width: { xs: "100%", sm: "auto" } }}
+          >
             Cancel
           </Button>
           <Button
@@ -1648,6 +1886,7 @@ export default function ViewTemplate() {
             variant="contained"
             onClick={deleteTemplate}
             disabled={saving}
+            sx={{ minHeight: 44, width: { xs: "100%", sm: "auto" } }}
             startIcon={
               saving ? (
                 <CircularProgress size={18} color="inherit" />

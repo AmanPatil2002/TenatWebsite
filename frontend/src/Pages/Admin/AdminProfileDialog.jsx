@@ -39,7 +39,8 @@ const authFetch = async (path, options = {}) => {
     },
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.message || "Something went wrong");
+  if (!res.ok)
+    throw new Error(data.message || "Unable to complete the request. Try again.");
   return data;
 };
 
@@ -128,10 +129,12 @@ const validatePasswords = (passwords) => {
 };
 
 /* Section header helper */
-function SectionHeader({ title, description }) {
+function SectionHeader({ id, title, description }) {
   return (
     <Box sx={{ mb: 2 }}>
       <Typography
+        id={id}
+        component="h3"
         variant="overline"
         sx={{
           display: "block",
@@ -162,6 +165,8 @@ export default function AdminProfileDialog({ open, onClose, onSaved }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+  const [initialProfile, setInitialProfile] = useState(emptyProfile);
 
   // Load the current admin's data every time the dialog opens
   useEffect(() => {

@@ -167,16 +167,39 @@ const money = (value, currency = "INR") =>
 const compact = (value) =>
   new Intl.NumberFormat("en-IN", { notation: "compact" }).format(value || 0);
 
+const formatCount = (value) =>
+  new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(
+    Number(value || 0),
+  );
+
+const formatTime = (value) =>
+  value
+    ? new Intl.DateTimeFormat("en-IN", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(value)
+    : "";
+
+const formatLongDate = (value) =>
+  new Intl.DateTimeFormat("en-IN", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(value);
+
 const cap = (s = "") => s.charAt(0).toUpperCase() + s.slice(1);
 
-const shortDate = (value) =>
-  value
-    ? new Date(value).toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      })
-    : "—";
+const shortDate = (value) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+};
 
 const pctChange = (current, previous) =>
   previous ? ((current - previous) / previous) * 100 : null;
@@ -194,7 +217,7 @@ const lastMonths = (n = 6) => {
     const d = new Date(now.getFullYear(), now.getMonth() - (n - 1 - i), 1);
     return {
       key: `${d.getFullYear()}-${d.getMonth()}`,
-      label: d.toLocaleDateString("en-IN", { month: "short" }),
+      label: new Intl.DateTimeFormat("en-IN", { month: "short" }).format(d),
     };
   });
 };
@@ -254,10 +277,16 @@ const cardSx = {
   boxShadow:
     "0 1px 2px rgba(16,24,40,0.04), 0 8px 24px -12px rgba(16,24,40,0.08)",
   transition: "box-shadow 180ms ease, transform 180ms ease",
-  "&:hover": {
-    boxShadow:
-      "0 1px 2px rgba(16,24,40,0.04), 0 16px 36px -12px rgba(16,24,40,0.18)",
-    transform: "translateY(-2px)",
+  "@media (hover: hover)": {
+    "&:hover": {
+      boxShadow:
+        "0 1px 2px rgba(16,24,40,0.04), 0 16px 36px -12px rgba(16,24,40,0.18)",
+      transform: "translateY(-2px)",
+    },
+  },
+  "@media (prefers-reduced-motion: reduce)": {
+    transition: "none",
+    "&:hover": { transform: "none" },
   },
 };
 
@@ -304,7 +333,11 @@ function TrendBadge({ value }) {
 
 function StatCard({ title, value, icon, color, loading, trend, caption }) {
   return (
-    <Card sx={{ ...cardSx, position: "relative", overflow: "hidden" }}>
+    <Card
+      component="section"
+      aria-label={title}
+      sx={{ ...cardSx, position: "relative", overflow: "hidden" }}
+    >
       {/* Top accent */}
       <Box
         sx={{
@@ -350,6 +383,7 @@ function StatCard({ title, value, icon, color, loading, trend, caption }) {
             <Typography
               variant="caption"
               color="text.secondary"
+              title={title}
               sx={{
                 fontWeight: 700,
                 letterSpacing: 0.6,
@@ -357,9 +391,8 @@ function StatCard({ title, value, icon, color, loading, trend, caption }) {
                 fontSize: 11,
                 display: "block",
                 mb: 0.75,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
+                lineHeight: 1.35,
+                overflowWrap: "anywhere",
               }}
             >
               {title}
@@ -374,6 +407,7 @@ function StatCard({ title, value, icon, color, loading, trend, caption }) {
                   lineHeight: 1.1,
                   letterSpacing: -0.6,
                   overflowWrap: "anywhere",
+                  fontVariantNumeric: "tabular-nums",
                 }}
               >
                 {value}
@@ -433,7 +467,7 @@ function Panel({
   children,
 }) {
   return (
-    <Card sx={cardSx}>
+    <Card component="section" aria-label={title} sx={cardSx}>
       <CardContent
         sx={{
           p: 3,
@@ -445,9 +479,9 @@ function Panel({
         }}
       >
         <Stack
-          direction="row"
+          direction={{ xs: "column", sm: "row" }}
           justifyContent="space-between"
-          alignItems="flex-start"
+          alignItems={{ xs: "stretch", sm: "flex-start" }}
           spacing={1.5}
           sx={{ mb: 2 }}
         >
@@ -465,7 +499,16 @@ function Panel({
                   }}
                 />
               )}
-              <Typography variant="h6" fontWeight={700} noWrap sx={{ minWidth: 0 }}>
+              <Typography
+                component="h2"
+                variant="h6"
+                fontWeight={700}
+                sx={{
+                  minWidth: 0,
+                  overflowWrap: "anywhere",
+                  textWrap: "balance",
+                }}
+              >
                 {title}
               </Typography>
             </Stack>
@@ -485,7 +528,9 @@ function Panel({
               </Typography>
             )}
           </Box>
-          {action && <Box sx={{ flexShrink: 0 }}>{action}</Box>}
+          {action && (
+            <Box sx={{ flexShrink: 0, maxWidth: "100%" }}>{action}</Box>
+          )}
         </Stack>
 
         {loading ? (
@@ -514,14 +559,14 @@ function Panel({
               >
                 <SparkleIcon size={20} />
               </Box>
-              <Typography fontWeight={600} variant="body2">
-                {error ? "Could not load data" : emptyText}
+              <Typography fontWeight={600} variant="body2" textAlign="center">
+                {error ? "Data Unavailable" : emptyText}
               </Typography>
-              {!error && (
-                <Typography variant="caption">
-                  Data will appear here once available.
-                </Typography>
-              )}
+              <Typography variant="caption" textAlign="center">
+                {error
+                  ? "Refresh the dashboard to try again."
+                  : "Data will appear here once available."}
+              </Typography>
             </Stack>
           </Box>
         ) : (
@@ -570,6 +615,7 @@ function DonutChart({ data, centerLabel = "Total", maxItems = 6 }) {
     <Box>
       {/* Fixed-size box, so the center label is always on the donut hole */}
       <Box
+        aria-hidden="true"
         sx={{
           position: "relative",
           width: SIZE,
@@ -603,7 +649,12 @@ function DonutChart({ data, centerLabel = "Total", maxItems = 6 }) {
           }}
         >
           <Box sx={{ textAlign: "center" }}>
-            <Typography variant="h5" fontWeight={800} lineHeight={1.1}>
+            <Typography
+              variant="h5"
+              fontWeight={800}
+              lineHeight={1.1}
+              sx={{ fontVariantNumeric: "tabular-nums" }}
+            >
               {compact(total)}
             </Typography>
             <Typography variant="caption" color="text.secondary">
@@ -637,9 +688,13 @@ function DonutChart({ data, centerLabel = "Total", maxItems = 6 }) {
             <Typography
               variant="body2"
               fontWeight={700}
-              sx={{ minWidth: 24, textAlign: "right" }}
+              sx={{
+                minWidth: 24,
+                textAlign: "right",
+                fontVariantNumeric: "tabular-nums",
+              }}
             >
-              {d.value}
+              {formatCount(d.value)}
             </Typography>
             <Typography
               variant="caption"
@@ -683,6 +738,7 @@ function RatingBreakdown({ reviews, average }) {
             precision={0.1}
             readOnly
             size="small"
+            aria-label={`Average rating: ${average} out of 5`}
             sx={{ mt: 0.5, color: C.amber }}
           />
           <Typography variant="caption" color="text.secondary" display="block">
@@ -700,6 +756,7 @@ function RatingBreakdown({ reviews, average }) {
                 <LinearProgress
                   variant="determinate"
                   value={total ? (count / total) * 100 : 0}
+                  aria-label={`${star}-star reviews: ${formatCount(count)}`}
                   sx={{
                     flex: 1,
                     height: 8,
@@ -1019,6 +1076,9 @@ export default function AdminDashboard() {
 
   return (
     <Box
+      component="main"
+      id="admin-dashboard-main"
+      aria-busy={loading}
       sx={{
         minHeight: "100vh",
         background: `
@@ -1027,8 +1087,9 @@ export default function AdminDashboard() {
           radial-gradient(900px 500px at 50% 100%, ${alpha(C.teal, 0.08)}, transparent 60%),
           #f8fafc
         `,
-        py: { xs: 3, md: 4 },
-        px: { xs: 2, md: 4 },
+        py: { xs: 2, sm: 3, md: 4 },
+        px: { xs: 1.5, sm: 2, md: 4 },
+        overflowX: "hidden",
       }}
     >
       <Box sx={{ maxWidth: 1500, mx: "auto" }}>
@@ -1078,6 +1139,7 @@ export default function AdminDashboard() {
           >
             <Box sx={{ minWidth: 0 }}>
               <Typography
+                component="h1"
                 variant="h4"
                 fontWeight={800}
                 sx={{
@@ -1085,6 +1147,7 @@ export default function AdminDashboard() {
                   letterSpacing: -0.6,
                   overflowWrap: "anywhere",
                   lineHeight: 1.15,
+                  textWrap: "balance",
                 }}
               >
                 {greeting()}, {username}
@@ -1093,12 +1156,7 @@ export default function AdminDashboard() {
                 variant="body2"
                 sx={{ opacity: 0.85, mt: 0.75, maxWidth: 520 }}
               >
-                {new Date().toLocaleDateString("en-IN", {
-                  weekday: "long",
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                })}{" "}
+                {formatLongDate(new Date())}
               </Typography>
             </Box>
 
@@ -1134,22 +1192,24 @@ export default function AdminDashboard() {
                     {item.label}
                   </Typography>
                   <Typography variant="h6" fontWeight={800} sx={{ mt: 0.25 }}>
-                    {loading || error ? "–" : item.value}
+                    {loading ? "Loading…" : error ? "—" : item.value}
                   </Typography>
                 </Box>
               ))}
               <Tooltip
                 title={
                   updatedAt
-                    ? `Last updated ${updatedAt.toLocaleTimeString("en-IN", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}`
-                    : "Refresh data"
+                    ? `Last updated ${formatTime(updatedAt)}`
+                    : "Refresh dashboard data"
                 }
               >
                 <span>
                   <IconButton
+                    aria-label={
+                      loading
+                        ? "Refreshing dashboard data"
+                        : "Refresh dashboard data"
+                    }
                     onClick={() => load()}
                     disabled={loading}
                     sx={{
@@ -1162,6 +1222,10 @@ export default function AdminDashboard() {
                       border: "1px solid rgba(255,255,255,0.28)",
                       backdropFilter: "blur(8px)",
                       "&:hover": { bgcolor: "rgba(255,255,255,0.22)" },
+                      "&:focus-visible": {
+                        outline: "3px solid rgba(255,255,255,0.9)",
+                        outlineOffset: 2,
+                      },
                       "&.Mui-disabled": { color: "rgba(255,255,255,0.4)" },
                     }}
                   >
@@ -1173,19 +1237,40 @@ export default function AdminDashboard() {
           </Stack>
         </Box>
 
-        {error && (
-          <Alert
-            severity="error"
-            sx={{ mb: 3, borderRadius: 2 }}
-            action={
-              <Button color="inherit" size="small" onClick={() => load()}>
-                Retry
-              </Button>
-            }
-          >
-            {error}
-          </Alert>
-        )}
+        <Box aria-live="polite" aria-atomic="true">
+          {loading && (
+            <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
+              Refreshing dashboard data…
+            </Alert>
+          )}
+          {error && !loading && (
+            <Alert
+              severity="error"
+              sx={{ mb: 3, borderRadius: 2 }}
+              action={
+                <Button
+                  color="inherit"
+                  onClick={() => load()}
+                  sx={{ minHeight: 44 }}
+                >
+                  Retry
+                </Button>
+              }
+            >
+              {error} Refresh the dashboard to try again.
+            </Alert>
+          )}
+          {!error && !loading && updatedAt && (
+            <Typography
+              component="p"
+              variant="caption"
+              color="text.secondary"
+              sx={{ mb: 1.5 }}
+            >
+              Dashboard updated at {formatTime(updatedAt)}.
+            </Typography>
+          )}
+        </Box>
 
         {/* ============ KPI CARDS ============ */}
         <Grid container spacing={{ xs: 2, md: 2.5 }}>
@@ -1197,7 +1282,7 @@ export default function AdminDashboard() {
             >
               <StatCard
                 {...card}
-                value={error ? "-" : card.value}
+                value={error ? "—" : card.value}
                 loading={loading}
               />
             </Grid>
@@ -1219,7 +1304,7 @@ export default function AdminDashboard() {
                 <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                   <Chip
                     size="small"
-                    label={`6-mo ${money(sixMonthRevenue)}`}
+                    label={`6-Month Total: ${money(sixMonthRevenue)}`}
                     sx={{
                       fontWeight: 700,
                       bgcolor: alpha(C.teal, 0.12),
@@ -1231,7 +1316,7 @@ export default function AdminDashboard() {
                     <Chip
                       size="small"
                       variant="outlined"
-                      label={`Best: ${bestMonth.label}`}
+                      label={`Best Month: ${bestMonth.label}`}
                       sx={{ fontWeight: 600, borderRadius: 1.5 }}
                     />
                   )}
@@ -1317,6 +1402,7 @@ export default function AdminDashboard() {
                         value={Number(r.rating) || 0}
                         readOnly
                         size="small"
+                        aria-label={`${Number(r.rating) || 0} out of 5 stars`}
                         sx={{ color: C.amber }}
                       />
                     }
@@ -1422,7 +1508,7 @@ export default function AdminDashboard() {
         >
           <Grid size={{ xs: 12, md: 6, lg: 4 }} sx={{ display: "flex" }}>
             <Panel
-              title="Purchases Sites"
+              title="Purchases by Site"
               subtitle="Share of total purchases"
               accent={PALETTE[0]}
               loading={loading}
@@ -1472,8 +1558,24 @@ export default function AdminDashboard() {
               error={error}
               empty={!templateRows.length}
             >
-              <Box sx={{ overflowX: "auto", mx: -1 }}>
-                <Table size="small" sx={{ minWidth: 520 }}>
+              <Box
+                role="region"
+                aria-label="Template performance table"
+                tabIndex={0}
+                sx={{
+                  overflowX: "auto",
+                  mx: -1,
+                  "&:focus-visible": {
+                    outline: `2px solid ${theme.palette.primary.main}`,
+                    outlineOffset: 2,
+                  },
+                }}
+              >
+                <Table
+                  size="small"
+                  aria-label="Template performance"
+                  sx={{ minWidth: 520 }}
+                >
                   <TableHead>
                     <TableRow
                       sx={{
@@ -1503,11 +1605,28 @@ export default function AdminDashboard() {
                         <TableCell sx={{ color: "text.secondary" }}>
                           {i + 1}
                         </TableCell>
-                        <TableCell sx={{ fontWeight: 600 }}>
-                          {row.name}
+                        <TableCell
+                          sx={{
+                            fontWeight: 600,
+                            maxWidth: 220,
+                            overflowWrap: "anywhere",
+                          }}
+                        >
+                          {row.name || "Unnamed template"}
                         </TableCell>
-                        <TableCell align="right">{row.purchases}</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 700 }}>
+                        <TableCell
+                          align="right"
+                          sx={{ fontVariantNumeric: "tabular-nums" }}
+                        >
+                          {formatCount(row.purchases)}
+                        </TableCell>
+                        <TableCell
+                          align="right"
+                          sx={{
+                            fontWeight: 700,
+                            fontVariantNumeric: "tabular-nums",
+                          }}
+                        >
                           {money(row.revenue)}
                         </TableCell>
                         <TableCell>
@@ -1519,6 +1638,7 @@ export default function AdminDashboard() {
                             <LinearProgress
                               variant="determinate"
                               value={row.share}
+                              aria-label={`${row.name || "Unnamed template"}: ${row.share.toFixed(0)}% of revenue`}
                               sx={{
                                 flex: 1,
                                 height: 6,
@@ -1605,8 +1725,24 @@ export default function AdminDashboard() {
                 />
               }
             >
-              <Box sx={{ overflowX: "auto", mx: -1 }}>
-                <Table size="small" sx={{ minWidth: 640 }}>
+              <Box
+                role="region"
+                aria-label="Recent payments table"
+                tabIndex={0}
+                sx={{
+                  overflowX: "auto",
+                  mx: -1,
+                  "&:focus-visible": {
+                    outline: `2px solid ${theme.palette.primary.main}`,
+                    outlineOffset: 2,
+                  },
+                }}
+              >
+                <Table
+                  size="small"
+                  aria-label="Recent payments"
+                  sx={{ minWidth: 640 }}
+                >
                   <TableHead>
                     <TableRow
                       sx={{
@@ -1656,12 +1792,17 @@ export default function AdminDashboard() {
                             >
                               {(p.templateName || "?").charAt(0).toUpperCase()}
                             </Avatar>
-                            <Typography variant="body2" fontWeight={600}>
-                              {p.templateName || "—"}
+                            <Typography
+                              variant="body2"
+                              fontWeight={600}
+                              sx={{ maxWidth: 220, overflowWrap: "anywhere" }}
+                            >
+                              {p.templateName || "Unnamed template"}
                             </Typography>
                           </Stack>
                         </TableCell>
                         <TableCell
+                          title={p.transactionId || "Transaction ID unavailable"}
                           sx={{
                             maxWidth: 160,
                             overflow: "hidden",
@@ -1677,7 +1818,11 @@ export default function AdminDashboard() {
                         </TableCell>
                         <TableCell
                           align="right"
-                          sx={{ fontWeight: 700, whiteSpace: "nowrap" }}
+                          sx={{
+                            fontWeight: 700,
+                            whiteSpace: "nowrap",
+                            fontVariantNumeric: "tabular-nums",
+                          }}
                         >
                           {money(p.amount, p.currency || "INR")}
                         </TableCell>
@@ -1750,10 +1895,7 @@ export default function AdminDashboard() {
           <Typography variant="caption" color="text.secondary">
             Admin Dashboard · Data refreshes on demand ·{" "}
             {updatedAt
-              ? `Last synced ${updatedAt.toLocaleTimeString("en-IN", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}`
+              ? `Last synced ${formatTime(updatedAt)}`
               : "Not synced yet"}
           </Typography>
         </Box>

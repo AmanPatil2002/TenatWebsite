@@ -3,11 +3,13 @@ const authenticateToken = require("../../middleware/authenticate");
 const authenticateSiteAdmin = require("../../middleware/authenticateSiteAdmin");
 const {
   getTheme,
+  getPublicTheme,
   updateCustomTheme,
   setActiveTheme,
   resetToDefault
 } = require("../../controller/site/sitethemeController");
 
+router.get("/:siteId/public/theme", getPublicTheme);
 // Client-admin routes (MUST come before generic /:siteId/theme to avoid route capture)
 router.get("/client-admin/:siteId/theme", authenticateSiteAdmin, getTheme);
 router.put("/client-admin/:siteId/theme/custom", authenticateSiteAdmin, updateCustomTheme);

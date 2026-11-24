@@ -32,6 +32,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const EMAIL_MAX = 190;
+const PASSWORD_MAX = 72;
 const EMAIL_RE = /^\S+@\S+\.\S+$/;
 
 const BRAND = {
@@ -115,15 +116,19 @@ function ForgotPasswordDialog({ initialEmail, onClose, onDone }) {
     if (loading) return;
 
     if (!/^\d{6}$/.test(code)) {
-      setError("Enter the 6-digit code");
+      setError("Enter the 6-digit code from your email.");
       return;
     }
     if (newPassword.length < 6) {
-      setError("Password must be at least 6 characters");
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+    if (newPassword.length > PASSWORD_MAX) {
+      setError(`Password must be ${PASSWORD_MAX} characters or fewer.`);
       return;
     }
     if (newPassword !== confirm) {
-      setError("Passwords do not match");
+      setError("Passwords do not match.");
       return;
     }
 
@@ -152,49 +157,77 @@ function ForgotPasswordDialog({ initialEmail, onClose, onDone }) {
       onClose={loading ? undefined : onClose}
       fullWidth
       maxWidth="xs"
-      PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+      aria-labelledby="forgot-password-title"
+      aria-describedby="forgot-password-description"
+      PaperProps={{ sx: { borderRadius: 3, p: { xs: 0, sm: 1 } } }}
     >
       <form onSubmit={step === 1 ? requestCode : submitReset} noValidate>
-        <DialogTitle sx={{ fontWeight: 700 }}>
+        <DialogTitle id="forgot-password-title" sx={{ fontWeight: 700 }}>
           {step === 1 ? "Forgot password" : "Reset password"}
         </DialogTitle>
 
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             {error && (
-              <Alert severity="error" sx={{ borderRadius: 2 }}>
+              <Alert
+                severity="error"
+                role="alert"
+                aria-live="assertive"
+                sx={{ borderRadius: 2 }}
+              >
                 {error}
               </Alert>
             )}
             {info && (
-              <Alert severity="info" sx={{ borderRadius: 2 }}>
+              <Alert
+                severity="info"
+                role="status"
+                aria-live="polite"
+                sx={{ borderRadius: 2 }}
+              >
                 {info}
               </Alert>
             )}
 
             {step === 1 ? (
               <>
-                <Typography variant="body2" color="text.secondary">
-                  Enter your account email and we'll send you a 6-digit code.
+                <Typography
+                  id="forgot-password-description"
+                  variant="body2"
+                  color="text.secondary"
+                >
+                  Enter your account email and we&apos;ll send you a 6-digit
+                  code.
                 </Typography>
                 <TextField
                   label="Email"
+                  name="email"
                   type="email"
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
                     setError("");
                   }}
-                  inputProps={{ maxLength: EMAIL_MAX }}
+                  inputProps={{ maxLength: EMAIL_MAX, inputMode: "email" }}
                   autoComplete="email"
                   autoFocus
+                  required
                   fullWidth
                 />
               </>
             ) : (
               <>
+                <Typography
+                  id="forgot-password-description"
+                  variant="body2"
+                  color="text.secondary"
+                >
+                  Enter the code sent to {email.trim()} and choose a new
+                  password.
+                </Typography>
                 <TextField
                   label="6-digit code"
+                  name="code"
                   value={code}
                   onChange={(e) => {
                     setCode(e.target.value.replace(/\D/g, "").slice(0, 6));
@@ -203,17 +236,22 @@ function ForgotPasswordDialog({ initialEmail, onClose, onDone }) {
                   inputProps={{ inputMode: "numeric", maxLength: 6 }}
                   autoComplete="one-time-code"
                   autoFocus
+                  required
                   fullWidth
                 />
                 <TextField
                   label="New password"
+                  name="newPassword"
                   type={showPassword ? "text" : "password"}
                   value={newPassword}
                   onChange={(e) => {
                     setNewPassword(e.target.value);
                     setError("");
                   }}
+                  inputProps={{ maxLength: PASSWORD_MAX }}
+                  helperText="Use 6 to 72 characters."
                   autoComplete="new-password"
+                  required
                   fullWidth
                   InputProps={{
                     endAdornment: (
@@ -222,9 +260,11 @@ function ForgotPasswordDialog({ initialEmail, onClose, onDone }) {
                           aria-label={
                             showPassword ? "Hide password" : "Show password"
                           }
+                          aria-pressed={showPassword}
                           onClick={() => setShowPassword((s) => !s)}
                           onMouseDown={(e) => e.preventDefault()}
                           edge="end"
+                          sx={{ minWidth: 44, minHeight: 44 }}
                         >
                           {showPassword ? <VisibilityOff /> : <Visibility />}
                         </IconButton>
@@ -234,13 +274,16 @@ function ForgotPasswordDialog({ initialEmail, onClose, onDone }) {
                 />
                 <TextField
                   label="Confirm new password"
+                  name="confirmPassword"
                   type={showPassword ? "text" : "password"}
                   value={confirm}
                   onChange={(e) => {
                     setConfirm(e.target.value);
                     setError("");
                   }}
+                  inputProps={{ maxLength: PASSWORD_MAX }}
                   autoComplete="new-password"
+                  required
                   fullWidth
                 />
                 <Link
@@ -258,8 +301,21 @@ function ForgotPasswordDialog({ initialEmail, onClose, onDone }) {
           </Stack>
         </DialogContent>
 
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button type="button" onClick={onClose} disabled={loading}>
+        <DialogActions
+          sx={{
+            px: 3,
+            pb: 2,
+            gap: 1,
+            flexDirection: { xs: "column-reverse", sm: "row" },
+            "& > :not(style)": { m: 0, minHeight: 44 },
+          }}
+        >
+          <Button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            fullWidth
+          >
             Cancel
           </Button>
           <Button
@@ -267,14 +323,15 @@ function ForgotPasswordDialog({ initialEmail, onClose, onDone }) {
             variant="contained"
             disableElevation
             disabled={loading}
+            fullWidth
             sx={{ borderRadius: 2, px: 2.5 }}
           >
             {step === 1
               ? loading
-                ? "Sending..."
+                ? "Sending…"
                 : "Send code"
               : loading
-                ? "Resetting..."
+                ? "Resetting…"
                 : "Reset password"}
           </Button>
         </DialogActions>
@@ -363,6 +420,8 @@ function Login() {
       <CssBaseline />
       <Box
         component="main"
+        id="main-content"
+        tabIndex={-1}
         sx={{
           minHeight: "100vh",
           "@supports (height: 100dvh)": { minHeight: "100dvh" },
@@ -553,12 +612,22 @@ function Login() {
                 <form onSubmit={handleSubmit} noValidate>
                   <Stack spacing={2.25}>
                     {notice && (
-                      <Alert severity="success" sx={{ borderRadius: 2 }}>
+                      <Alert
+                        severity="success"
+                        role="status"
+                        aria-live="polite"
+                        sx={{ borderRadius: 2 }}
+                      >
                         {notice}
                       </Alert>
                     )}
                     {serverError && (
-                      <Alert severity="error" sx={{ borderRadius: 2 }}>
+                      <Alert
+                        severity="error"
+                        role="alert"
+                        aria-live="assertive"
+                        sx={{ borderRadius: 2 }}
+                      >
                         {serverError}
                       </Alert>
                     )}
@@ -570,7 +639,7 @@ function Login() {
                       value={form.email}
                       onChange={handleChange}
                       placeholder="you@example.com"
-                      inputProps={{ maxLength: EMAIL_MAX }}
+                      inputProps={{ maxLength: EMAIL_MAX, inputMode: "email" }}
                       error={Boolean(errors.email)}
                       helperText={errors.email}
                       autoComplete="email"
@@ -601,10 +670,15 @@ function Login() {
                                     ? "Hide password"
                                     : "Show password"
                                 }
+                                aria-pressed={showPassword}
                                 onClick={() => setShowPassword((prev) => !prev)}
+                                onMouseDown={(event) => event.preventDefault()}
                                 edge="end"
-                                size="small"
-                                sx={{ color: "text.secondary" }}
+                                sx={{
+                                  color: "text.secondary",
+                                  minWidth: 44,
+                                  minHeight: 44,
+                                }}
                               >
                                 {showPassword ? (
                                   <VisibilityOff />
@@ -650,7 +724,7 @@ function Login() {
                         },
                       }}
                     >
-                      {loading ? "Signing in..." : "Sign in"}
+                      {loading ? "Signing in…" : "Sign in"}
                     </Button>
                   </Stack>
                 </form>

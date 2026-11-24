@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import {
   Box,
   Container,
@@ -22,6 +23,9 @@ import LocationOnIcon from "@mui/icons-material/LocationOnOutlined";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const CONTACT_URL = `${API_URL}/contact/acontact`;
+const CURRENT_YEAR = new Intl.DateTimeFormat("en", { year: "numeric" }).format(
+  new Date(),
+);
 
 /* Reusable footer info row – mirrors the InfoRow from the contact page */
 const FooterInfoRow = ({ icon, label, value, href, external }) => (
@@ -255,9 +259,8 @@ export default function Footer() {
                 fontSize: "0.875rem",
               }}
             >
-              Lorem ipsum dolor sit amet consectetur, adipisicing elit. Possimus
-              nulla fugiat et veniam dicta? Reiciendis magnam dolores maiores
-              repellendus molestiae!
+              Build, publish, and manage professional tenant websites from one
+              secure workspace.
             </Typography>
 
             <Stack direction="row" spacing={0.75} sx={{ mt: 3 }}>
@@ -284,9 +287,10 @@ export default function Footer() {
                 },
               ].map((s, i) => (
                 <IconButton
-                  key={i}
+                key={s.href}
                   component="a"
                   href={s.href}
+                  aria-label={`Open ${["LinkedIn", "YouTube", "Instagram", "Facebook"][i]}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   size="small"
@@ -294,7 +298,7 @@ export default function Footer() {
                     color: "#94a3b8",
                     border: "1px solid rgba(255,255,255,0.08)",
                     borderRadius: 1.5,
-                    transition: "all 0.2s ease",
+                    transition: "background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease",
                     "&:hover": {
                       color: s.hover,
                       borderColor: alpha(s.hover, 0.5),
@@ -329,12 +333,13 @@ export default function Footer() {
               {[
                 { name: "Home", path: "/home" },
                 { name: "Contact", path: "/contact" },
-                { name: "Template", path: "/viewtemp" },
+                { name: "Templates", path: "/templates" },
                 { name: "My Account", path: "/myaccount" },
               ].map((item) => (
                 <Link
                   key={item.name}
-                  href={item.path}
+                  component={RouterLink}
+                  to={item.path}
                   underline="none"
                   sx={{
                     color: "#94a3b8",
@@ -384,7 +389,7 @@ export default function Footer() {
                 variant="body2"
                 sx={{ color: "#64748b", fontSize: "0.8rem" }}
               >
-                Contact information is not available at the moment.
+                Contact details are not available yet.
               </Typography>
             )}
           </Grid>
@@ -411,7 +416,7 @@ export default function Footer() {
               fontSize: "0.8rem",
             }}
           >
-            © {new Date().getFullYear()} Tenant Website. All Rights Reserved.
+            © {CURRENT_YEAR} Tenant Website. All rights reserved.
           </Typography>
         </Box>
       </Container>

@@ -105,6 +105,43 @@ exports.getTheme = async (req, res) => {
   }
 };
 
+exports.getPublicTheme = async (req, res) => {
+  const siteId = Number(req.params.siteId);
+  if (!Number.isSafeInteger(siteId) || siteId <= 0) {
+    return res.status(400).json({ error: "Invalid site id" });
+  }
+  try {
+    const { getPublicSite } = require("./access");
+    await getPublicSite(String(siteId));
+    const [[site]] = await db.query(
+      `SELECT s.name AS siteName, th.color, th.background,
+              st.defaultTheme, st.customTheme, st.activeTheme
+         FROM sites s
+         JOIN theme th ON th.themeId = s.themeId
+         LEFT JOIN sitethemes st ON st.siteId = s.id
+        WHERE s.id = ?`,
+      [siteId],
+    );
+    if (!site) return res.status(404).json({ error: "Site not found" });
+    let effectiveTheme = { color: site.color, background: site.background };
+    if (site.activeTheme === "custom" && site.customTheme) {
+      effectiveTheme = site.customTheme;
+    } else if (site.defaultTheme) {
+      effectiveTheme = site.defaultTheme;
+    }
+    return res.json({
+      siteId,
+      siteName: site.siteName,
+      activeTheme: site.activeTheme || "default",
+      effectiveTheme,
+    });
+  } catch (error) {
+    if (error.status) return res.status(error.status).json({ error: error.message });
+    console.error("getPublicTheme error", error);
+    return res.status(500).json({ error: "Could not load public theme" });
+  }
+};
+
 // -------------------------------------------------------------------
 // PUT /sites/:siteId/theme/custom
 // Body: { customTheme: { color: "...", background: "..." }, activeTheme?: "custom"|"default" }

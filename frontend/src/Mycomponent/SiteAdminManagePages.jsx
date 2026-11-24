@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import axios from "axios";
 import { CKEditor } from "ckeditor4-react";
@@ -8,8 +8,13 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   IconButton,
+  MenuItem,
   Paper,
   Stack,
   TextField,
@@ -19,7 +24,37 @@ import {
   useTheme,
 } from "@mui/material";
 
-import { buildPageBody } from "../utils/buildPageContent";
+import { buildFormMarkup, buildPageBody, inferColumns } from "../utils/buildPageContent";
+import { getTablePermission } from "../config/readOnlyTables";
+
+/* ------------------------------------------------------------------ */
+/*  dehydrate                                                          */
+/*  The editor shows hydrated HTML (real table data). Before storing   */
+/*  we swap every generated block back to its original placeholder,    */
+/*  so pages.page keeps placeholders and the live site stays current.  */
+/* ------------------------------------------------------------------ */
+const dehydrate = (html) => {
+  if (!html) return "";
+  try {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    doc.querySelectorAll("[data-tn-placeholder]").forEach((el) => {
+      let original;
+      try {
+        let raw = el.getAttribute("data-tn-placeholder") || "";
+        if (raw.startsWith("v1:")) raw = raw.slice(3);
+        original = decodeURIComponent(raw);
+      } catch {
+        return;
+      }
+      const tpl = doc.createElement("template");
+      tpl.innerHTML = original;
+      el.replaceWith(tpl.content);
+    });
+    return doc.body.innerHTML;
+  } catch {
+    return html;
+  }
+};
 
 /* ------------------------------------------------------------------ */
 /*  Inline SVG icons — no MUI icon imports, no tree-shaking issues     */
@@ -61,7 +96,6 @@ const EditIcon = (p) => (
     <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
   </SvgIcon>
 );
-
 const SaveIcon = (p) => (
   <SvgIcon {...p}>
     <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
@@ -82,7 +116,47 @@ const DeleteIcon = (p) => (
     <path d="M10 11v6M14 11v6" />
   </SvgIcon>
 );
+// Convert different API response formats into arrays.
+const getArrayResponse = (payload, keys = []) => {
+  if (Array.isArray(payload)) return payload;
 
+  if (!payload || typeof payload !== "object") return [];
+
+  for (const key of keys) {
+    if (Array.isArray(payload[key])) {
+      return payload[key];
+    }
+  }
+
+  if (payload.data && payload.data !== payload) {
+    return getArrayResponse(payload.data, keys);
+  }
+
+  return [];
+};
+
+// Extract a resource name whether the API returns a string or object.
+const getResourceName = (item) => {
+  if (typeof item === "string") return item.trim();
+
+  if (item && typeof item === "object") {
+    return String(
+      item.resourceName ??
+        item.resource ??
+        item.tableName ??
+        item.entity ??
+        item.name ??
+        item.key ??
+        "",
+    ).trim();
+  }
+
+  return "";
+};
+
+// Normalize resource records.
+const getRecords = (payload) =>
+  getArrayResponse(payload, ["records", "rows", "items", "data"]);
 export default function SiteAdminManagePages() {
   const { site, pages, setPages, setSite, baseUrl, authConfig, API_URL } =
     useOutletContext();
@@ -96,14 +170,22 @@ export default function SiteAdminManagePages() {
   const [success, setSuccess] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [title, setTitle] = useState("");
+  // `content` always holds the STORED html (with placeholders).
   const [content, setContent] = useState("");
   const [creating, setCreating] = useState(false);
   const [sliders, setSliders] = useState([]);
   const [galleryItems, setGalleryItems] = useState([]);
   const [siteData, setSiteData] = useState({});
-  const [, setResourcesLoading] = useState(false);
-  const [, setDataSections] = useState([]);
+  const [resourcesReady, setResourcesReady] = useState(false);
+  const [formDialogOpen, setFormDialogOpen] = useState(false);
+  const [formResource, setFormResource] = useState("");
+  const [formFields, setFormFields] = useState("");
+  const [formSubmitText, setFormSubmitText] = useState("Submit");
+  const [formSuccessMessage, setFormSuccessMessage] = useState(
+    "Thank you. Your submission was received.",
+  );
   const editorRef = useRef(null);
+  const dehydrateTimer = useRef(null);
   const pagesUrl = `${baseUrl}/pages`;
 
   const hiddenScrollSx = {
@@ -112,57 +194,102 @@ export default function SiteAdminManagePages() {
     scrollbarWidth: "none",
   };
 
-  const applyTheme = (editor) => {
-    if (!editor) return;
-    // Prefer effectiveTheme from /theme endpoint; fallback to legacy top-level fields
-    const eff = site?.effectiveTheme || {};
-    const bg = eff.background || site?.background || "#ffffff";
-    const fg = eff.color || site?.color || "#222222";
-    const doc = editor.document.$;
-    const existing = doc.querySelector('style[data-tenat-theme="1"]');
-    if (existing) existing.remove();
-    const style = doc.createElement("style");
-    style.setAttribute("data-tenat-theme", "1");
-    style.textContent = `
-      body {
-        background-color: ${bg} !important;
-        color: ${fg} !important;
-      }
-    `;
-    doc.head.appendChild(style);
-    editor.document.getBody().setStyles({ backgroundColor: bg, color: fg });
-  };
+  const applyTheme = useCallback(
+    (editor) => {
+      if (!editor || !editor.document) return;
+      const eff = site?.effectiveTheme || {};
+      const bg = eff.background || site?.background || "#ffffff";
+      const fg = eff.color || site?.color || "#222222";
+      const doc = editor.document.$;
+      doc
+        .querySelectorAll('style[data-tenat-theme="1"]')
+        .forEach((n) => n.remove());
+      const style = doc.createElement("style");
+      style.setAttribute("data-tenat-theme", "1");
+      style.textContent = `
+        body { background-color: ${bg} !important; color: ${fg} !important; }
 
-  const loadPages = async (keepSelectedId = "") => {
-    const { data } = await axios.get(pagesUrl, authConfig);
-    const list = Array.isArray(data.pages) ? data.pages : [];
-    setSite(data);
-    setPages(list);
+        /* Gallery + slider styles — mirror buildPageSrcDoc so the editor
+           preview matches the live site. */
+        .site-gallery { margin-top: 32px; }
+        .site-gallery-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+          gap: 16px;
+        }
+        .site-gallery figure {
+          margin: 0;
+          overflow: hidden;
+          border-radius: 10px;
+          background: #ffffff;
+        }
+        .site-gallery img {
+          display: block;
+          width: 100%;
+          height: 240px;
+          object-fit: cover;
+        }
+        .site-gallery figcaption { padding: 10px 12px; }
 
-    const selected =
-      list.find((page) => String(page.sitePageId) === String(keepSelectedId)) ||
-      list[0];
-    setSelectedId(selected ? String(selected.sitePageId) : "");
-    setTitle(selected?.title || "");
-    setContent(selected?.page || "");
-    setCreating(!selected);
-  };
+        .site-home-slider {
+          width: 100%;
+          margin: 22px auto 28px;
+          overflow: hidden;
+          border-radius: 12px;
+          background: #f0f0f0;
+        }
+        .site-slider-track { display: flex; width: 100%; }
+        .site-slide {
+          position: relative;
+          flex: 0 0 100%;
+          height: clamp(220px, 42vw, 520px);
+        }
+        .site-slide img { width: 100%; height: 100%; object-fit: cover; }
+        .site-slide span {
+          position: absolute;
+          inset: auto 0 0;
+          padding: 18px 22px;
+          color: #fff;
+          background: linear-gradient(transparent, rgba(0,0,0,.7));
+          font-size: 1.15rem;
+          text-align: left;
+        }
+      `;
+      doc.head.appendChild(style);
+      editor.document.getBody().setStyles({ backgroundColor: bg, color: fg });
+    },
+    [site],
+  );
 
+  /* ---------------- Single loader (mount + save + delete) ------------ */
+  const loadPages = useCallback(
+    async (keepSelectedId = "") => {
+      const { data } = await axios.get(pagesUrl, authConfig);
+      const list = Array.isArray(data.pages) ? data.pages : [];
+      setSite(data);
+      setPages(list);
+
+      const selected =
+        list.find(
+          (page) => String(page.sitePageId) === String(keepSelectedId),
+        ) || list[0];
+      setSelectedId(selected ? String(selected.sitePageId) : "");
+      setTitle(selected?.title || "");
+      setContent(selected?.page || "");
+      setCreating(!selected);
+      return list;
+    },
+    [authConfig, pagesUrl, setPages, setSite],
+  );
+
+  /* ---------------- Load pages ---------------- */
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
       setLoading(true);
       setError("");
       try {
-        const { data } = await axios.get(pagesUrl, authConfig);
-        if (cancelled) return;
-        const list = Array.isArray(data.pages) ? data.pages : [];
-        setSite(data);
-        setPages(list);
-        setSelectedId(list[0] ? String(list[0].sitePageId) : "");
-        setTitle(list[0]?.title || "");
-        setContent(list[0]?.page || "");
-        setCreating(list.length === 0);
+        await loadPages("");
       } catch (requestError) {
         if (!cancelled) {
           setError(
@@ -179,85 +306,173 @@ export default function SiteAdminManagePages() {
     return () => {
       cancelled = true;
     };
-  }, [pagesUrl, authConfig]);
+  }, [loadPages]);
 
-  const previewHtml = (rawHtml, pageTitle) => {
-    // Build the base hydrated HTML — no editor-only placeholder block.
-    return buildPageBody({
-      html: rawHtml,
-      pageTitle,
-      slides: sliders,
-      galleries: galleryItems,
-      siteData,
-    });
-  };
-  useEffect(() => {
-    if (site && editorRef.current) {
-      applyTheme(editorRef.current);
-    }
-  }, [site]);
-
-  // --- Render resource sections ---
-  // [Removed renderResources() as it is no longer used in the layout]
+  /* ---------------- Load slider / gallery / data / headers ---------- */
 
   useEffect(() => {
     let cancelled = false;
+
     const loadResources = async () => {
-      setResourcesLoading(true);
+      setResourcesReady(false);
+
       try {
-        const [sliderRes, galleryRes, sectionsRes] = await Promise.allSettled([
-          axios.get(`${baseUrl}/slider`, authConfig),
-          axios.get(`${baseUrl}/galleries`, authConfig),
-          axios.get(`${baseUrl}/data`, authConfig),
-        ]);
+        const [sliderRes, galleryRes, sectionsRes, headersRes] =
+          await Promise.allSettled([
+            axios.get(`${baseUrl}/slider`, authConfig),
+            axios.get(`${baseUrl}/galleries`, authConfig),
+            axios.get(`${baseUrl}/data`, authConfig),
+            axios.get(`${baseUrl}/header`, authConfig),
+          ]);
+
         if (cancelled) return;
 
-        const sliderList =
-          sliderRes.status === "fulfilled" &&
-          Array.isArray(sliderRes.value.data)
-            ? sliderRes.value.data
-            : [];
-        const galleryList =
-          galleryRes.status === "fulfilled" &&
-          Array.isArray(galleryRes.value.data)
-            ? galleryRes.value.data
-            : [];
-        const sections =
-          sectionsRes.status === "fulfilled" &&
-          Array.isArray(sectionsRes.value.data)
-            ? sectionsRes.value.data
-            : [];
+        const getResult = (result, name) => {
+          if (result.status === "rejected") {
+            console.error(
+              `[ManagePages] Failed to load ${name}:`,
+              result.reason?.response?.data || result.reason,
+            );
+            return null;
+          }
+
+          return result.value.data;
+        };
+
+        const sliderPayload = getResult(sliderRes, "slider");
+        const galleryPayload = getResult(galleryRes, "galleries");
+        const sectionsPayload = getResult(sectionsRes, "data sections");
+        const headersPayload = getResult(headersRes, "headers");
+
+        const sliderList = getArrayResponse(sliderPayload, [
+          "sliders",
+          "items",
+          "data",
+        ]);
+
+        const galleryList = getArrayResponse(galleryPayload, [
+          "galleries",
+          "items",
+          "data",
+        ]);
+
+        const sections = getArrayResponse(sectionsPayload, [
+          "resources",
+          "sections",
+          "tables",
+          "entities",
+          "data",
+        ])
+          .map(getResourceName)
+          .filter(Boolean);
+
+        console.log("[ManagePages] Available resources:", sections);
 
         setSliders(sliderList);
         setGalleryItems(galleryList);
-        setDataSections(sections);
 
+        // Fetch actual records for every resource.
         const recordsEntries = await Promise.all(
           sections.map(async (resource) => {
             try {
-              const { data } = await axios.get(
-                `${baseUrl}/data/${resource}`,
+              const response = await axios.get(
+                `${baseUrl}/data/${encodeURIComponent(resource)}`,
                 authConfig,
               );
-              return [resource, Array.isArray(data) ? data : []];
-            } catch {
+
+              const records = getRecords(response.data);
+
+              console.log(
+                `[ManagePages] ${resource}:`,
+                records.length,
+                "records",
+              );
+
+              return [resource, records];
+            } catch (err) {
+              console.error(
+                `[ManagePages] Failed to fetch ${resource}:`,
+                err.response?.data || err.message,
+              );
+
               return [resource, []];
             }
           }),
         );
-        if (!cancelled) {
-          setSiteData(Object.fromEntries(recordsEntries));
+
+        const merged = Object.fromEntries(recordsEntries);
+
+        // Support both a direct header object and wrapped header response.
+        const headerObject =
+          headersPayload?.header ?? headersPayload?.headers ?? headersPayload;
+
+        if (
+          headerObject &&
+          !Array.isArray(headerObject) &&
+          typeof headerObject === "object"
+        ) {
+          merged.headers = [{ id: "headers", ...headerObject }];
         }
-      } finally {
-        if (!cancelled) setResourcesLoading(false);
+
+        if (cancelled) return;
+
+        setSiteData(merged);
+        setResourcesReady(true);
+
+        console.log("[ManagePages] Final site data:", merged);
+      } catch (err) {
+        console.error("[ManagePages] Resource loading failed:", err);
+
+        if (!cancelled) {
+          setSiteData({});
+          setResourcesReady(true);
+        }
       }
     };
 
     loadResources();
+
     return () => {
       cancelled = true;
     };
   }, [baseUrl, authConfig]);
+
+  /* ---------------- Hydrated html shown inside the editor ------------ */
+  // Recompute the initial editor markup as data changes. The editor is not
+  // mounted until resource loading finishes, so async CKEditor initialization
+  // cannot race a resource-driven remount.
+  const editorInitData = useMemo(() => {
+    if (creating) return "";
+    try {
+      return buildPageBody({
+        html: content,
+        pageTitle: title,
+        slides: sliders,
+        galleries: galleryItems,
+        siteData,
+        baseUrl: API_URL, // absolute /uploads/… in editor preview
+      });
+    } catch (err) {
+      console.error("[ManagePages] buildPageBody failed:", err);
+      return content;
+    }
+  }, [
+    creating,
+    selectedId,
+    resourcesReady,
+    content,
+    title,
+    sliders,
+    galleryItems,
+    siteData,
+    API_URL,
+  ]);
+
+  useEffect(() => {
+    if (site && editorRef.current) {
+      applyTheme(editorRef.current);
+    }
+  }, [site, applyTheme]);
 
   const selectPage = (page) => {
     setSelectedId(String(page.sitePageId));
@@ -267,6 +482,18 @@ export default function SiteAdminManagePages() {
     setError("");
     setSuccess("");
   };
+
+  // CKEditor 4 does not re-apply initData after mount, so push the new
+  // page's hydrated markup into the live editor instance on selection change.
+  useEffect(() => {
+    if (!editorRef.current) return;
+    const nextData = creating ? "" : editorInitData;
+    try {
+      editorRef.current.setData(nextData || "");
+    } catch {
+      // editor not ready yet; initData prop will handle initial load
+    }
+  }, [selectedId, creating, editorInitData]);
 
   const movePage = async (index, offset) => {
     const targetIndex = index + offset;
@@ -320,7 +547,7 @@ export default function SiteAdminManagePages() {
       if (creating) {
         const { data } = await axios.post(
           pagesUrl,
-          { title, page: content },
+          { title, page: content, isFormSubmission: true },
           authConfig,
         );
         await loadPages(data.sitePageId);
@@ -328,7 +555,7 @@ export default function SiteAdminManagePages() {
       } else {
         await axios.put(
           `${pagesUrl}/${selectedId}`,
-          { title, page: content },
+          { title, page: content, isFormSubmission: true },
           authConfig,
         );
         await loadPages(selectedId);
@@ -343,6 +570,67 @@ export default function SiteAdminManagePages() {
     }
   };
 
+  const insertForm = () => {
+    const resources = Object.keys(siteData).filter((resource) =>
+      getTablePermission(
+        site?.packKey || site?.vertical || site?.pack || "",
+        resource,
+      ) === "status"
+    );
+    if (!resources.length) {
+      setError("This site has no visitor-submission resources.");
+      return;
+    }
+    setFormResource(resources[0]);
+    setFormFields("");
+    setFormSubmitText("Submit");
+    setFormSuccessMessage("Thank you. Your submission was received.");
+    setFormDialogOpen(true);
+  };
+
+  const insertConfiguredForm = () => {
+    if (!formResource) return;
+    const inferred = inferColumns(siteData[formResource]);
+    const available = inferred
+      .filter((column) =>
+        !/(status|password|token|price|amount|total|id$)/i.test(column.key)
+      )
+      .map((column) => column.key);
+    const selected = formFields
+      .split(",")
+      .map((name) => name.trim())
+      .filter((name) => available.includes(name));
+    if (!selected.length) {
+      setError("Select at least one supported form field.");
+      return;
+    }
+    const fields = selected.map((name) => {
+      const column = inferred.find((item) => item.key === name);
+      return {
+        name,
+        label: column?.label || name,
+        type:
+          /email/i.test(name) ? "email" :
+          /phone|mobile/i.test(name) ? "phone" :
+          /date/i.test(name) ? "date" :
+          /time/i.test(name) ? "time" :
+          /message|description|comment|address|details/i.test(name) ? "textarea" :
+          "text",
+        required: true,
+      };
+    });
+    const markup = buildFormMarkup({
+      resource: formResource,
+      fields,
+      submitText: formSubmitText.trim() || "Submit",
+      successMessage:
+        formSuccessMessage.trim() || "Thank you. Your submission was received.",
+    });
+    editorRef.current?.insertHtml(markup);
+    setFormDialogOpen(false);
+    setSuccess("Submission form inserted.");
+  };
+
   const deletePage = async (page) => {
     if (!window.confirm(`Delete "${page.title}"? This cannot be undone.`)) {
       return;
@@ -353,8 +641,6 @@ export default function SiteAdminManagePages() {
     setSuccess("");
     try {
       await axios.delete(`${pagesUrl}/${page.sitePageId}`, authConfig);
-      // If the deleted page was the one being edited, clear the editor
-      // and let loadPages pick the next page (or enter creating mode).
       const keepSelectedId =
         String(page.sitePageId) === String(selectedId) ? "" : selectedId;
       await loadPages(keepSelectedId);
@@ -368,14 +654,42 @@ export default function SiteAdminManagePages() {
     }
   };
 
+  // Debounced dehydrate — avoids re-parsing the editor DOM on every keystroke.
+  const handleEditorChange = (event) => {
+    const html = event.editor.getData();
+    if (dehydrateTimer.current) clearTimeout(dehydrateTimer.current);
+    dehydrateTimer.current = setTimeout(() => {
+      setContent(dehydrate(html));
+    }, 200);
+  };
+
+  useEffect(
+    () => () => {
+      if (dehydrateTimer.current) clearTimeout(dehydrateTimer.current);
+    },
+    [],
+  );
+
   const selectedPage = pages.find((p) => String(p.sitePageId) === selectedId);
   const currentTitle = creating
     ? "New custom page"
     : selectedPage?.title || "Page";
+  const formResources = Object.keys(siteData).filter((resource) =>
+    getTablePermission(
+      site?.packKey || site?.vertical || site?.pack || "",
+      resource,
+    ) === "status"
+  );
+  const formAvailableFields = formResource
+    ? inferColumns(siteData[formResource])
+        .filter((column) =>
+          !/(status|password|token|price|amount|total|id$)/i.test(column.key)
+        )
+        .map((column) => column.key)
+    : [];
 
   return (
     <Box sx={{ maxWidth: 1440, mx: "auto" }}>
-      {/* ---------------- Page header ---------------- */}
       <Stack
         direction={{ xs: "column", sm: "row" }}
         spacing={2}
@@ -428,7 +742,7 @@ export default function SiteAdminManagePages() {
             alignItems: "start",
           }}
         >
-          {/* ---------------- Sidebar:  pages ---------------- */}
+          {/* ---------------- Sidebar: pages ---------------- */}
           <Stack
             spacing={2}
             sx={{
@@ -437,7 +751,6 @@ export default function SiteAdminManagePages() {
               pr: { md: 0.5 },
             }}
           >
-            {/* Pages list card */}
             <Paper
               variant="outlined"
               sx={{ p: 2, borderRadius: 3, minWidth: 0 }}
@@ -454,6 +767,7 @@ export default function SiteAdminManagePages() {
                   Pages
                 </Typography>
                 <Button
+                  type="button"
                   size="small"
                   variant="outlined"
                   startIcon={<AddIcon size={14} />}
@@ -526,7 +840,7 @@ export default function SiteAdminManagePages() {
                               size="small"
                               label="Editing"
                               sx={{
-                                height: 18,
+                                height: 20,
                                 fontSize: 10,
                                 fontWeight: 700,
                                 bgcolor: alpha(
@@ -559,20 +873,22 @@ export default function SiteAdminManagePages() {
                       >
                         <Stack sx={{ flexShrink: 0 }}>
                           <IconButton
+                            type="button"
                             size="small"
                             aria-label={`Move ${page.title} up`}
-                            disabled={reordering || deletingId || index === 0}
+                            disabled={reordering || !!deletingId || index === 0}
                             onClick={() => movePage(index, -1)}
                             sx={{ p: 0.25, borderRadius: 1 }}
                           >
                             <UpIcon size={14} />
                           </IconButton>
                           <IconButton
+                            type="button"
                             size="small"
                             aria-label={`Move ${page.title} down`}
                             disabled={
                               reordering ||
-                              deletingId ||
+                              !!deletingId ||
                               index === pages.length - 1
                             }
                             onClick={() => movePage(index, 1)}
@@ -582,22 +898,25 @@ export default function SiteAdminManagePages() {
                           </IconButton>
                         </Stack>
                         <Tooltip title={`Delete ${page.title}`}>
-                          <IconButton
-                            size="small"
-                            aria-label={`Delete ${page.title}`}
-                            color="error"
-                            disabled={
-                              reordering || deletingId || pages.length <= 1
-                            }
-                            onClick={() => deletePage(page)}
-                            sx={{ p: 0.25, borderRadius: 1 }}
-                          >
-                            {deletingId === String(page.sitePageId) ? (
-                              <CircularProgress size={14} color="error" />
-                            ) : (
-                              <DeleteIcon size={14} />
-                            )}
-                          </IconButton>
+                          <span>
+                            <IconButton
+                              type="button"
+                              size="small"
+                              aria-label={`Delete ${page.title}`}
+                              color="error"
+                              disabled={
+                                reordering || !!deletingId || pages.length <= 1
+                              }
+                              onClick={() => deletePage(page)}
+                              sx={{ p: 0.25, borderRadius: 1 }}
+                            >
+                              {deletingId === String(page.sitePageId) ? (
+                                <CircularProgress size={14} color="error" />
+                              ) : (
+                                <DeleteIcon size={14} />
+                              )}
+                            </IconButton>
+                          </span>
                         </Tooltip>
                       </Stack>
                     </Stack>
@@ -689,6 +1008,14 @@ export default function SiteAdminManagePages() {
                 >
                   Page content
                 </Typography>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={insertForm}
+                  sx={{ mb: 1, textTransform: "none" }}
+                >
+                  Insert submission form
+                </Button>
                 <Box
                   sx={{
                     width: "100%",
@@ -711,10 +1038,10 @@ export default function SiteAdminManagePages() {
                     },
                   }}
                 >
+                  {resourcesReady && (
                   <CKEditor
-                    key={creating ? "new" : selectedId}
-                    editorUrl="https://cdn.ckeditor.com/4.22.1/standard-all/ckeditor.js"
-                    initData={creating ? "" : content}
+                    editorUrl="https://cdn.ckeditor.com/4.22.1/full-all/ckeditor.js"
+                    initData={editorInitData}
                     onBeforeLoad={(CKEDITOR) => {
                       if (CKEDITOR.plugins.get("localvideo")) return;
 
@@ -755,63 +1082,43 @@ export default function SiteAdminManagePages() {
                               input.click();
                             },
                           });
-
                           editor.ui.addButton("LocalVideo", {
                             label: "Insert video",
                             command: "localvideoCmd",
-                            toolbar: "insert",
-                            icon:
-                              "data:image/svg+xml;utf8," +
-                              encodeURIComponent(
-                                '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="#444" d="M4 5h11a2 2 0 0 1 2 2v3l5-3v10l-5-3v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/></svg>',
-                              ),
+                            toolbar: "insert,10",
+                            icon: "/assets/icons/video.png",
                           });
                         },
                       });
                     }}
                     config={{
-                      height: 350,
+                      height: 420,
                       language: "en",
+                      versionCheck: false,
+                      removePlugins: "exportpdf",
+                      // Preserve every attribute/class the generator relies on
+                      // so data-field / data-attr survive editor round-trips.
                       allowedContent: true,
-                      // Enable the colorbutton plugin for text/background color
+                      extraAllowedContent:
+                        "div[*]{*}; section[*]{*}; p[*]{*}; a[*]{*}; img[*]{*}; figure; figcaption; table[*]{*}; thead; tbody; tr[*]{*}; td[*]{*}; th[*]{*}; span[*]{*}; video[*]{*}; source[*]; form[*]{*}; input[*]{*}; textarea[*]{*}; select[*]{*}; option[*]{*}; label[*]{*}; button[*]{*}",
+
                       extraPlugins:
-                        "uploadimage,localvideo,colorbutton,find,divarea",
+                        "uploadimage,localvideo,colorbutton,find,divarea,justify,showblocks,smiley,pagebreak,copyformatting",
 
-                      // Use toolbarGroups for better organization and future plugin compatibility
-                      toolbarGroups: [
-                        {
-                          name: "document",
-                          groups: ["mode", "document", "doctools"],
-                        },
-                        { name: "clipboard", groups: ["clipboard", "undo"] },
-                        {
-                          name: "editing",
-                          groups: ["find", "selection", "spellchecker"],
-                        },
-                        { name: "forms" },
-                        {
-                          name: "basicstyles",
-                          groups: ["basicstyles", "cleanup"],
-                        },
-                        {
-                          name: "paragraph",
-                          groups: ["list", "indent", "blocks", "align", "bidi"],
-                        },
-                        { name: "links" },
-                        { name: "insert" },
-                        { name: "styles" },
-                        { name: "colors" },
-                        { name: "tools" },
-                        { name: "others" },
-                        { name: "about" },
-                      ],
+                      clipboard_handleImages: false,
 
-                      // Explicitly add your custom LocalVideo button into the 'insert' group
-                      // (Since it is not a standard plugin, we add it to the toolbar array)
                       toolbar: [
                         {
                           name: "document",
-                          items: ["Source", "-", "Preview", "-", "Maximize"],
+                          items: [
+                            "Source",
+                            "-",
+                            "Preview",
+                            "-",
+                            "Print",
+                            "-",
+                            "Templates",
+                          ],
                         },
                         {
                           name: "clipboard",
@@ -828,9 +1135,18 @@ export default function SiteAdminManagePages() {
                         },
                         {
                           name: "editing",
-                          items: ["Find", "Replace", "-", "SelectAll"],
+                          items: [
+                            "Find",
+                            "Replace",
+                            "-",
+                            "SelectAll",
+                            "CopyFormatting",
+                          ],
                         },
+                        { name: "tools", items: ["Maximize", "ShowBlocks"] },
+
                         "/",
+
                         {
                           name: "basicstyles",
                           items: [
@@ -846,6 +1162,20 @@ export default function SiteAdminManagePages() {
                         },
                         { name: "colors", items: ["TextColor", "BGColor"] },
                         {
+                          name: "styles",
+                          items: [
+                            "Styles",
+                            "-",
+                            "Format",
+                            "-",
+                            "Font",
+                            "FontSize",
+                          ],
+                        },
+
+                        "/",
+
+                        {
                           name: "paragraph",
                           items: [
                             "NumberedList",
@@ -860,9 +1190,15 @@ export default function SiteAdminManagePages() {
                             "JustifyCenter",
                             "JustifyRight",
                             "JustifyBlock",
+                            "-",
+                            "BidiLtr",
+                            "BidiRtl",
                           ],
                         },
                         { name: "links", items: ["Link", "Unlink", "Anchor"] },
+
+                        "/",
+
                         {
                           name: "insert",
                           items: [
@@ -870,29 +1206,45 @@ export default function SiteAdminManagePages() {
                             "LocalVideo",
                             "Table",
                             "HorizontalRule",
+                            "-",
                             "SpecialChar",
+                            "Smiley",
+                            "PageBreak",
+                            "Iframe",
                           ],
                         },
-                        { name: "styles", items: ["Format", "FontSize"] },
-                        { name: "tools", items: ["Maximize"] },
+
+                        "/",
+
+                        {
+                          name: "forms",
+                          items: [
+                            "Form",
+                            "Checkbox",
+                            "Radio",
+                            "TextField",
+                            "Textarea",
+                            "Select",
+                            "Button",
+                            "ImageButton",
+                            "HiddenField",
+                          ],
+                        },
                       ],
 
-                      // Remove buttons you don't want to keep the toolbar clean
-                      removeButtons:
-                        "NewPage,Templates,Form,Checkbox,Radio,TextField,Textarea,Select,Button,ImageButton,HiddenField,About",
+                      removeButtons: "",
 
-                      // Keep your upload settings
                       uploadUrl: `${API_URL}/uploads/ckeditor`,
                       imageUploadUrl: `${API_URL}/uploads/ckeditor`,
                       filebrowserImageUploadUrl: `${API_URL}/uploads/ckeditor`,
                     }}
                     onInstanceReady={(event) => {
-                      const editor = event.editor;
-                      editorRef.current = editor;
-                      applyTheme(editor);
+                      editorRef.current = event.editor;
+                      applyTheme(event.editor);
                     }}
-                    onChange={(event) => setContent(event.editor.getData())}
+                    onChange={handleEditorChange}
                   />
+                  )}
                 </Box>
               </Box>
 
@@ -912,6 +1264,7 @@ export default function SiteAdminManagePages() {
                     : "Changes are not published until you save."}
                 </Typography>
                 <Button
+                  type="button"
                   variant="contained"
                   disableElevation
                   startIcon={
@@ -946,6 +1299,65 @@ export default function SiteAdminManagePages() {
           </Paper>
         </Box>
       )}
+      <Dialog
+        open={formDialogOpen}
+        onClose={() => setFormDialogOpen(false)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>Insert submission form</DialogTitle>
+        <DialogContent sx={{ display: "grid", gap: 2, pt: 2 }}>
+          <TextField
+            select
+            label="Submission resource"
+            value={formResource}
+            onChange={(event) => {
+              setFormResource(event.target.value);
+              setFormFields("");
+            }}
+            fullWidth
+          >
+            {formResources.map((resource) => (
+              <MenuItem key={resource} value={resource}>
+                {resource}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            label="Fields"
+            value={formFields}
+            onChange={(event) => setFormFields(event.target.value)}
+            helperText={
+              formAvailableFields.length
+                ? `Comma-separated. Available: ${formAvailableFields.join(", ")}`
+                : "No supported fields are available."
+            }
+            fullWidth
+          />
+          <TextField
+            label="Submit button text"
+            value={formSubmitText}
+            onChange={(event) => setFormSubmitText(event.target.value)}
+            fullWidth
+          />
+          <TextField
+            label="Success message"
+            value={formSuccessMessage}
+            onChange={(event) => setFormSuccessMessage(event.target.value)}
+            fullWidth
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setFormDialogOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={insertConfiguredForm}
+            disabled={!formResource || !formFields.trim()}
+          >
+            Insert form
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

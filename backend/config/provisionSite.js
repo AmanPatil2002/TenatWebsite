@@ -126,7 +126,8 @@ const generateUniqueDbName = async (userName, siteName, siteId) => {
 
 // Check if a table exists in a database
 const tableExists = async (dbName, tableName, schemaName) => {
-  const actualSchemaName = schemaName || (await getExistingDatabaseName(dbName));
+  const actualSchemaName =
+    schemaName || (await getExistingDatabaseName(dbName));
   if (!actualSchemaName) return false;
   const result = await q(
     `SELECT TABLE_NAME
@@ -149,7 +150,9 @@ const siteTablesForPack = (packKey) => {
 };
 
 const findMissingSiteTables = async (siteId, dbName, packKey) => {
-  const expected = [...new Set(siteTablesForPack(packKey).map(([name]) => name))];
+  const expected = [
+    ...new Set(siteTablesForPack(packKey).map(([name]) => name)),
+  ];
   const actualSchemaName = dbName
     ? await getExistingDatabaseName(dbName)
     : null;
@@ -164,10 +167,10 @@ const findMissingSiteTables = async (siteId, dbName, packKey) => {
         WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN (?)`,
       [actualSchemaName, expected],
     ),
-    q(
-      "SELECT baseName FROM sitetables WHERE siteId = ? AND baseName IN (?)",
-      [siteId, expected],
-    ),
+    q("SELECT baseName FROM sitetables WHERE siteId = ? AND baseName IN (?)", [
+      siteId,
+      expected,
+    ]),
   ]);
   const present = new Set(presentRows.map(({ TABLE_NAME }) => TABLE_NAME));
   const registered = new Set(registeredRows.map(({ baseName }) => baseName));
@@ -206,11 +209,7 @@ async function ensureSiteDatabase(siteId, dbName, packKey, provisionStatus) {
     if (!actualDbName) {
       throw new Error("Site database does not exist after provisioning");
     }
-    const remaining = await findMissingSiteTables(
-      id,
-      actualDbName,
-      packKey,
-    );
+    const remaining = await findMissingSiteTables(id, actualDbName, packKey);
     if (remaining.tables.length || remaining.registered.length) {
       throw new Error(
         `Site database schema is incomplete; missing tables: ${remaining.tables.join(", ")}`,
@@ -250,8 +249,7 @@ const qualifyDdl = (siteId, base, ddl, dbNameFromSite) => {
   // 2) Replace foreign-key REFERENCES to other tables
   out = out.replace(
     /\bREFERENCES\s+`?([a-zA-Z0-9_]+)`?\s*\(/gi,
-    (_m, refTable) =>
-      `REFERENCES ${tn(siteId, refTable, dbNameFromSite)} (`,
+    (_m, refTable) => `REFERENCES ${tn(siteId, refTable, dbNameFromSite)} (`,
   );
 
   return out;
@@ -288,10 +286,10 @@ async function provisionSiteDatabase(siteId) {
       existing[0]?.dbName ||
       (await generateUniqueDbName(userName, siteName, id));
 
-    await q(
-      "UPDATE sites SET dbName = COALESCE(dbName, ?) WHERE id = ?",
-      [generatedDbName, id],
-    );
+    await q("UPDATE sites SET dbName = COALESCE(dbName, ?) WHERE id = ?", [
+      generatedDbName,
+      id,
+    ]);
     const reservedSite = await q("SELECT dbName FROM sites WHERE id = ?", [id]);
     generatedDbName = reservedSite[0]?.dbName;
     if (!generatedDbName) {
@@ -323,6 +321,7 @@ async function provisionSiteDatabase(siteId) {
     // Build the table list: common + category-specific pack
     const tables = siteTablesForPack(packKey);
 
+    const failures = []; // <-- ADD THIS LINE
     for (const [base, ddl] of tables) {
       if (!/^[a-z][a-z0-9_]*$/.test(base)) {
         throw new Error(`Bad table key: ${base}`);
@@ -331,20 +330,33 @@ async function provisionSiteDatabase(siteId) {
         throw new Error(`Invalid table definition: ${base}`);
       }
 
-      if (!(await tableExists(generatedDbName, base, actualDbName))) {
-        await q(qualifyDdl(id, base, ddl, generatedDbName));
-      } else {
-        console.log(
-          `Table ${base} already exists in ${generatedDbName}, skipping creation`,
-        );
-      }
+      try {
+        if (!(await tableExists(generatedDbName, base, actualDbName))) {
+          await q(qualifyDdl(id, base, ddl, generatedDbName));
+        } else {
+          console.log(
+            `Table ${base} already exists in ${generatedDbName}, skipping creation`,
+          );
+        }
 
-      await q(
-        "INSERT IGNORE INTO sitetables (siteId, baseName) VALUES (?, ?)",
-        [id, base],
-      );
+        await q(
+          "INSERT IGNORE INTO sitetables (siteId, baseName) VALUES (?, ?)",
+          [id, base],
+        );
+      } catch (err) {
+        console.error(
+          `Failed to create table ${base} in ${generatedDbName}:`,
+          err.message,
+        );
+        failures.push({ base, message: err.message });
+      }
     }
 
+    if (failures.length) {
+      throw new Error(
+        `Failed to create ${failures.length} table(s): ${failures.map((f) => `${f.base} (${f.message})`).join("; ")}`,
+      );
+    }
     // Verify required tables exist
     if (!(await tableExists(generatedDbName, "pages", actualDbName))) {
       throw new Error("Failed to create required table: pages");
@@ -372,11 +384,7 @@ async function provisionSiteDatabase(siteId) {
       `INSERT INTO ${tn(id, "headers", generatedDbName)} (siteTitle)
        SELECT s.name FROM sites s
         WHERE s.id = ?
-          AND NOT EXISTS (SELECT 1 FROM ${tn(
-            id,
-            "headers",
-            generatedDbName,
-          )})`,
+          AND NOT EXISTS (SELECT 1 FROM ${tn(id, "headers", generatedDbName)})`,
       [id],
     );
 

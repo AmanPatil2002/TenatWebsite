@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
+import { getTablePermission } from "../config/readOnlyTables";
 import {
   AppBar,
   Box,
   Button,
   CircularProgress,
+  Collapse,
   Divider,
   Drawer,
   IconButton,
   List,
-  ListItem,
   ListItemButton,
   ListItemIcon,
   ListItemText,
@@ -22,6 +23,8 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
+import ExpandLess from "@mui/icons-material/ExpandLess";
+import ExpandMore from "@mui/icons-material/ExpandMore";
 
 /* ------------------------------------------------------------------ */
 /*  Inline SVG icons                                                   */
@@ -106,7 +109,47 @@ const DataIcon = (p) => (
     <path d="M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7" />
   </SvgIcon>
 );
-const LogoutIcon = (p) => (
+
+// Map dynamic table names to appropriate icons
+const getTableIcon = (tableName) => {
+  const name = tableName.toLowerCase();
+  switch (name) {
+    case "employees":
+    case "staff":
+    case "users":
+      return EmployeesIcon;
+    case "news":
+    case "posts":
+    case "articles":
+    case "blog":
+      return NewsIcon;
+    case "gallery":
+    case "images":
+    case "photos":
+    case "media":
+      return GalleryIcon;
+    case "slider":
+    case "slides":
+    case "banners":
+      return SliderIcon;
+    case "branding":
+    case "header":
+    case "footer":
+    case "headerfooter":
+      return BrandingIcon;
+    case "theme":
+    case "themes":
+      return ThemeIcon;
+    case "pages":
+      return PagesIcon;
+    case "dashboard":
+      return DashboardIcon;
+    default:
+      return DataIcon;
+  }
+};
+
+const LayoutLogoutIcon = (p) => (
   <SvgIcon {...p}>
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
     <path d="m16 17 5-5-5-5" />
@@ -122,20 +165,6 @@ const MenuOpenIcon = (p) => (
   <SvgIcon {...p}>
     <path d="M4 6h16M4 12h10M4 18h16" />
     <path d="m17 9 3 3-3 3" />
-  </SvgIcon>
-);
-const PreviewIcon = (p) => (
-  <SvgIcon {...p}>
-    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
-    <circle cx="12" cy="12" r="3" />
-  </SvgIcon>
-);
-const GlobeIcon = (p) => (
-  <SvgIcon {...p}>
-    <circle cx="12" cy="12" r="9" />
-    <path d="M3 12h18" />
-    <path d="M12 3a14 14 0 0 1 0 18" />
-    <path d="M12 3a14 14 0 0 0 0 18" />
   </SvgIcon>
 );
 const ChevronIcon = (p) => (
@@ -159,6 +188,17 @@ export default function SiteAdminLayout() {
   const isSmallScreen = useMediaQuery(theme.breakpoints.down("md"));
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [expandedSections, setExpandedSections] = useState({
+    content: true,
+    records: true,
+    dataTables: true,
+    customerActivity: true,
+  });
+  const [tableResources, setTableResources] = useState([]);
+
+  const toggleSection = (section) => {
+    setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
+  };
 
   useEffect(() => {
     if (!isSmallScreen) setMobileOpen(false);
@@ -169,6 +209,7 @@ export default function SiteAdminLayout() {
     : collapsed
       ? MINI_WIDTH
       : FULL_WIDTH;
+  // True only when the drawer is actually the narrow icon-only version
   const navCompact = !isSmallScreen && collapsed;
 
   const token = localStorage.getItem("siteAdminToken");
@@ -188,7 +229,6 @@ export default function SiteAdminLayout() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Track the latest in-flight request so we can cancel stale ones.
   const requestRef = useRef(null);
 
   const signOut = useCallback(() => {
@@ -199,20 +239,22 @@ export default function SiteAdminLayout() {
   }, [navigate]);
 
   const reloadSite = useCallback(async () => {
-    // Cancel any previous in-flight load.
     if (requestRef.current) requestRef.current.abort();
     const controller = new AbortController();
     requestRef.current = controller;
 
     try {
-      // 1. Site + pages
-      const pagesRes = await axios.get(`${baseUrl}/pages`, {
-        ...authConfig,
-        signal: controller.signal,
-      });
+      const [pagesRes, schemaRes] = await Promise.all([
+        axios.get(`${baseUrl}/pages`, {
+          ...authConfig,
+          signal: controller.signal,
+        }),
+        axios.get(`${baseUrl}/data/schema`, {
+          ...authConfig,
+          signal: controller.signal,
+        }),
+      ]);
 
-      // Normalise both response shapes:
-      //   { siteName, categoryName, ..., pages: [...] }  OR  [ ...pages ]
       const raw = pagesRes.data;
       const isArray = Array.isArray(raw);
       const siteMeta = isArray ? {} : raw || {};
@@ -222,7 +264,30 @@ export default function SiteAdminLayout() {
           ? raw.pages
           : [];
 
-      // 2. Theme — treat failure as non-fatal (fall back to site meta)
+      // Fetch dynamic tables - schemaRes.data may contain site info including packKey/vertical
+      const schemaData = schemaRes.data || {};
+      const schemas = schemaData.resources || {};
+      // Extract packKey/vertical from schema response (backend returns site metadata here)
+      const sitePackKey =
+        schemaData.packKey ||
+        schemaData.vertical ||
+        schemaData.pack ||
+        schemaData.type ||
+        "";
+
+      const knownResources = Object.entries(schemas)
+        .filter(([name, schema]) => {
+          if (getTablePermission(sitePackKey, name) === "hidden") return false;
+          return (
+            !schema.isCommon &&
+            Array.isArray(schema.columns) &&
+            schema.columns.some((c) => c.editable)
+          );
+        })
+        .map(([name]) => name);
+
+      setTableResources(knownResources);
+
       let themeData = {};
       try {
         const themeRes = await axios.get(`${baseUrl}/theme`, {
@@ -230,67 +295,49 @@ export default function SiteAdminLayout() {
           signal: controller.signal,
         });
         themeData = themeRes.data || {};
-      } catch (themeError) {
-        if (axios.isCancel(themeError)) return;
-        if (themeError.response?.status === 401) {
-          signOut();
-          return;
-        }
-        // Non-fatal — keep going with siteMeta only.
-        console.warn("Theme fetch failed:", themeError?.message);
+      } catch (e) {
+        console.warn("Theme fetch failed:", e?.message);
       }
 
       if (controller.signal.aborted) return;
 
+      // Include packKey/vertical in site object for permission checks
       setSite({
         ...siteMeta,
         ...themeData,
         pages: pageList,
+        packKey: sitePackKey,
+        vertical: sitePackKey,
       });
       setPages(pageList);
       setError("");
     } catch (requestError) {
       if (axios.isCancel(requestError)) return;
-
       if (requestError.response?.status === 401) {
         signOut();
         return;
       }
-
-      console.error("reloadSite failed:", requestError);
-
-      const message =
+      setError(
         requestError.response?.data?.message ||
-        requestError.message ||
-        "Could not load site details.";
-      setError(message);
+          requestError.message ||
+          "Could not load site details.",
+      );
     } finally {
       if (!controller.signal.aborted) setInitialLoading(false);
     }
   }, [authConfig, baseUrl, signOut]);
 
-  // Redirect to login when no token is present.
-  useEffect(() => {
-    if (!token) navigate(`${siteBasePath}/login`, { replace: true });
-  }, [token, navigate, siteBasePath]);
-
-  // Load site data once per token/site. Do NOT depend on location.pathname —
-  // site metadata doesn't change per route, and refetching on every nav was
-  // re-triggering the error banner.
   useEffect(() => {
     if (!token) {
-      setInitialLoading(false);
+      navigate(`${siteBasePath}/login`, { replace: true });
       return;
     }
-
     setInitialLoading(true);
     reloadSite();
-
     return () => {
       if (requestRef.current) requestRef.current.abort();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, baseUrl]);
+  }, [token, baseUrl, navigate, siteBasePath, reloadSite]);
 
   const siteName = site?.siteName || localStorage.getItem("siteAdminSiteName");
 
@@ -335,25 +382,105 @@ export default function SiteAdminLayout() {
       icon: <BrandingIcon size={20} />,
       path: `${siteBasePath}/header-footer`,
     },
-    {
-      text: "Site data",
-      icon: <DataIcon size={20} />,
-      path: `${siteBasePath}/data`,
-    },
   ];
 
-  const currentItem = menuItems.find((i) => i.path === location.pathname);
+  const contentItems = menuItems.slice(0, 3);
+  const recordItems = menuItems.slice(3);
 
   const transition = theme.transitions.create(["width", "margin"], {
     duration: theme.transitions.duration.shorter,
   });
 
-  const contentItems = menuItems.slice(0, 7);
-  const extraItems = menuItems.slice(7);
+  const NavItem = ({ item }) => {
+    const selected = location.pathname === item.path;
+    return (
+      <Tooltip title={navCompact ? item.text : ""} placement="right">
+        <ListItemButton
+          selected={selected}
+          onClick={() => navigate(item.path)}
+          sx={{
+            position: "relative",
+            borderRadius: 2,
+            minHeight: 44,
+            px: navCompact ? 1 : 1.5,
+            justifyContent: navCompact ? "center" : "flex-start",
+            color: "text.secondary",
+            "&::before": selected
+              ? {
+                  content: '""',
+                  position: "absolute",
+                  left: 0,
+                  top: 8,
+                  bottom: 8,
+                  width: 3,
+                  borderRadius: "0 3px 3px 0",
+                  bgcolor: "primary.main",
+                }
+              : {},
+            "&:hover": {
+              backgroundColor: alpha(theme.palette.primary.main, 0.06),
+              color: "text.primary",
+              "& .MuiListItemIcon-root": { color: "primary.main" },
+            },
+            "&.Mui-selected": {
+              backgroundColor: alpha(theme.palette.primary.main, 0.1),
+              color: "primary.main",
+              "& .MuiListItemIcon-root": { color: "primary.main" },
+            },
+          }}
+        >
+          <ListItemIcon
+            sx={{ minWidth: 0, mr: navCompact ? 0 : 1.5, color: "inherit" }}
+          >
+            {item.icon}
+          </ListItemIcon>
+          {!navCompact && (
+            <ListItemText
+              primary={item.text}
+              slotProps={{
+                primary: {
+                  sx: { fontSize: 14, fontWeight: selected ? 700 : 500 },
+                },
+              }}
+            />
+          )}
+          {!navCompact && selected && (
+            <ChevronIcon size={14} color={theme.palette.primary.main} />
+          )}
+        </ListItemButton>
+      </Tooltip>
+    );
+  };
+
+  // Section header: full label + arrow normally, a thin divider in mini mode
+  const renderSectionHeader = (key, label) => {
+    if (navCompact) return <Divider sx={{ my: 1 }} />;
+
+    return (
+      <ListItemButton
+        onClick={() => toggleSection(key)}
+        sx={{ borderRadius: 2, mb: 0.5 }}
+      >
+        <ListItemText
+          primary={label}
+          slotProps={{
+            primary: {
+              variant: "caption",
+              sx: { fontWeight: 700, textTransform: "uppercase" },
+            },
+          }}
+        />
+        {expandedSections[key] ? (
+          <ExpandLess fontSize="small" />
+        ) : (
+          <ExpandMore fontSize="small" />
+        )}
+      </ListItemButton>
+    );
+  };
 
   return (
     <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#f7f8fc" }}>
-      {/* ---------------- AppBar ---------------- */}
       <AppBar
         position="fixed"
         elevation={0}
@@ -373,13 +500,6 @@ export default function SiteAdminLayout() {
             onClick={() =>
               isSmallScreen ? setMobileOpen((p) => !p) : setCollapsed((p) => !p)
             }
-            aria-label={
-              isSmallScreen
-                ? "Open sidebar"
-                : navCompact
-                  ? "Expand sidebar"
-                  : "Collapse sidebar"
-            }
             sx={{
               mr: 1.5,
               color: "text.secondary",
@@ -389,54 +509,35 @@ export default function SiteAdminLayout() {
           >
             {isSmallScreen ? (
               <MenuIcon size={20} />
-            ) : navCompact ? (
+            ) : collapsed ? (
               <MenuIcon size={20} />
             ) : (
               <MenuOpenIcon size={20} />
             )}
           </IconButton>
-
-          <Stack spacing={0.25} sx={{ flexGrow: 1, minWidth: 0 }}>
-            <Typography variant="subtitle1" fontWeight={700} noWrap>
-              {currentItem?.text || "Dashboard"}
-            </Typography>
-          </Stack>
-
-          <Stack
-            direction="row"
-            spacing={{ xs: 1, sm: 1.5 }}
-            sx={{ alignItems: "center" }}
+          <Typography
+            variant="subtitle1"
+            fontWeight={700}
+            noWrap
+            sx={{ flexGrow: 1 }}
           >
-            <Button
-              size="small"
-              variant="contained"
-              disableElevation
-              startIcon={<PreviewIcon size={16} />}
-              onClick={() => navigate(`${siteBasePath}/preview`)}
-              sx={{
-                borderRadius: 2,
-                textTransform: "none",
-                fontWeight: 600,
-                px: 2,
-                display: { xs: "none", sm: "inline-flex" },
-                boxShadow: `0 4px 12px ${alpha(
-                  theme.palette.primary.main,
-                  0.25,
-                )}`,
-              }}
-            >
-              View site
-            </Button>
-          </Stack>
+            {siteName || "Admin"}
+          </Typography>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => navigate(`${siteBasePath}/preview`)}
+            sx={{ textTransform: "none", fontWeight: 600, flexShrink: 0 }}
+          >
+            View Preview
+          </Button>
         </Toolbar>
       </AppBar>
 
-      {/* ---------------- Drawer ---------------- */}
       <Drawer
         variant={isSmallScreen ? "temporary" : "permanent"}
         open={isSmallScreen ? mobileOpen : true}
         onClose={() => setMobileOpen(false)}
-        ModalProps={{ keepMounted: true }}
         sx={{
           width: { xs: 0, md: drawerWidth },
           flexShrink: 0,
@@ -459,12 +560,11 @@ export default function SiteAdminLayout() {
             paddingTop: 1,
           }}
         >
-          {/* Brand / site identity */}
           <Stack
             direction="row"
             sx={{
               alignItems: "center",
-              justifyContent: collapsed ? "center" : "flex-start",
+              justifyContent: navCompact ? "center" : "flex-start",
               minHeight: 68,
               px: navCompact ? 0 : 2.5,
               borderBottom: `1px solid ${theme.palette.divider}`,
@@ -479,351 +579,112 @@ export default function SiteAdminLayout() {
                 placeItems: "center",
                 background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
                 color: "#fff",
-                flexShrink: 0,
-                boxShadow: `0 6px 16px ${alpha(
-                  theme.palette.primary.main,
-                  0.3,
-                )}`,
               }}
             >
               <PagesIcon size={22} />
             </Box>
             {!navCompact && (
-              <Box sx={{ ml: 1.5, minWidth: 0 }}>
-                <Typography
-                  variant="subtitle2"
-                  fontWeight={800}
-                  noWrap
-                  letterSpacing="-0.01em"
-                >
-                  {siteName || "My Site"}
-                </Typography>
-                <Typography
-                  variant="caption"
-                  noWrap
-                  sx={{ color: "text.secondary", display: "block" }}
-                >
-                  Site workspace
-                </Typography>
-              </Box>
+              <Typography
+                variant="subtitle2"
+                fontWeight={800}
+                noWrap
+                sx={{ ml: 1.5 }}
+              >
+                {siteName || "My Site"}
+              </Typography>
             )}
           </Stack>
 
-          {/* Nav */}
           <List sx={{ px: 1.5, py: 2, flexGrow: 1, overflowY: "auto" }}>
-            {!collapsed && (
-              <Typography
-                variant="caption"
-                sx={{
-                  px: 1.5,
-                  mb: 1,
-                  display: "block",
-                  color: "text.secondary",
-                  fontWeight: 700,
-                  letterSpacing: ".08em",
-                  textTransform: "uppercase",
-                  fontSize: 10.5,
-                }}
-              >
-                Content
-              </Typography>
-            )}
-            {contentItems.map((item) => {
-              const selected = location.pathname === item.path;
-              return (
-                <ListItem
-                  key={item.text}
-                  disablePadding
-                  sx={{ display: "block", mb: 0.5 }}
-                >
-                  <Tooltip title={collapsed ? item.text : ""} placement="right">
-                    <ListItemButton
-                      selected={selected}
-                      onClick={() => navigate(item.path)}
-                      sx={{
-                        position: "relative",
-                        borderRadius: 2,
-                        minHeight: 44,
-                        px: collapsed ? 1 : 1.5,
-                        color: "text.secondary",
-                        "&::before": selected
-                          ? {
-                              content: '""',
-                              position: "absolute",
-                              left: 0,
-                              top: 8,
-                              bottom: 8,
-                              width: 3,
-                              borderRadius: "0 3px 3px 0",
-                              bgcolor: "primary.main",
-                            }
-                          : {},
-                        "&:hover": {
-                          backgroundColor: alpha(
-                            theme.palette.primary.main,
-                            0.06,
-                          ),
-                          color: "text.primary",
-                          "& .MuiListItemIcon-root": { color: "primary.main" },
-                        },
-                        "&.Mui-selected": {
-                          backgroundColor: alpha(
-                            theme.palette.primary.main,
-                            0.1,
-                          ),
-                          color: "primary.main",
-                          "& .MuiListItemIcon-root": { color: "primary.main" },
-                          "&:hover": {
-                            backgroundColor: alpha(
-                              theme.palette.primary.main,
-                              0.14,
-                            ),
-                          },
-                        },
-                      }}
-                    >
-                      <ListItemIcon
-                        sx={{
-                          minWidth: 0,
-                          mr: collapsed ? 0 : 1.5,
-                          color: "inherit",
-                        }}
-                      >
-                        {item.icon}
-                      </ListItemIcon>
-                      {!collapsed && (
-                        <ListItemText
-                          primary={item.text}
-                          slotProps={{
-                            primary: {
-                              sx: {
-                                fontSize: 14,
-                                fontWeight: selected ? 700 : 500,
-                              },
-                            },
-                          }}
-                        />
-                      )}
-                      {!collapsed && selected && (
-                        <ChevronIcon
-                          size={14}
-                          color={theme.palette.primary.main}
-                        />
-                      )}
-                    </ListItemButton>
-                  </Tooltip>
-                </ListItem>
-              );
-            })}
+            {/* Content */}
+            {renderSectionHeader("content", "Content")}
+            <Collapse in={navCompact || expandedSections.content}>
+              {contentItems.map((i) => (
+                <NavItem key={i.text} item={i} />
+              ))}
+            </Collapse>
 
-            {extraItems.length > 0 && (
-              <>
-                {!collapsed && (
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      px: 1.5,
-                      mt: 2,
-                      mb: 1,
-                      display: "block",
-                      color: "text.secondary",
-                      fontWeight: 700,
-                      letterSpacing: ".08em",
-                      textTransform: "uppercase",
-                      fontSize: 10.5,
+            {/* Records */}
+            {renderSectionHeader("records", "Records")}
+            <Collapse in={navCompact || expandedSections.records}>
+              {recordItems.map((i) => (
+                <NavItem key={i.text} item={i} />
+              ))}
+            </Collapse>
+
+            {/* Data Tables */}
+            {renderSectionHeader("dataTables", "Content Management")}
+            <Collapse in={navCompact || expandedSections.dataTables}>
+              {tableResources.filter((res) =>
+                getTablePermission(site?.packKey || site?.vertical, res) === "full"
+              ).map((res) => {
+                const IconComponent = getTableIcon(res);
+                return (
+                  <NavItem
+                    key={res}
+                    item={{
+                      text: res.charAt(0).toUpperCase() + res.slice(1),
+                      icon: <IconComponent size={20} />,
+                      path: `${siteBasePath}/data/${res}`,
                     }}
-                  >
-                    Records
-                  </Typography>
-                )}
-                {collapsed && <Divider sx={{ my: 1.5 }} />}
-                {extraItems.map((item) => {
-                  const selected = location.pathname === item.path;
-                  return (
-                    <ListItem
-                      key={item.text}
-                      disablePadding
-                      sx={{ display: "block", mb: 0.5 }}
-                    >
-                      <Tooltip
-                        title={collapsed ? item.text : ""}
-                        placement="right"
-                      >
-                        <ListItemButton
-                          selected={selected}
-                          onClick={() => navigate(item.path)}
-                          sx={{
-                            position: "relative",
-                            borderRadius: 2,
-                            minHeight: 44,
-                            px: collapsed ? 1 : 1.5,
-                            color: "text.secondary",
-                            "&::before": selected
-                              ? {
-                                  content: '""',
-                                  position: "absolute",
-                                  left: 0,
-                                  top: 8,
-                                  bottom: 8,
-                                  width: 3,
-                                  borderRadius: "0 3px 3px 0",
-                                  bgcolor: "primary.main",
-                                }
-                              : {},
-                            "&:hover": {
-                              backgroundColor: alpha(
-                                theme.palette.primary.main,
-                                0.06,
-                              ),
-                              color: "text.primary",
-                              "& .MuiListItemIcon-root": {
-                                color: "primary.main",
-                              },
-                            },
-                            "&.Mui-selected": {
-                              backgroundColor: alpha(
-                                theme.palette.primary.main,
-                                0.1,
-                              ),
-                              color: "primary.main",
-                              "& .MuiListItemIcon-root": {
-                                color: "primary.main",
-                              },
-                              "&:hover": {
-                                backgroundColor: alpha(
-                                  theme.palette.primary.main,
-                                  0.14,
-                                ),
-                              },
-                            },
-                          }}
-                        >
-                          <ListItemIcon
-                            sx={{
-                              minWidth: 0,
-                              mr: collapsed ? 0 : 1.5,
-                              color: "inherit",
-                            }}
-                          >
-                            {item.icon}
-                          </ListItemIcon>
-                          {!collapsed && (
-                            <ListItemText
-                              primary={item.text}
-                              slotProps={{
-                                primary: {
-                                  sx: {
-                                    fontSize: 14,
-                                    fontWeight: selected ? 700 : 500,
-                                  },
-                                },
-                              }}
-                            />
-                          )}
-                        </ListItemButton>
-                      </Tooltip>
-                    </ListItem>
-                  );
-                })}
-              </>
-            )}
+                  />
+                );
+              })}
+            </Collapse>
+
+            {renderSectionHeader("customerActivity", "Customer Activity")}
+            <Collapse in={navCompact || expandedSections.customerActivity}>
+              {tableResources.filter((res) => {
+                const mode = getTablePermission(site?.packKey || site?.vertical, res);
+                return mode === "status" || mode === "view";
+              }).map((res) => {
+                const IconComponent = getTableIcon(res);
+                return (
+                  <NavItem
+                    key={res}
+                    item={{
+                      text: res.charAt(0).toUpperCase() + res.slice(1),
+                      icon: <IconComponent size={20} />,
+                      path: `${siteBasePath}/data/${res}`,
+                    }}
+                  />
+                );
+              })}
+            </Collapse>
           </List>
 
-          {/* Bottom: plan chip */}
-          {!collapsed && (
-            <Box sx={{ px: 2, pb: 1.5 }}>
-              <Box
+          <Divider />
+          <List sx={{ px: 1.5, py: 1.5 }}>
+            <Tooltip title={navCompact ? "Sign out" : ""} placement="right">
+              <ListItemButton
+                onClick={signOut}
                 sx={{
-                  p: 1.5,
                   borderRadius: 2,
-                  bgcolor: alpha(theme.palette.primary.main, 0.06),
-                  border: `1px solid ${alpha(
-                    theme.palette.primary.main,
-                    0.15,
-                  )}`,
+                  justifyContent: navCompact ? "center" : "flex-start",
                 }}
               >
-                <Stack
-                  direction="row"
-                  spacing={0.75}
-                  sx={{ alignItems: "center", mb: 0.5 }}
-                >
-                  <GlobeIcon size={14} color={theme.palette.primary.main} />
-                  <Typography
-                    variant="caption"
-                    fontWeight={700}
-                    color="primary.main"
-                  >
-                    Your site is live
-                  </Typography>
-                </Stack>
-                <Typography variant="caption" color="text.secondary">
-                  Purchased template workspace
-                </Typography>
-              </Box>
-            </Box>
-          )}
-
-          <Divider />
-
-          <List sx={{ px: 1.5, py: 1.5 }}>
-            <ListItem disablePadding>
-              <Tooltip title={collapsed ? "Sign out" : ""} placement="right">
-                <ListItemButton
-                  onClick={signOut}
-                  sx={{
-                    borderRadius: 2,
-                    minHeight: 44,
-                    px: collapsed ? 1 : 1.5,
-                    color: "text.secondary",
-                    "&:hover": {
-                      backgroundColor: alpha(theme.palette.error.main, 0.08),
-                      color: theme.palette.error.main,
-                      "& .MuiListItemIcon-root": {
-                        color: theme.palette.error.main,
-                      },
-                    },
-                  }}
-                >
-                  <ListItemIcon
-                    sx={{
-                      minWidth: 0,
-                      mr: collapsed ? 0 : 1.5,
-                      color: "inherit",
-                    }}
-                  >
-                    <LogoutIcon size={20} />
-                  </ListItemIcon>
-                  {!collapsed && (
-                    <ListItemText
-                      primary="Sign out"
-                      slotProps={{
-                        primary: { sx: { fontSize: 14, fontWeight: 500 } },
-                      }}
-                    />
-                  )}
-                </ListItemButton>
-              </Tooltip>
-            </ListItem>
+                <ListItemIcon sx={{ minWidth: 0, mr: navCompact ? 0 : 1.5 }}>
+                  <LayoutLogoutIcon size={20} />
+                </ListItemIcon>
+                {!navCompact && <ListItemText primary="Sign out" />}
+              </ListItemButton>
+            </Tooltip>
           </List>
         </Box>
       </Drawer>
 
-      {/* ---------------- Main ---------------- */}
       <Box
         component="main"
         sx={{
           flexGrow: 1,
-          minWidth: 0,
           p: { xs: 2, sm: 3, md: 4 },
           mt: "68px",
-          transition,
+          bgcolor: "#f9fafb",
+          minHeight: "calc(100vh - 68px)",
         }}
       >
         {initialLoading ? (
-          <Box sx={{ display: "grid", placeItems: "center", minHeight: 320 }}>
-            <CircularProgress />
-          </Box>
+          <CircularProgress />
         ) : (
           <Outlet
             context={{
@@ -837,7 +698,7 @@ export default function SiteAdminLayout() {
               authConfig,
               siteBasePath,
               siteId,
-              API_URL, // <-- add this
+              API_URL,
             }}
           />
         )}

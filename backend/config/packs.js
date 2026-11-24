@@ -2,13 +2,13 @@ const common = () => [
   [
     "sitetables",
     `CREATE TABLE sitetables (
-      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-      siteId BIGINT UNSIGNED NOT NULL,
-      baseName VARCHAR(64) NOT NULL,
-      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE KEY uqSiteTables (siteId, baseName),
-      INDEX idxSiteTablesSite (siteId)
-    ) ENGINE=InnoDB`,
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    siteId BIGINT UNSIGNED NOT NULL,
+    baseName VARCHAR(64) NOT NULL,
+    createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uqSiteTables (siteId, baseName),
+    INDEX idxSiteTablesSite (siteId)
+  ) ENGINE=InnoDB`,
   ],
   [
     "sitethemes",
@@ -185,7 +185,7 @@ const school = () => [
       UNIQUE KEY uqSubjectsClassCode (classId, code),
       INDEX idxSubjectsClassStatus (classId, status),
       CONSTRAINT fkSubjectsClass FOREIGN KEY (classId)
-        REFERENCES classes(id) ON DELETE SET NULL,
+        REFERENCES classes(id) ON DELETE CASCADE,
       CONSTRAINT fkSubjectsTeacher FOREIGN KEY (teacherId)
         REFERENCES teachers(id) ON DELETE SET NULL
     ) ENGINE=InnoDB`,
@@ -226,7 +226,7 @@ const school = () => [
       updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idxExamsClassDate (classId, examDate),
       CONSTRAINT fkExamsClass FOREIGN KEY (classId)
-        REFERENCES classes(id) ON DELETE SET NULL,
+        REFERENCES classes(id) ON DELETE CASCADE,
       CONSTRAINT fkExamsSubject FOREIGN KEY (subjectId)
         REFERENCES subjects(id) ON DELETE SET NULL
     ) ENGINE=InnoDB`,
@@ -621,7 +621,7 @@ const ecommerce = () => [
   INDEX idxEcommercePaymentsOrder (orderId),
   INDEX idxEcommercePaymentsStatus (status, createdAt),
   CONSTRAINT fkEcommercePaymentsOrder FOREIGN KEY (orderId)
-    REFERENCES orders(id) ON DELETE SET NULL
+    REFERENCES orders(id) ON DELETE CASCADE
 ) ENGINE=InnoDB`,
   ],
   [
@@ -742,9 +742,9 @@ const restaurant = () => [
       updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       UNIQUE KEY uqOrdersNo (orderNo),
       INDEX idxOrdersTableStatus (tableId, status),
-      CONSTRAINT fkOrdersTable FOREIGN KEY (tableId)
+      CONSTRAINT fkRestaurantOrdersTable FOREIGN KEY (tableId)
         REFERENCES restauranttables(id) ON DELETE SET NULL,
-      CONSTRAINT fkOrdersReservation FOREIGN KEY (reservationId)
+      CONSTRAINT fkRestaurantOrdersReservation FOREIGN KEY (reservationId)
         REFERENCES reservations(id) ON DELETE SET NULL
     ) ENGINE=InnoDB`,
   ],
@@ -812,7 +812,7 @@ const hotel = () => [
       UNIQUE KEY uqRoomsNumber (roomNumber),
       INDEX idxRoomsTypeStatus (roomTypeId, status),
       CONSTRAINT fkRoomsType FOREIGN KEY (roomTypeId)
-        REFERENCES roomtypes(id) ON DELETE RESTRICT
+        REFERENCES roomtypes(id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
   ],
   [
@@ -836,7 +836,7 @@ const hotel = () => [
       INDEX idxBookingsRoomDates (roomId, checkInDate, checkOutDate),
       INDEX idxBookingsStatus (bookingStatus, checkInDate),
       CONSTRAINT fkBookingsRoom FOREIGN KEY (roomId)
-        REFERENCES rooms(id) ON DELETE RESTRICT
+        REFERENCES rooms(id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
   ],
   [
@@ -1325,7 +1325,7 @@ const eventmanagement = () => [
       updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idxRegistrationsEventStatus (eventId, registrationStatus),
       CONSTRAINT fkRegistrationsEvent FOREIGN KEY (eventId)
-        REFERENCES events(id) ON DELETE RESTRICT
+        REFERENCES events(id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
   ],
   [
@@ -1376,7 +1376,7 @@ const eventmanagement = () => [
       INDEX idxTicketsRegistration (registrationId),
       CONSTRAINT fkTicketsRegistration FOREIGN KEY (registrationId)
         REFERENCES registrations(id) ON DELETE CASCADE,
-      CONSTRAINT fkTicketsTicketType FOREIGN KEY (ticketTypeId)
+      CONSTRAINT fkTicketsType FOREIGN KEY (ticketTypeId)
         REFERENCES tickettypes(id) ON DELETE SET NULL
     ) ENGINE=InnoDB`,
   ],
@@ -1601,7 +1601,7 @@ const spa = () => [
       updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idxAppointmentsServiceDateStatus (serviceId, appointmentDate, status),
       CONSTRAINT fkAppointmentsService FOREIGN KEY (serviceId)
-        REFERENCES services(id) ON DELETE RESTRICT,
+        REFERENCES services(id) ON DELETE CASCADE,
       CONSTRAINT fkAppointmentsTherapist FOREIGN KEY (therapistId)
         REFERENCES therapists(id) ON DELETE SET NULL
     ) ENGINE=InnoDB`,
@@ -1856,7 +1856,7 @@ const salon = () => [
       INDEX idxSalonBookingsDateStatus (bookingDate, status),
       INDEX idxSalonBookingsStylistDate (stylistId, bookingDate),
       CONSTRAINT fkSalonBookingsService FOREIGN KEY (serviceId)
-        REFERENCES salonservices(id) ON DELETE RESTRICT,
+        REFERENCES salonservices(id) ON DELETE CASCADE,
       CONSTRAINT fkSalonBookingsStylist FOREIGN KEY (stylistId)
         REFERENCES stylists(id) ON DELETE SET NULL
     ) ENGINE=InnoDB`,
@@ -2051,7 +2051,7 @@ const finance = () => [
       INDEX idxFinanceApplicationsStatus (status, createdAt),
       INDEX idxFinanceApplicationsProduct (productId, status),
       CONSTRAINT fkFinanceApplicationsProduct FOREIGN KEY (productId)
-        REFERENCES financeproducts(id) ON DELETE RESTRICT
+        REFERENCES financeproducts(id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
   ],
   [
@@ -2349,8 +2349,8 @@ const petcare = () => [
       updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idxPetAppointmentsDateStatus (appointmentDate, status),
       CONSTRAINT fkPetAppointmentsService FOREIGN KEY (serviceId)
-        REFERENCES petservices(id) ON DELETE RESTRICT,
-      CONSTRAINT fkPetAppointmentsVet FOREIGN KEY (veterinarianId)
+        REFERENCES petservices(id) ON DELETE CASCADE,
+      CONSTRAINT fkPetAppointmentsVeterinarian FOREIGN KEY (veterinarianId)
         REFERENCES veterinarians(id) ON DELETE SET NULL
     ) ENGINE=InnoDB`,
   ],
@@ -2570,7 +2570,7 @@ const dental = () => [
       CONSTRAINT fkTreatmentPlansAppointment FOREIGN KEY (appointmentId)
         REFERENCES dentalappointments(id) ON DELETE SET NULL,
       CONSTRAINT fkTreatmentPlansPatient FOREIGN KEY (patientId)
-        REFERENCES dentalpatients(id) ON DELETE SET NULL,
+        REFERENCES dentalpatients(id) ON DELETE CASCADE,
       CONSTRAINT fkTreatmentPlansDentist FOREIGN KEY (dentistId)
         REFERENCES dentists(id) ON DELETE SET NULL
     ) ENGINE=InnoDB`,
@@ -2591,7 +2591,7 @@ const dental = () => [
       CONSTRAINT fkDentalPaymentsAppointment FOREIGN KEY (appointmentId)
         REFERENCES dentalappointments(id) ON DELETE SET NULL,
       CONSTRAINT fkDentalPaymentsPatient FOREIGN KEY (patientId)
-        REFERENCES dentalpatients(id) ON DELETE SET NULL
+        REFERENCES dentalpatients(id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
   ],
 ];
@@ -2781,7 +2781,7 @@ const interiordesign = () => [
       createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       INDEX idxMoodboardsProject (projectId),
       CONSTRAINT fkMoodboardsProject FOREIGN KEY (projectId)
-        REFERENCES designprojects(id) ON DELETE SET NULL
+        REFERENCES designprojects(id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
   ],
 ];
@@ -2969,7 +2969,7 @@ const streaming = () => [
       updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idxSubscriptionsUser (userEmail, status),
       CONSTRAINT fkSubscriptionsPlan FOREIGN KEY (planId)
-        REFERENCES subscriptionplans(id) ON DELETE RESTRICT
+        REFERENCES subscriptionplans(id) ON DELETE CASCADE
     ) ENGINE=InnoDB`,
   ],
   [
@@ -2983,9 +2983,9 @@ const streaming = () => [
       watchedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       INDEX idxWatchHistoryUser (userEmail, watchedAt),
       CONSTRAINT fkWatchHistoryMovie FOREIGN KEY (movieId)
-        REFERENCES movies(id) ON DELETE CASCADE,
+        REFERENCES movies(id) ON DELETE SET NULL,
       CONSTRAINT fkWatchHistoryEpisode FOREIGN KEY (episodeId)
-        REFERENCES episodes(id) ON DELETE CASCADE
+        REFERENCES episodes(id) ON DELETE SET NULL
     ) ENGINE=InnoDB`,
   ],
 ];
@@ -3026,8 +3026,7 @@ const gaming = () => [
       updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idxGamesCategoryStatus (categoryId, status),
       INDEX idxGamesPlatformStatus (platform, status),
-      CONSTRAINT fkGamesCategory FOREIGN KEY (categoryId)
-        REFERENCES gamecategories(id) ON DELETE SET NULL
+      CONSTRAINT fkGamesCategory FOREIGN KEY (categoryId) REFERENCES gamecategories(id) ON DELETE SET NULL
     ) ENGINE=InnoDB`,
   ],
   [

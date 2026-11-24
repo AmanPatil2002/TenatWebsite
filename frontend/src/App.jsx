@@ -33,7 +33,6 @@ import ViewTemplate from "./Mycomponent/ViewTemplate";
 import MySiteView from "./Mycomponent/MySiteView";
 import AddTheme from "./Mycomponent/AddTheme";
 import AddPages from "./Mycomponent/AddPages";
-// import SiteAdminAccess from "./Mycomponent/SiteAdminAccess";
 import SiteAdminLogin from "./Pages/Client/SiteAdminLogin";
 import SiteAdminLayout from "./Mycomponent/SiteAdminLayout";
 import SiteAdminDashboard from "./Mycomponent/SiteAdminDashboard";
@@ -48,10 +47,15 @@ import SiteAdminThemePage from "./Mycomponent/SiteAdminThemePage";
 import BugReports from "./Mycomponent/BugReports";
 import SiteHeader from "./Mycomponent/SiteHeader";
 import Site from "./Pages/Client/Site";
+import SkipLink from "./components/SkipLink";
+import RouteStatus from "./components/RouteStatus";
+import NotFoundPage from "./components/NotFoundPage";
 
 function App() {
   return (
     <Router>
+      <SkipLink />
+      <RouteStatus />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -70,6 +74,7 @@ function App() {
           <Route path="gallery" element={<SiteAdminGalary />} />
           <Route path="header-footer" element={<SiteHeader />} />
           <Route path="data" element={<SiteAdminData />} />
+          <Route path="data/:tableName" element={<SiteAdminData />} />
           <Route path="theme" element={<SiteAdminThemePage />} />
         </Route>
 
@@ -91,6 +96,7 @@ function App() {
         <Route element={<ProtectedRoutes />}>
           <Route path="/mysite/:siteSlug" element={<Site />} />
         </Route>
+        <Route path="/site/:siteSlug" element={<Site />} />
 
         {/* Admin */}
         <Route element={<ProtectedRoutes role="admin" />}>
@@ -108,12 +114,13 @@ function App() {
             <Route path="usereview" element={<ViewReview />} />
             <Route path="admindashboard" element={<AdminDashboard />} />
             <Route path="invoice" element={<ViewPayment />} />
-            {/* <Route path="site-admins" element={<SiteAdminAccess />} /> */}
             <Route path="bug-reports" element={<BugReports />} />
             <Route path="faq" element={<AddFaq />} />
             <Route path="contact" element={<AddContact />} />
           </Route>
         </Route>
+
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Router>
   );

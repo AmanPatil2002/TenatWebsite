@@ -37,26 +37,36 @@ const API_URL = (
 
 const CONTACT_URL = `${API_URL}/contact/acontact`;
 
+const dateFormatter = new Intl.DateTimeFormat(undefined, {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+});
+
+const decimalFormatter = new Intl.NumberFormat("en-IN", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
 const formatMoney = (amount, currency) => {
   const value = Number(amount) || 0;
+  const currencyCode = String(currency || "INR").toUpperCase();
+
   try {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
-      currency: currency || "INR",
+      currency: currencyCode,
     }).format(value);
   } catch {
-    return `${value.toFixed(2)} ${currency || ""}`.trim();
+    return `${decimalFormatter.format(value)} ${currencyCode}`;
   }
 };
 
-const formatShortDate = (value) =>
-  value
-    ? new Date(value).toLocaleDateString(undefined, {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      })
-    : "—";
+const formatShortDate = (value) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "—" : dateFormatter.format(date);
+};
 
 const getPages = (value) => {
   if (Array.isArray(value)) return value;
@@ -86,10 +96,18 @@ const statusMeta = (status) => {
     return { label: "Pending", color: "warning" };
   }
   if (["failed", "cancelled", "canceled"].includes(value)) {
-    return { label: value, color: "error" };
+    return {
+      label: `${value.charAt(0).toUpperCase()}${value.slice(1)}`,
+      color: "error",
+    };
   }
   if (value === "refunded") return { label: "Refunded", color: "default" };
-  return { label: value || "Paid", color: value ? "default" : "success" };
+  return {
+    label: value
+      ? `${value.charAt(0).toUpperCase()}${value.slice(1)}`
+      : "Paid",
+    color: value ? "default" : "success",
+  };
 };
 
 const headCellSx = {
@@ -137,8 +155,10 @@ function MetaRow({ label, value, breakAll }) {
         variant="body2"
         fontWeight={600}
         sx={{
+          minWidth: 0,
           textAlign: "right",
           wordBreak: breakAll ? "break-all" : "normal",
+          overflowWrap: "anywhere",
         }}
       >
         {value}
@@ -164,12 +184,6 @@ function InvoiceDialog({ payment, adminContact, onClose }) {
     payment.baseAmount ?? payment.templatePriceSnapshot ?? null;
 
   /* ---- Totals ---- */
-  const pagesTotal =
-    payment.pagesAmount ??
-    (hasPagePrices
-      ? pages.reduce((sum, p) => sum + Number(p.price || 0), 0)
-      : 0);
-
   const totalPaid = Number(payment.amount || 0);
 
   /* ---- From (seller) ---- */
@@ -183,7 +197,9 @@ function InvoiceDialog({ payment, adminContact, onClose }) {
   const billedEmail = payment.email || "";
 
   const invoiceDate = formatShortDate(payment.paidAt || payment.createdAt);
-  const isPaid = payment.status === "paid";
+  const isPaid = ["captured", "paid", "success", "completed"].includes(
+    String(payment.status || "").toLowerCase(),
+  );
 
   return (
     <Dialog
@@ -191,7 +207,14 @@ function InvoiceDialog({ payment, adminContact, onClose }) {
       onClose={onClose}
       fullWidth
       maxWidth="md"
-      PaperProps={{ sx: { borderRadius: 2, overflow: "hidden" } }}
+      aria-labelledby="invoice-dialog-title"
+      PaperProps={{
+        sx: {
+          borderRadius: 2,
+          overflow: "hidden",
+          overscrollBehavior: "contain",
+        },
+      }}
     >
       <GlobalStyles
         styles={{
@@ -234,13 +257,22 @@ function InvoiceDialog({ payment, adminContact, onClose }) {
             aria-label="Close invoice"
             onClick={onClose}
             size="small"
-            sx={{ position: "absolute", right: 8, top: 8, color: "inherit" }}
+            sx={{
+              position: "absolute",
+              right: 8,
+              top: 8,
+              minWidth: 44,
+              minHeight: 44,
+              color: "inherit",
+            }}
           >
-            <CloseIcon fontSize="small" />
+            <CloseIcon fontSize="small" aria-hidden="true" />
           </IconButton>
 
           <Box sx={{ textAlign: "center" }}>
             <Typography
+              id="invoice-dialog-title"
+              component="h2"
               sx={{
                 fontSize: 28,
                 fontWeight: 800,
@@ -248,7 +280,7 @@ function InvoiceDialog({ payment, adminContact, onClose }) {
                 lineHeight: 1,
               }}
             >
-              INVOICE
+              Invoice
             </Typography>
           </Box>
         </Box>
@@ -262,7 +294,7 @@ function InvoiceDialog({ payment, adminContact, onClose }) {
               <Box
                 sx={{
                   display: "grid",
-                  gridTemplateColumns: "auto 1fr",
+                  gridTemplateColumns: "minmax(0, auto) minmax(0, 1fr)",
                   columnGap: 2,
                   rowGap: 0.75,
                   alignItems: "baseline",
@@ -324,7 +356,11 @@ function InvoiceDialog({ payment, adminContact, onClose }) {
               <Box sx={{ minWidth: 0, width: "100%" }}>
                 <Typography sx={sectionLabelSx}>From</Typography>
 
-                <Typography variant="body1" fontWeight={700}>
+                <Typography
+                  variant="body1"
+                  fontWeight={700}
+                  sx={{ overflowWrap: "anywhere" }}
+                >
                   {fromName}
                 </Typography>
 
@@ -350,16 +386,27 @@ function InvoiceDialog({ payment, adminContact, onClose }) {
                 border: "1px solid",
                 borderColor: "divider",
                 borderRadius: 1.5,
+                overflowX: "auto",
               }}
             >
-              <Table size="small" sx={{ tableLayout: "fixed", minWidth: 480 }}>
+              <Table
+                size="small"
+                aria-label="Invoice line items"
+                sx={{ tableLayout: "fixed", minWidth: 480 }}
+              >
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ ...invoiceHeadCellSx, width: 44, pl: 2 }}>
+                    <TableCell
+                      scope="col"
+                      sx={{ ...invoiceHeadCellSx, width: 44, pl: 2 }}
+                    >
                       #
                     </TableCell>
-                    <TableCell sx={invoiceHeadCellSx}>Description</TableCell>
+                    <TableCell scope="col" sx={invoiceHeadCellSx}>
+                      Description
+                    </TableCell>
                     <TableCell
+                      scope="col"
                       sx={{ ...invoiceHeadCellSx, width: 120, pr: 2 }}
                       align="right"
                     >
@@ -446,12 +493,6 @@ function InvoiceDialog({ payment, adminContact, onClose }) {
                             : "No pages recorded"}
                         </Typography>
                       </TableCell>
-                      <TableCell align="right" sx={{ verticalAlign: "top" }}>
-                        {pages.length || "—"}
-                      </TableCell>
-                      <TableCell align="right" sx={{ verticalAlign: "top" }}>
-                        —
-                      </TableCell>
                       <TableCell
                         align="right"
                         sx={{
@@ -504,7 +545,11 @@ function InvoiceDialog({ payment, adminContact, onClose }) {
           <Typography
             variant="caption"
             color="text.secondary"
-            sx={{ display: "block", textAlign: "center" }}
+            sx={{
+              display: "block",
+              textAlign: "center",
+              overflowWrap: "anywhere",
+            }}
           >
             This is a computer-generated invoice and does not require a
             signature. For questions, contact {fromEmail || fromName}.
@@ -512,18 +557,33 @@ function InvoiceDialog({ payment, adminContact, onClose }) {
         </Box>
       </Box>
 
-      <DialogActions className="no-print" sx={{ px: 3, py: 2 }}>
-        <Button onClick={onClose} sx={{ textTransform: "none" }}>
+      <DialogActions
+        className="no-print"
+        sx={{
+          px: { xs: 2, sm: 3 },
+          py: 2,
+          flexDirection: { xs: "column-reverse", sm: "row" },
+          alignItems: "stretch",
+          gap: 1,
+          "& > :not(style) ~ :not(style)": { ml: 0 },
+        }}
+      >
+        <Button
+          onClick={onClose}
+          sx={{ minHeight: 44, textTransform: "none" }}
+        >
           Close
         </Button>
         <Button
           variant="contained"
           disableElevation
-          startIcon={<PrintOutlinedIcon fontSize="small" />}
+          startIcon={
+            <PrintOutlinedIcon fontSize="small" aria-hidden="true" />
+          }
           onClick={() => window.print()}
-          sx={{ textTransform: "none", fontWeight: 600 }}
+          sx={{ minHeight: 44, textTransform: "none", fontWeight: 600 }}
         >
-          Print / Save PDF
+          Print or Save PDF
         </Button>
       </DialogActions>
     </Dialog>
@@ -548,12 +608,16 @@ export default function ViewPayment({ admin = true }) {
     localStorage.getItem("token") ||
     localStorage.getItem("authToken") ||
     localStorage.getItem("accessToken");
-  const loadError = error || (!token ? "Please log in first." : "");
-  const columnCount = admin ? 7 : 6;
+  const loadError =
+    error || (!token ? "Log in to view template purchases." : "");
+  const columnCount = admin ? 5 : 4;
 
   // Load payments
   useEffect(() => {
-    if (!token) return undefined;
+    if (!token) {
+      setLoading(false);
+      return undefined;
+    }
 
     let cancelled = false;
     axios
@@ -665,16 +729,20 @@ export default function ViewPayment({ admin = true }) {
                 color: "primary.contrastText",
               }}
             >
-              <ReceiptLongOutlinedIcon fontSize="small" />
+              <ReceiptLongOutlinedIcon
+                fontSize="small"
+                aria-hidden="true"
+              />
             </Box>
 
             <Box sx={{ minWidth: 0 }}>
               <Typography
+                component="h1"
                 variant="h5"
                 fontWeight={700}
-                sx={{ lineHeight: 1.2 }}
+                sx={{ lineHeight: 1.2, textWrap: "balance" }}
               >
-                Purchased Templates
+                Template Purchases
               </Typography>
 
               <Typography variant="body2" color="text.secondary">
@@ -689,7 +757,10 @@ export default function ViewPayment({ admin = true }) {
           <TextField
             size="small"
             fullWidth
-            placeholder="Search invoice, user, template..."
+            label="Search Purchases"
+            name="purchaseSearch"
+            autoComplete="off"
+            placeholder="Invoice, customer, or template…"
             value={search}
             onChange={(event) => {
               setSearch(event.target.value);
@@ -706,24 +777,59 @@ export default function ViewPayment({ admin = true }) {
               input: {
                 startAdornment: (
                   <InputAdornment position="start">
-                    <SearchIcon fontSize="small" />
+                    <SearchIcon fontSize="small" aria-hidden="true" />
                   </InputAdornment>
                 ),
+                endAdornment: search ? (
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label="Clear purchase search"
+                      edge="end"
+                      onClick={() => {
+                        setSearch("");
+                        setPage(0);
+                      }}
+                      sx={{ minWidth: 44, minHeight: 44 }}
+                    >
+                      <CloseIcon fontSize="small" aria-hidden="true" />
+                    </IconButton>
+                  </InputAdornment>
+                ) : null,
               },
             }}
           />
         </Stack>
 
         {loadError && (
-          <Alert severity="error" sx={{ mb: 2, borderRadius: 1.5 }}>
+          <Alert
+            severity="error"
+            role="alert"
+            sx={{ mb: 2, borderRadius: 1.5 }}
+          >
             {loadError}
           </Alert>
         )}
 
         {loading && token ? (
-          <Box sx={{ display: "grid", placeItems: "center", py: 8 }}>
-            <CircularProgress />
-          </Box>
+          <Paper
+            elevation={0}
+            role="status"
+            aria-live="polite"
+            sx={{
+              display: "grid",
+              placeItems: "center",
+              gap: 1.5,
+              py: 8,
+              border: "1px solid",
+              borderColor: "divider",
+              borderRadius: 2,
+            }}
+          >
+            <CircularProgress size={32} aria-label="Loading purchases" />
+            <Typography variant="body2" color="text.secondary">
+              Loading purchases…
+            </Typography>
+          </Paper>
         ) : !loadError ? (
           <Paper
             elevation={0}
@@ -734,21 +840,31 @@ export default function ViewPayment({ admin = true }) {
               overflow: "hidden",
             }}
           >
-            <TableContainer sx={{ maxHeight: 600 }}>
-              <Table stickyHeader>
+            <TableContainer sx={{ maxHeight: 600, overflowX: "auto" }}>
+              <Table stickyHeader aria-label="Template purchases">
                 <TableHead>
                   <TableRow>
                     {admin && (
-                      <TableCell sx={headCellSx}>Purchased by</TableCell>
+                      <TableCell scope="col" sx={headCellSx}>
+                        Customer
+                      </TableCell>
                     )}
-                    <TableCell sx={headCellSx}>Site &amp; pages</TableCell>
-                    <TableCell sx={headCellSx} align="right">
-                      Amount / Date
+                    <TableCell scope="col" sx={headCellSx}>
+                      Template &amp; Pages
                     </TableCell>
-                    {/* <TableCell sx={headCellSx}>Date</TableCell> */}
-                    <TableCell sx={headCellSx}>Status</TableCell>
-                    <TableCell sx={headCellSx} align="center" width={110}>
-                      Action
+                    <TableCell scope="col" sx={headCellSx} align="right">
+                      Amount &amp; Date
+                    </TableCell>
+                    <TableCell scope="col" sx={headCellSx}>
+                      Status
+                    </TableCell>
+                    <TableCell
+                      scope="col"
+                      sx={headCellSx}
+                      align="center"
+                      width={120}
+                    >
+                      Invoice
                     </TableCell>
                   </TableRow>
                 </TableHead>
@@ -783,17 +899,17 @@ export default function ViewPayment({ admin = true }) {
                                 <Typography
                                   variant="body2"
                                   fontWeight={600}
-                                  noWrap
+                                  sx={{ overflowWrap: "anywhere" }}
                                 >
                                   {payment.userName || "—"}
                                 </Typography>
                                 <Typography
                                   variant="caption"
                                   color="text.secondary"
-                                  noWrap
                                   display="block"
+                                  sx={{ overflowWrap: "anywhere" }}
                                 >
-                                  {payment.email}
+                                  {payment.email || "No email recorded"}
                                 </Typography>
                               </Box>
                             </Stack>
@@ -801,8 +917,13 @@ export default function ViewPayment({ admin = true }) {
                         )}
 
                         <TableCell sx={{ minWidth: 220, maxWidth: 320 }}>
-                          <Typography variant="body2" fontWeight={600}>
-                            {payment.templateName || `#${payment.templateId}`}
+                          <Typography
+                            variant="body2"
+                            fontWeight={600}
+                            sx={{ overflowWrap: "anywhere" }}
+                          >
+                            {payment.templateName ||
+                              `Template #${payment.templateId}`}
                           </Typography>
                           <Typography
                             variant="caption"
@@ -822,7 +943,13 @@ export default function ViewPayment({ admin = true }) {
                           </Typography>
                         </TableCell>
 
-                        <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                        <TableCell
+                          align="right"
+                          sx={{
+                            whiteSpace: "nowrap",
+                            fontVariantNumeric: "tabular-nums",
+                          }}
+                        >
                           <Typography variant="body2" sx={{ fontWeight: 600 }}>
                             {formatMoney(payment.amount, payment.currency)}
                           </Typography>
@@ -839,10 +966,7 @@ export default function ViewPayment({ admin = true }) {
                             label={status.label}
                             color={status.color}
                             variant="outlined"
-                            sx={{
-                              textTransform: "capitalize",
-                              fontWeight: 600,
-                            }}
+                            sx={{ fontWeight: 600 }}
                           />
                         </TableCell>
 
@@ -851,10 +975,14 @@ export default function ViewPayment({ admin = true }) {
                             size="small"
                             variant="outlined"
                             startIcon={
-                              <ReceiptLongOutlinedIcon fontSize="small" />
+                              <ReceiptLongOutlinedIcon
+                                fontSize="small"
+                                aria-hidden="true"
+                              />
                             }
                             onClick={() => setSelectedPayment(payment)}
                             sx={{
+                              minHeight: 44,
                               textTransform: "none",
                               fontWeight: 600,
                               whiteSpace: "nowrap",
@@ -898,6 +1026,8 @@ export default function ViewPayment({ admin = true }) {
               component="div"
               count={filteredPayments.length}
               page={page}
+              labelRowsPerPage="Purchases per page:"
+              getItemAriaLabel={(type) => `${type} purchases page`}
               onPageChange={(_, newPage) => setPage(newPage)}
               rowsPerPage={rowsPerPage}
               onRowsPerPageChange={(event) => {
@@ -905,7 +1035,20 @@ export default function ViewPayment({ admin = true }) {
                 setPage(0);
               }}
               rowsPerPageOptions={[5, 10, 25]}
-              sx={{ borderTop: 1, borderColor: "divider" }}
+              slotProps={{
+                select: {
+                  inputProps: { "aria-label": "Purchases per page" },
+                  native: true,
+                },
+              }}
+              sx={{
+                borderTop: 1,
+                borderColor: "divider",
+                "& .MuiTablePagination-actions button": {
+                  minWidth: 44,
+                  minHeight: 44,
+                },
+              }}
             />
           </Paper>
         ) : null}

@@ -2,10 +2,11 @@ const router = require("express").Router();
 const authenticateToken = require("../../middleware/authenticate");
 const authenticateSiteAdmin = require("../../middleware/authenticateSiteAdmin");
 const {
-  getSitePages, getSitePageOptions, createSitePage,
+  getSitePages, getPublicSitePages, getSitePageOptions, createSitePage,
   updateSitePage, deleteSitePage, reorderSitePages,
 } = require("../../controller/site/pageController");
 
+router.get("/:siteId/public/pages", getPublicSitePages);
 // Owner routes
 router.get("/:siteId/pages", authenticateToken, getSitePages);
 router.post("/:siteId/pages", authenticateToken, createSitePage);

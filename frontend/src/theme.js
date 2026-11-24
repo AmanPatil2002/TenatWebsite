@@ -74,23 +74,24 @@ const clientTheme = createTheme({
   },
   typography: {
     fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+    htmlFontSize: 16,
     h1: {
       fontWeight: 800,
-      fontSize: "3.5rem",
+      fontSize: "clamp(2.25rem, 5vw, 3.5rem)",
       lineHeight: 1.15,
       letterSpacing: "-0.03em",
       color: "#0f172a",
     },
     h2: {
       fontWeight: 800,
-      fontSize: "2.75rem",
+      fontSize: "clamp(1.875rem, 4vw, 2.75rem)",
       lineHeight: 1.2,
       letterSpacing: "-0.02em",
       color: "#0f172a",
     },
     h3: {
       fontWeight: 800,
-      fontSize: "2.25rem",
+      fontSize: "clamp(1.625rem, 3vw, 2.25rem)",
       lineHeight: 1.25,
       letterSpacing: "-0.02em",
       color: "#0f172a",
@@ -193,10 +194,30 @@ const clientTheme = createTheme({
         },
         html: {
           scrollBehavior: "smooth",
+          scrollPaddingTop: "5rem",
         },
         body: {
           backgroundColor: "#f8fafc",
           color: "#334155",
+          overflowX: "hidden",
+        },
+        "h1, h2, h3, h4, h5, h6": {
+          textWrap: "balance",
+        },
+        "p, li": {
+          textWrap: "pretty",
+        },
+        "*:focus-visible": {
+          outline: "3px solid rgba(2, 132, 199, 0.55)",
+          outlineOffset: 3,
+        },
+        "@media (prefers-reduced-motion: reduce)": {
+          "*, *::before, *::after": {
+            animationDuration: "0.01ms !important",
+            animationIterationCount: "1 !important",
+            transitionDuration: "0.01ms !important",
+            scrollBehavior: "auto !important",
+          },
         },
         "::selection": {
           backgroundColor: "rgba(2, 132, 199, 0.2)",
@@ -227,8 +248,13 @@ const clientTheme = createTheme({
         root: {
           borderRadius: 10,
           fontWeight: 600,
+          minHeight: 44,
           padding: "10px 20px",
-          transition: "all 0.2s ease",
+          transition: "background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease, transform 0.2s ease",
+          "&:focus-visible": {
+            outline: "3px solid rgba(2, 132, 199, 0.4)",
+            outlineOffset: 2,
+          },
           "&:hover": {
             transform: "translateY(-1px)",
           },
@@ -279,6 +305,23 @@ const clientTheme = createTheme({
         sizeLarge: {
           padding: "14px 28px",
           fontSize: "1.0625rem",
+        },
+      },
+    },
+    MuiIconButton: {
+      styleOverrides: {
+        root: {
+          minWidth: 44,
+          minHeight: 44,
+          transition: "background-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease, transform 0.2s ease",
+          "&:focus-visible": {
+            outline: "3px solid rgba(2, 132, 199, 0.4)",
+            outlineOffset: 2,
+          },
+        },
+        sizeSmall: {
+          minWidth: 40,
+          minHeight: 40,
         },
       },
     },
@@ -446,9 +489,20 @@ const clientTheme = createTheme({
         },
       },
     },
+    MuiTableContainer: {
+      styleOverrides: {
+        root: {
+          maxWidth: "100%",
+          overflowX: "auto",
+          overscrollBehaviorInline: "contain",
+          WebkitOverflowScrolling: "touch",
+        },
+      },
+    },
     MuiTableCell: {
       styleOverrides: {
         head: {
+          fontVariantNumeric: "tabular-nums",
           fontWeight: 700,
           fontSize: "0.75rem",
           textTransform: "uppercase",
@@ -503,8 +557,10 @@ const clientTheme = createTheme({
     MuiDialog: {
       styleOverrides: {
         paper: {
+          maxHeight: "min(90vh, 900px)",
           borderRadius: 20,
           boxShadow: "0 24px 60px rgba(15, 23, 42, 0.2)",
+          overscrollBehavior: "contain",
         },
       },
     },

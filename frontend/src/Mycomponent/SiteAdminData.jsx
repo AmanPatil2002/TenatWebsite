@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useOutletContext } from "react-router-dom";
+import { useOutletContext, useParams } from "react-router-dom";
 import axios from "axios";
 import { useTablePermissions } from "../hooks/useTablePermissions";
+import { getTablePermission } from "../config/readOnlyTables";
 import {
   Alert,
   Avatar,
@@ -995,12 +996,14 @@ function ImageUrlField({ spec, value, onChange, onBlur, error }) {
 export default function SiteAdminData() {
   const theme = useTheme();
   const { baseUrl, authConfig, site } = useOutletContext();
+  const { tableName } = useParams();
 
-  const vertical = site?.packKey || '';
+  // Support multiple possible property names for vertical/packKey
+  const vertical = site?.packKey || site?.vertical || site?.pack || site?.type || '';
 
   const [resources, setResources] = useState([]);
   const [resourceSchemas, setResourceSchemas] = useState({});
-  const [selectedResource, setSelectedResource] = useState("");
+  const [selectedResource, setSelectedResource] = useState(tableName || "");
   const [rows, setRows] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -1015,6 +1018,12 @@ export default function SiteAdminData() {
   const [notice, setNotice] = useState("");
   const [viewMode, setViewMode] = useState("table"); // 'table' | 'cards'
   const [hiddenColumns, setHiddenColumns] = useState([]);
+
+  useEffect(() => {
+    if (tableName) {
+      setSelectedResource(tableName);
+    }
+  }, [tableName]);
 
   const resourceConfigs = useMemo(
     () =>
@@ -1121,21 +1130,20 @@ export default function SiteAdminData() {
             ? data.resources
             : {};
         const knownResources = Object.entries(schemas)
-          .filter(
-            ([, schema]) =>
-              !schema.isCommon &&
-              Array.isArray(schema.columns) &&
-              schema.columns.some((column) => column.editable),
-          )
+          .filter(([name, schema]) => {
+            if (getTablePermission(vertical, name) === "hidden") return false;
+            return !schema.isCommon && Array.isArray(schema.columns) && schema.columns.some((column) => column.editable);
+          })
           .map(([name]) => name);
         setResourceSchemas(schemas);
         setResources(knownResources);
-        if (knownResources.length) {
+        // Only auto-select if no tableName from route params
+        if (!tableName && knownResources.length) {
           setSelectedResource(
             knownResources.find((name) => RESOURCE_ORDER.includes(name)) ||
               knownResources[0],
           );
-        } else {
+        } else if (!tableName) {
           setSelectedResource("");
         }
         setError("");
@@ -1154,7 +1162,7 @@ export default function SiteAdminData() {
     return () => {
       cancelled = true;
     };
-  }, [authConfig, baseUrl]);
+  }, [authConfig, baseUrl, tableName]);
 
   /* ---------------- Fetch rows when resource changes ---------------- */
   useEffect(() => {
@@ -1173,6 +1181,17 @@ export default function SiteAdminData() {
   };
 
   const openEditRecord = (record) => {
+    if (tablePermissions.isStatusOnly) {
+      const statusField = tablePermissions.allowedStatusField;
+      if (!statusField) return;
+      setEditingRecord(record);
+      setForm({ [statusField]: formatInputValue(record[statusField], "select") });
+      setFieldErrors({});
+      setError("");
+      setNotice("");
+      setDialogOpen(true);
+      return;
+    }
     setEditingRecord(record);
     setForm(formFromRecord(record, config));
     setFieldErrors({});
@@ -1185,7 +1204,15 @@ export default function SiteAdminData() {
     event.preventDefault();
     if (!config) return;
 
-    const errors = validateForm(form, config);
+    const errors = tablePermissions.isStatusOnly
+      ? (() => {
+          const statusField = tablePermissions.allowedStatusField;
+          const message = statusField
+            ? validateField(config.fields[statusField], form[statusField])
+            : "This table has no permitted status field.";
+          return message ? { [statusField || "status"]: message } : {};
+        })()
+      : validateForm(form, config);
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
       setError("Please fix the highlighted fields.");
@@ -1197,7 +1224,9 @@ export default function SiteAdminData() {
     setFieldErrors({});
     setNotice("");
     try {
-      const payload = makePayload(form, config);
+      const payload = tablePermissions.isStatusOnly
+        ? { [tablePermissions.allowedStatusField]: form[tablePermissions.allowedStatusField] }
+        : makePayload(form, config);
 
       if (editingRecord) {
         await axios.put(`${resourceUrl}/${editingRecord.id}`, payload, authConfig);
@@ -1376,10 +1405,28 @@ export default function SiteAdminData() {
   };
 
   /* ---------------- Loading state ---------------- */
+  if (!site || !vertical) {
+    return (
+      <Box sx={{ display: "grid", placeItems: "center", minHeight: 320 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   if (loading && !config) {
     return (
       <Box sx={{ display: "grid", placeItems: "center", minHeight: 320 }}>
         <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (!loading && !config) {
+    return (
+      <Box sx={{ maxWidth: 700, mx: "auto", mt: 4 }}>
+        <Alert severity="warning">
+          This resource is unavailable, hidden, or not part of this site.
+        </Alert>
       </Box>
     );
   }
@@ -1420,10 +1467,10 @@ export default function SiteAdminData() {
             )}
             <Box>
               <Typography variant="h4" fontWeight={800} letterSpacing="-0.02em">
-                Site data
+                {config.label}
               </Typography>
               <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-                Manage the records stored for this site.
+                Manage the {config.label.toLowerCase()} stored for this site.
               </Typography>
             </Box>
           </Stack>
@@ -1471,67 +1518,7 @@ export default function SiteAdminData() {
         </Alert>
       )}
 
-      {/* Resource selector */}
       <Paper variant="outlined" sx={{ borderRadius: 3, overflow: "hidden", mb: 2 }}>
-        <Box sx={{ p: 2, borderBottom: 1, borderColor: "divider" }}>
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={1.5}
-            sx={{ alignItems: { xs: "stretch", sm: "center" } }}
-          >
-            <TextField
-              select
-              size="small"
-              label="Data table"
-              value={selectedResource}
-              onChange={(event) => {
-                setSelectedResource(event.target.value);
-                setSearch("");
-                setNotice("");
-                setError("");
-                setHiddenColumns([]);
-              }}
-              disabled={loading || availableResources.length === 0}
-              sx={{ minWidth: { sm: 280 }, flex: { sm: 1 } }}
-            >
-              {availableResources.map((resource) => {
-                const resConfig = resourceConfigs[resource];
-                return (
-                  <MenuItem key={resource} value={resource}>
-                    <Stack
-                      direction="row"
-                      spacing={1}
-                      sx={{ alignItems: "center" }}
-                    >
-                      <Box
-                        sx={{
-                          width: 24,
-                          height: 24,
-                          borderRadius: 1,
-                          display: "grid",
-                          placeItems: "center",
-                          bgcolor: alpha(resConfig.color, 0.15),
-                          color: resConfig.color,
-                        }}
-                      >
-                        <resConfig.icon size={14} />
-                      </Box>
-                      {resConfig.label}
-                    </Stack>
-                  </MenuItem>
-                );
-              })}
-            </TextField>
-            {config && (
-              <Chip
-                label={`${rows.length} record${rows.length === 1 ? "" : "s"}`}
-                variant="outlined"
-                icon={<FieldIcon size={16} />}
-              />
-            )}
-          </Stack>
-        </Box>
-
         {config && (
           <Box sx={{ p: 2 }}>
             <Stack
@@ -1593,7 +1580,6 @@ export default function SiteAdminData() {
                 </Tooltip>
               </Stack>
             </Stack>
-
             {/* Column visibility chips */}
             <Stack
               direction="row"
@@ -1649,7 +1635,7 @@ export default function SiteAdminData() {
                     ? "Try adjusting your search terms."
                     : "Add your first record to get started."}
                 </Typography>
-                {!search && (
+                {!search && tablePermissions.canCreate && (
                   <Button
                     variant="contained"
                     startIcon={<AddIcon />}
@@ -1915,7 +1901,12 @@ export default function SiteAdminData() {
                 p: 3,
               }}
             >
-              {config && Object.entries(config.fields).map(renderFormField)}
+              {config && Object.entries(config.fields)
+                .filter(([name]) =>
+                  !tablePermissions.isStatusOnly ||
+                  name === tablePermissions.allowedStatusField
+                )
+                .map(renderFormField)}
             </Box>
           </DialogContent>
           <DialogActions sx={{ px: 3, py: 2, borderTop: 1, borderColor: "divider" }}>

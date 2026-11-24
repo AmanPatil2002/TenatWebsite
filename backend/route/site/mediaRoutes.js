@@ -3,6 +3,7 @@ const authenticateToken = require("../../middleware/authenticate");
 const authenticateSiteAdmin = require("../../middleware/authenticateSiteAdmin");
 const siteMedia = require("../../controller/siteMediaController");
 
+router.get("/:siteId/public/media", siteMedia.listPublicPublishedMedia);
 router.get("/client-admin/:siteId/media", authenticateSiteAdmin, siteMedia.listPublishedMedia);
 router.get("/:siteId/media", authenticateToken, siteMedia.listPublishedMedia);
 router.post("/client-admin/:siteId/media/upload", authenticateSiteAdmin, ...siteMedia.uploadImage);

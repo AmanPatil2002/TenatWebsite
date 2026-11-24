@@ -8,16 +8,17 @@ import {
   Divider,
   FormControl,
   FormHelperText,
+  IconButton,
   InputLabel,
   MenuItem,
   Paper,
   Select,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import {
-  AddPhotoAlternateOutlined,
   CloudUploadOutlined,
   SaveOutlined,
   DeleteOutlineOutlined,
@@ -246,10 +247,12 @@ function MultiplePhotoUpload({ value = [], onChange, disabled = false }) {
     <Box>
       <input
         ref={inputRef}
+        id="template-photo-upload"
         hidden
         multiple
         type="file"
         accept="image/*"
+        aria-describedby="template-photo-upload-help"
         onChange={handleFiles}
         disabled={disabled || uploading}
       />
@@ -258,9 +261,17 @@ function MultiplePhotoUpload({ value = [], onChange, disabled = false }) {
       <Box
         onClick={() => !disabled && !uploading && inputRef.current?.click()}
         role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if ((e.key === "Enter" || e.key === " ") && !disabled && !uploading) {
+        aria-label="Upload template photos"
+        aria-describedby="template-photo-upload-help"
+        aria-disabled={disabled || uploading}
+        tabIndex={disabled || uploading ? -1 : 0}
+        onKeyDown={(event) => {
+          if (
+            (event.key === "Enter" || event.key === " ") &&
+            !disabled &&
+            !uploading
+          ) {
+            event.preventDefault();
             inputRef.current?.click();
           }
         }}
@@ -301,13 +312,17 @@ function MultiplePhotoUpload({ value = [], onChange, disabled = false }) {
         <Typography variant="subtitle2" fontWeight={600}>
           {uploading ? "Uploading photos..." : "Click to upload photos"}
         </Typography>
-        <Typography variant="body2" color="text.secondary">
+        <Typography
+          id="template-photo-upload-help"
+          variant="body2"
+          color="text.secondary"
+        >
           Multiple images supported · PNG, JPG, WEBP · max 10 MB each
         </Typography>
       </Box>
 
       {error && (
-        <Alert severity="error" sx={{ mt: 2 }}>
+        <Alert severity="error" role="alert" sx={{ mt: 2 }}>
           {error}
         </Alert>
       )}
@@ -355,16 +370,19 @@ function MultiplePhotoUpload({ value = [], onChange, disabled = false }) {
                 <Typography variant="caption" color="text.secondary" noWrap>
                   Photo {index + 1}
                 </Typography>
-                <Button
-                  color="error"
-                  size="small"
-                  aria-label={`Remove photo ${index + 1}`}
-                  onClick={() => removePhoto(index)}
-                  disabled={disabled || uploading}
-                  sx={{ minWidth: 32, p: 0.5 }}
-                >
-                  <DeleteOutlineOutlined fontSize="small" />
-                </Button>
+                <Tooltip title={`Remove photo ${index + 1}`}>
+                  <span>
+                    <IconButton
+                      color="error"
+                      aria-label={`Remove photo ${index + 1}`}
+                      onClick={() => removePhoto(index)}
+                      disabled={disabled || uploading}
+                      sx={{ width: 44, height: 44 }}
+                    >
+                      <DeleteOutlineOutlined fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
               </Box>
             </Paper>
           ))}
@@ -597,6 +615,29 @@ export default function AddTemplate() {
   };
 
   const handleReset = () => {
+    const hasEnteredData =
+      form.categoryId ||
+      form.name.trim() ||
+      form.language.trim() ||
+      form.shortDescription.trim() ||
+      form.description.trim() ||
+      form.thumbnailUrl.trim() ||
+      form.photos.length ||
+      form.price !== "" ||
+      form.themeIds.length ||
+      form.pageIds.length ||
+      form.status !== EMPTY_FORM.status ||
+      Number(form.validityDays) !== EMPTY_FORM.validityDays;
+
+    if (
+      hasEnteredData &&
+      !window.confirm(
+        "Reset this form? All unsaved template details will be cleared.",
+      )
+    ) {
+      return;
+    }
+
     setForm({ ...EMPTY_FORM });
     setPages([]);
     setPagesLoading(false);
@@ -616,8 +657,10 @@ export default function AddTemplate() {
           gap: 2,
         }}
       >
-        <CircularProgress />
-        <Typography color="text.secondary">Loading template form…</Typography>
+        <CircularProgress aria-label="Loading template form" />
+        <Typography color="text.secondary" role="status" aria-live="polite">
+          Loading template form…
+        </Typography>
       </Box>
     );
   }
@@ -634,7 +677,15 @@ export default function AddTemplate() {
   };
 
   return (
-    <Box sx={{ maxWidth: 1080, mx: "auto", px: { xs: 2, sm: 3 }, py: 4 }}>
+    <Box
+      component="main"
+      sx={{
+        maxWidth: 1080,
+        mx: "auto",
+        px: { xs: 2, sm: 3 },
+        py: { xs: 3, sm: 4 },
+      }}
+    >
       {/* Header */}
       <Box sx={{ mb: 3 }}>
         <Typography
@@ -643,8 +694,13 @@ export default function AddTemplate() {
         >
           Admin · Templates
         </Typography>
-        <Typography variant="h4" fontWeight={700} sx={{ lineHeight: 1.2 }}>
-          Add Template
+        <Typography
+          component="h1"
+          variant="h4"
+          fontWeight={700}
+          sx={{ lineHeight: 1.2 }}
+        >
+          Add template
         </Typography>
         <Typography color="text.secondary" sx={{ mt: 1, maxWidth: 720 }}>
           Create a template, upload photos, and select its category, themes, and
@@ -655,12 +711,17 @@ export default function AddTemplate() {
       {/* Alerts */}
       <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2 }}>
         {error && (
-          <Alert severity="error" onClose={() => setError("")}>
+          <Alert severity="error" role="alert" onClose={() => setError("")}>
             {error}
           </Alert>
         )}
         {success && (
-          <Alert severity="success" onClose={() => setSuccess("")}>
+          <Alert
+            severity="success"
+            role="status"
+            aria-live="polite"
+            onClose={() => setSuccess("")}
+          >
             {success}
           </Alert>
         )}
@@ -691,12 +752,22 @@ export default function AddTemplate() {
                   label="Category"
                   onChange={handleCategoryChange}
                 >
+                  {!categories.length && (
+                    <MenuItem disabled value="">
+                      No categories available
+                    </MenuItem>
+                  )}
                   {categories.map((category) => (
                     <MenuItem key={getId(category)} value={getId(category)}>
                       {getName(category)}
                     </MenuItem>
                   ))}
                 </Select>
+                {!categories.length && (
+                  <FormHelperText>
+                    Create a category before adding a template.
+                  </FormHelperText>
+                )}
               </FormControl>
 
               <TextField
@@ -886,6 +957,11 @@ export default function AddTemplate() {
                     );
                   }}
                 >
+                  {!themes.length && (
+                    <MenuItem disabled value="">
+                      No themes available
+                    </MenuItem>
+                  )}
                   {themes.map((theme) => (
                     <MenuItem key={getId(theme)} value={String(getId(theme))}>
                       <Box
@@ -930,7 +1006,11 @@ export default function AddTemplate() {
                     </MenuItem>
                   ))}
                 </Select>
-                <FormHelperText>Select one or more themes.</FormHelperText>
+                <FormHelperText>
+                  {themes.length
+                    ? "Select one or more themes."
+                    : "No themes are available yet."}
+                </FormHelperText>
               </FormControl>
 
               <Box>
@@ -983,7 +1063,7 @@ export default function AddTemplate() {
                 </FormControl>
 
                 {form.pageIds.length > 0 && (
-                  <Alert severity="info" sx={{ mt: 1.5 }}>
+                  <Alert severity="info" role="status" sx={{ mt: 1.5 }}>
                     Selected page total: {form.currency}{" "}
                     {calculatedPagePrice.toFixed(2)}
                   </Alert>
@@ -1059,9 +1139,9 @@ export default function AddTemplate() {
               variant="outlined"
               onClick={handleReset}
               disabled={saving}
-              fullWidth={false}
+              sx={{ minHeight: 44, width: { xs: "100%", sm: "auto" } }}
             >
-              Reset
+              Reset form
             </Button>
 
             <Button
@@ -1075,8 +1155,10 @@ export default function AddTemplate() {
                 )
               }
               disabled={saving || loading || pagesLoading}
+              aria-busy={saving}
+              sx={{ minHeight: 44, width: { xs: "100%", sm: "auto" } }}
             >
-              {saving ? "Saving..." : "Save Template"}
+              {saving ? "Saving…" : "Save template"}
             </Button>
           </Box>
         </Stack>

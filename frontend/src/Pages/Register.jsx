@@ -171,6 +171,8 @@ function Register() {
       <CssBaseline />
       <Box
         component="main"
+        id="main-content"
+        tabIndex={-1}
         sx={{
           minHeight: "100vh",
           "@supports (height: 100dvh)": { minHeight: "100dvh" },
@@ -391,7 +393,12 @@ function Register() {
                 <form onSubmit={handleSubmit} noValidate>
                   <Stack spacing={2.25}>
                     {serverError && (
-                      <Alert severity="error" sx={{ borderRadius: 2 }}>
+                      <Alert
+                        severity="error"
+                        role="alert"
+                        aria-live="assertive"
+                        sx={{ borderRadius: 2 }}
+                      >
                         {serverError}
                       </Alert>
                     )}
@@ -419,7 +426,7 @@ function Register() {
                       value={form.email}
                       onChange={handleChange}
                       placeholder="you@example.com"
-                      inputProps={{ maxLength: EMAIL_MAX }}
+                      inputProps={{ maxLength: EMAIL_MAX, inputMode: "email" }}
                       error={Boolean(errors.email)}
                       helperText={errors.email}
                       autoComplete="email"
@@ -480,11 +487,15 @@ function Register() {
                                     ? "Hide password"
                                     : "Show password"
                                 }
+                                aria-pressed={showPassword}
                                 onClick={() => setShowPassword((prev) => !prev)}
                                 onMouseDown={(event) => event.preventDefault()}
                                 edge="end"
-                                size="small"
-                                sx={{ color: "text.secondary" }}
+                                sx={{
+                                  color: "text.secondary",
+                                  minWidth: 44,
+                                  minHeight: 44,
+                                }}
                               >
                                 {showPassword ? (
                                   <VisibilityOff fontSize="small" />
@@ -517,7 +528,7 @@ function Register() {
                         },
                       }}
                     >
-                      {loading ? "Creating account..." : "Create account"}
+                      {loading ? "Creating account…" : "Create account"}
                     </Button>
                   </Stack>
                 </form>

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 
 import AppBar from "@mui/material/AppBar";
 import Box from "@mui/material/Box";
@@ -74,7 +74,7 @@ function Header() {
           <Box sx={{ display: { xs: "flex", md: "none" }, alignItems: "center" }}>
             <IconButton
               size="medium"
-              aria-label="navigation menu"
+              aria-label={anchorElNav ? "Close navigation menu" : "Open navigation menu"}
               aria-controls="menu-appbar"
               aria-haspopup="true"
               onClick={handleOpenNavMenu}
@@ -186,7 +186,7 @@ function Header() {
             {navItems.map((item) => (
               <Button
                 key={item.name}
-                component={Link}
+                component={NavLink}
                 to={item.path}
                 disableRipple
                 sx={{
@@ -198,10 +198,20 @@ function Header() {
                   py: 0.75,
                   borderRadius: 2,
                   position: "relative",
-                  transition: "all 0.2s ease",
-                  "&:hover": {
+                  transition: "background-color 0.2s ease, color 0.2s ease",
+                  "&:hover, &.active": {
                     color: "#ffffff",
                     backgroundColor: alpha("#3b82f6", 0.15),
+                  },
+                  "&.active::after": {
+                    content: '""',
+                    position: "absolute",
+                    right: 14,
+                    bottom: 3,
+                    left: 14,
+                    height: 2,
+                    borderRadius: 999,
+                    bgcolor: "#7dd3fc",
                   },
                 }}
               >
@@ -217,10 +227,14 @@ function Header() {
                 <Tooltip title="My Profile" arrow>
                   <IconButton
                     onClick={handleOpenUserMenu}
+                    aria-label="Open account menu"
+                    aria-controls={anchorElUser ? "user-menu" : undefined}
+                    aria-haspopup="true"
+                    aria-expanded={Boolean(anchorElUser)}
                     sx={{
                       p: 0.5,
                       border: "1px solid rgba(255,255,255,0.12)",
-                      transition: "all 0.2s ease",
+                      transition: "border-color 0.2s ease, box-shadow 0.2s ease",
                       "&:hover": {
                         borderColor: "rgba(59,130,246,0.6)",
                         boxShadow: "0 0 0 4px rgba(59,130,246,0.12)",
@@ -339,7 +353,7 @@ function Header() {
                   color: "#ffffff",
                   background: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
                   boxShadow: "0 4px 14px rgba(37,99,235,0.35)",
-                  transition: "all 0.2s ease",
+                  transition: "background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease",
                   "&:hover": {
                     background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
                     boxShadow: "0 6px 20px rgba(37,99,235,0.45)",

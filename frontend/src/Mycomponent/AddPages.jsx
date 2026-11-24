@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { CKEditor } from "ckeditor4-react";
-
 import {
   Alert,
   Box,
@@ -28,9 +27,8 @@ import {
   TextField,
   Tooltip,
   Typography,
+  alpha,
 } from "@mui/material";
-import { alpha } from "@mui/material/styles";
-
 import {
   Add as AddIcon,
   DeleteOutlined as DeleteIcon,
@@ -39,13 +37,16 @@ import {
   ArticleOutlined as ArticleIcon,
 } from "@mui/icons-material";
 
+// import { CATEGORICAL_PALETTE, getCategoricalColor } from "../config/cvdPalette";
+
 const API_URL = (
   import.meta.env.VITE_API_URL || "http://localhost:5000"
 ).replace(/\/$/, "");
 
+// Use CVD-safe palette slot 1 (blue) as primary brand color
 const BRAND = {
-  indigo: "#4f46e5",
-  indigoDeep: "#3730a3",
+  primary:  "#2a78d6", // #2a78d6
+  primaryDeep: "#1c5cab", // Sequential blue 550
   ink: "#0f172a",
   muted: "#64748b",
 };
@@ -69,7 +70,7 @@ const getPlainText = (html = "") => {
   const element = document.createElement("div");
   element.innerHTML = html;
   return (element.textContent || element.innerText || "")
-    .replace(/\u00a0/g, " ")
+    .replace(/ /g, " ")
     .trim();
 };
 
@@ -131,7 +132,7 @@ function SectionLabel({ children }) {
         display: "block",
         fontWeight: 700,
         letterSpacing: "0.1em",
-        color: BRAND.indigo,
+        color: BRAND.primary,
         lineHeight: 1.6,
       }}
     >
@@ -248,8 +249,8 @@ function PageForm({
             display: "grid",
             placeItems: "center",
             borderRadius: 2,
-            color: BRAND.indigo,
-            bgcolor: alpha(BRAND.indigo, 0.08),
+            color: BRAND.primary,
+            bgcolor: alpha(BRAND.primary, 0.08),
             "& .MuiSvgIcon-root": { fontSize: "1.25rem" },
           }}
         >
@@ -370,7 +371,7 @@ function PageForm({
           >
             <CKEditor
               key={editorKey}
-              editorUrl="https://cdn.ckeditor.com/4.22.1/standard-all/ckeditor.js"
+              editorUrl="https://cdn.ckeditor.com/4.22.1/full-all/ckeditor.js"
               initData={formData.page}
               onBeforeLoad={(CKEDITOR) => {
                 if (CKEDITOR.plugins.get("localvideo")) return;
@@ -414,51 +415,46 @@ function PageForm({
                       icon:
                         "data:image/svg+xml;utf8," +
                         encodeURIComponent(
-                          '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="#444" d="M4 5h11a2 2 0 0 1 2 2v3l5-3v10l-5-3v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/></svg>',
+                          '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16"><path fill="#444" d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg>',
                         ),
                     });
                   },
                 });
               }}
               config={{
-                height: 350,
+                height: 420,
                 language: "en",
+                versionCheck: false,
+                removePlugins: "exportpdf",
                 allowedContent: true,
-                // Enable the colorbutton plugin for text/background color
-                extraPlugins: "uploadimage,localvideo,colorbutton,find,divarea",
 
-                // Use toolbarGroups for better organization and future plugin compatibility
-                toolbarGroups: [
-                  {
-                    name: "document",
-                    groups: ["mode", "document", "doctools"],
-                  },
-                  { name: "clipboard", groups: ["clipboard", "undo"] },
-                  {
-                    name: "editing",
-                    groups: ["find", "selection", "spellchecker"],
-                  },
-                  { name: "forms" },
-                  { name: "basicstyles", groups: ["basicstyles", "cleanup"] },
-                  {
-                    name: "paragraph",
-                    groups: ["list", "indent", "blocks", "align", "bidi"],
-                  },
-                  { name: "links" },
-                  { name: "insert" },
-                  { name: "styles" },
-                  { name: "colors" },
-                  { name: "tools" },
-                  { name: "others" },
-                  { name: "about" },
-                ],
+                // Plugins loaded on top of the full-all build
+                extraPlugins:
+                  "embed,autoembed,uploadimage,localvideo,colorbutton,find,divarea,justify,showblocks,smiley,pagebreak,copyformatting",
+                embed_provider:
+                  "//ckeditor.iframe.ly/api/oembed?url={url}&callback={callback}",
+                // Disable clipboard image handling to silence the conflict warning
+                // (uploadimage plugin handles uploads instead)
+                clipboard_handleImages: false,
 
-                // Explicitly add your custom LocalVideo button into the 'insert' group
-                // (Since it is not a standard plugin, we add it to the toolbar array)
+                /*
+                 * Toolbar layout — each object is a group, "/" forces a new row.
+                 * Group names map to standard CKEditor toolbar groups so buttons
+                 * stay in a predictable position.
+                 */
                 toolbar: [
+                  // ── Row 1: Document & clipboard ──────────────────────────────
                   {
                     name: "document",
-                    items: ["Source", "-", "Preview", "-", "Maximize"],
+                    items: [
+                      "Source",
+                      "-",
+                      "Preview",
+                      "-",
+                      "Print",
+                      "-",
+                      "Templates",
+                    ],
                   },
                   {
                     name: "clipboard",
@@ -475,9 +471,19 @@ function PageForm({
                   },
                   {
                     name: "editing",
-                    items: ["Find", "Replace", "-", "SelectAll"],
+                    items: [
+                      "Find",
+                      "Replace",
+                      "-",
+                      "SelectAll",
+                      "CopyFormatting",
+                    ],
                   },
+                  { name: "tools", items: ["Maximize", "ShowBlocks"] },
+
                   "/",
+
+                  // ── Row 2: Text styling ──────────────────────────────────────
                   {
                     name: "basicstyles",
                     items: [
@@ -493,6 +499,14 @@ function PageForm({
                   },
                   { name: "colors", items: ["TextColor", "BGColor"] },
                   {
+                    name: "styles",
+                    items: ["Styles", "-", "Format", "-", "Font", "FontSize"],
+                  },
+
+                  "/",
+
+                  // ── Row 3: Paragraph & alignment ─────────────────────────────
+                  {
                     name: "paragraph",
                     items: [
                       "NumberedList",
@@ -507,9 +521,16 @@ function PageForm({
                       "JustifyCenter",
                       "JustifyRight",
                       "JustifyBlock",
+                      "-",
+                      "BidiLtr",
+                      "BidiRtl",
                     ],
                   },
                   { name: "links", items: ["Link", "Unlink", "Anchor"] },
+
+                  "/",
+
+                  // ── Row 4: Insert objects ────────────────────────────────────
                   {
                     name: "insert",
                     items: [
@@ -517,18 +538,37 @@ function PageForm({
                       "LocalVideo",
                       "Table",
                       "HorizontalRule",
+                      "-",
                       "SpecialChar",
+                      "Smiley",
+                      "PageBreak",
+                      "Iframe",
                     ],
                   },
-                  { name: "styles", items: ["Format", "FontSize"] },
-                  { name: "tools", items: ["Maximize"] },
+
+                  "/",
+
+                  // ── Row 5: Forms ─────────────────────────────────────────────
+                  {
+                    name: "forms",
+                    items: [
+                      "Form",
+                      "Checkbox",
+                      "Radio",
+                      "TextField",
+                      "Textarea",
+                      "Select",
+                      "Button",
+                      "ImageButton",
+                      "HiddenField",
+                    ],
+                  },
                 ],
 
-                // Remove buttons you don't want to keep the toolbar clean
-                removeButtons:
-                  "NewPage,Templates,Form,Checkbox,Radio,TextField,Textarea,Select,Button,ImageButton,HiddenField,About",
+                // No removeButtons restriction — show every button defined above
+                removeButtons: "",
 
-                // Keep your upload settings
+                // Upload endpoints
                 uploadUrl: `${API_URL}/uploads/ckeditor`,
                 imageUploadUrl: `${API_URL}/uploads/ckeditor`,
                 filebrowserImageUploadUrl: `${API_URL}/uploads/ckeditor`,
@@ -574,14 +614,14 @@ function PageForm({
               borderRadius: 2,
               textTransform: "none",
               fontWeight: 700,
-              bgcolor: BRAND.indigo,
-              boxShadow: `0 8px 20px ${alpha(BRAND.indigo, 0.25)}`,
+              bgcolor: BRAND.primary,
+              boxShadow: `0 8px 20px ${alpha(BRAND.primary, 0.25)}`,
               "&:hover": {
-                bgcolor: BRAND.indigoDeep,
-                boxShadow: `0 10px 24px ${alpha(BRAND.indigo, 0.32)}`,
+                bgcolor: BRAND.primaryDeep,
+                boxShadow: `0 10px 24px ${alpha(BRAND.primary, 0.32)}`,
               },
               "&.Mui-disabled": {
-                bgcolor: alpha(BRAND.indigo, 0.35),
+                bgcolor: alpha(BRAND.primary, 0.35),
                 color: "#fff",
               },
             }}
@@ -601,11 +641,11 @@ function PageForm({
                 borderRadius: 2,
                 textTransform: "none",
                 fontWeight: 600,
-                borderColor: alpha(BRAND.indigo, 0.35),
-                color: BRAND.indigo,
+                borderColor: alpha(BRAND.primary, 0.35),
+                color: BRAND.primary,
                 "&:hover": {
-                  borderColor: BRAND.indigo,
-                  bgcolor: alpha(BRAND.indigo, 0.04),
+                  borderColor: BRAND.primary,
+                  bgcolor: alpha(BRAND.primary, 0.04),
                 },
               }}
             >
@@ -815,7 +855,7 @@ export default function AddPages() {
               display: "block",
               fontWeight: 700,
               letterSpacing: "0.12em",
-              color: BRAND.indigo,
+              color: BRAND.primary,
             }}
           >
             Content
@@ -865,7 +905,7 @@ export default function AddPages() {
                 }}
               >
                 <CircularProgress
-                  sx={{ color: BRAND.indigo }}
+                  sx={{ color: BRAND.primary }}
                   aria-label="Loading form"
                 />
               </Paper>
@@ -927,11 +967,11 @@ export default function AddPages() {
                   textTransform: "none",
                   fontWeight: 600,
                   borderRadius: 2,
-                  borderColor: alpha(BRAND.indigo, 0.35),
-                  color: BRAND.indigo,
+                  borderColor: alpha(BRAND.primary, 0.35),
+                  color: BRAND.primary,
                   "&:hover": {
-                    borderColor: BRAND.indigo,
-                    bgcolor: alpha(BRAND.indigo, 0.04),
+                    borderColor: BRAND.primary,
+                    bgcolor: alpha(BRAND.primary, 0.04),
                   },
                 }}
               >
@@ -986,7 +1026,7 @@ export default function AddPages() {
                 borderColor: "divider",
                 "&::-webkit-scrollbar": { width: 6, height: 6 },
                 "&::-webkit-scrollbar-thumb": {
-                  bgcolor: alpha(BRAND.indigo, 0.25),
+                  bgcolor: alpha(BRAND.primary, 0.25),
                   borderRadius: 3,
                 },
               }}
@@ -997,7 +1037,7 @@ export default function AddPages() {
                     <TableCell
                       sx={{
                         fontWeight: 700,
-                        bgcolor: alpha(BRAND.indigo, 0.04),
+                        bgcolor: alpha(BRAND.primary, 0.04),
                         color: BRAND.ink,
                       }}
                     >
@@ -1006,7 +1046,7 @@ export default function AddPages() {
                     <TableCell
                       sx={{
                         fontWeight: 700,
-                        bgcolor: alpha(BRAND.indigo, 0.04),
+                        bgcolor: alpha(BRAND.primary, 0.04),
                         color: BRAND.ink,
                       }}
                     >
@@ -1016,7 +1056,7 @@ export default function AddPages() {
                       align="right"
                       sx={{
                         fontWeight: 700,
-                        bgcolor: alpha(BRAND.indigo, 0.04),
+                        bgcolor: alpha(BRAND.primary, 0.04),
                         color: BRAND.ink,
                         whiteSpace: "nowrap",
                       }}
@@ -1027,7 +1067,7 @@ export default function AddPages() {
                       align="center"
                       sx={{
                         fontWeight: 700,
-                        bgcolor: alpha(BRAND.indigo, 0.04),
+                        bgcolor: alpha(BRAND.primary, 0.04),
                         color: BRAND.ink,
                         whiteSpace: "nowrap",
                       }}
@@ -1043,7 +1083,7 @@ export default function AddPages() {
                       <TableCell colSpan={4} align="center" sx={{ py: 6 }}>
                         <CircularProgress
                           size={28}
-                          sx={{ color: BRAND.indigo }}
+                          sx={{ color: BRAND.primary }}
                         />
                         <Typography
                           variant="body2"
@@ -1073,7 +1113,7 @@ export default function AddPages() {
                         hover
                         key={getPageId(page)}
                         sx={{
-                          "&:hover": { bgcolor: alpha(BRAND.indigo, 0.03) },
+                          "&:hover": { bgcolor: alpha(BRAND.primary, 0.03) },
                         }}
                       >
                         <TableCell
@@ -1130,9 +1170,9 @@ export default function AddPages() {
                               onClick={() => handleEdit(page)}
                               aria-label={`Edit ${page.title}`}
                               sx={{
-                                color: BRAND.indigo,
+                                color: BRAND.primary,
                                 "&:hover": {
-                                  bgcolor: alpha(BRAND.indigo, 0.08),
+                                  bgcolor: alpha(BRAND.primary, 0.08),
                                 },
                               }}
                             >

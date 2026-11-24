@@ -4,6 +4,11 @@ import {
   Box,
   Button,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Divider,
   Grid,
   IconButton,
@@ -91,6 +96,7 @@ function FaqForm({
           placeholder="e.g. How do I change my domain?"
           value={formData.question}
           onChange={handleChange}
+          autoComplete="off"
           error={!!errors.question}
           helperText={errors.question || `Minimum ${MIN_QUESTION} characters`}
         />
@@ -106,6 +112,7 @@ function FaqForm({
           placeholder="Write a clear, helpful answer…"
           value={formData.answer}
           onChange={handleChange}
+          autoComplete="off"
           error={!!errors.answer}
           helperText={errors.answer || `Minimum ${MIN_ANSWER} characters`}
         />
@@ -162,6 +169,7 @@ export default function AddFaq() {
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [snack, setSnack] = useState({
     open: false,
     message: "",

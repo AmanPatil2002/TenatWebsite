@@ -70,6 +70,27 @@ const getActiveManagedSite = async (siteId, req) => {
   return ensureReadySiteDatabase(siteId, site);
 };
 
+const getPublicSite = async (siteId) => {
+  if (!isId(siteId)) throw new HttpError(400, "Invalid site id");
+  const [[site]] = await db.query(
+    `SELECT s.id, s.status, s.expiresAt, s.dbName, s.provisionStatus,
+            c.packKey,
+            pay.status AS paymentStatus,
+            s.expiresAt > CURRENT_TIMESTAMP AS notExpired
+       FROM sites s
+       JOIN template t ON t.templateId = s.templateId
+       JOIN categories c ON c.categoryId = t.categoryId
+       JOIN payments pay ON pay.id = s.paymentId
+      WHERE s.id = ?`,
+    [siteId],
+  );
+  if (!site) throw new HttpError(404, "Site not found");
+  if (site.status !== "active" || site.paymentStatus !== "captured" || !site.notExpired) {
+    throw new HttpError(403, "Site is inactive or expired");
+  }
+  return ensureReadySiteDatabase(siteId, site);
+};
+
 const readSiteHeader = async (siteId, dbName) => {
   const [[header]] = await db.query(
     `SELECT logoUrl, siteTitle, footerText, footerAddress,
@@ -84,4 +105,4 @@ const readSiteHeader = async (siteId, dbName) => {
   return header || null;
 };
 
-module.exports = { isId, getActiveOwnedSite, getActiveManagedSite, readSiteHeader };
+module.exports = { isId, getActiveOwnedSite, getActiveManagedSite, getPublicSite, readSiteHeader };

@@ -39,6 +39,8 @@ const SvgIcon = ({ children, size = 20, color = "currentColor" }) => (
     component="svg"
     xmlns="http://www.w3.org/2000/svg"
     viewBox="0 0 24 24"
+    aria-hidden="true"
+    focusable="false"
     sx={{ width: size, height: size, display: "block", color, flexShrink: 0 }}
     fill="none"
     stroke="currentColor"
@@ -211,7 +213,11 @@ export default function SiteAdminEmployees() {
   const activeCount = employees.filter((e) => e.status === "active").length;
 
   return (
-    <Box sx={{ maxWidth: 1280, mx: "auto" }}>
+    <Box
+      component="main"
+      aria-labelledby="employees-page-title"
+      sx={{ maxWidth: 1280, mx: "auto", minWidth: 0 }}
+    >
       {/* ---------------- Page header ---------------- */}
       <Stack
         direction={{ xs: "column", sm: "row" }}
@@ -222,11 +228,18 @@ export default function SiteAdminEmployees() {
           alignItems: { xs: "stretch", sm: "center" },
         }}
       >
-        <Box>
-          <Typography variant="h4" fontWeight={800} letterSpacing="-0.02em">
+        <Box sx={{ minWidth: 0 }}>
+          <Typography
+            id="employees-page-title"
+            component="h1"
+            variant="h4"
+            fontWeight={800}
+            letterSpacing="-0.02em"
+            sx={{ overflowWrap: "anywhere" }}
+          >
             Employees
           </Typography>
-          <Typography color="text.secondary" sx={{ mt: 0.5 }}>
+          <Typography color="text.secondary" sx={{ mt: 0.5, overflowWrap: "anywhere" }}>
             Manage the team associated with your purchased site.
           </Typography>
         </Box>
@@ -237,7 +250,7 @@ export default function SiteAdminEmployees() {
         >
           <Chip
             icon={<EmployeesIcon size={14} />}
-            label={`${employees.length} total`}
+            label={loading ? "Loading…" : `${employees.length} total`}
             variant="outlined"
             sx={{
               fontWeight: 600,
@@ -247,7 +260,7 @@ export default function SiteAdminEmployees() {
           />
           <Chip
             icon={<BriefcaseIcon size={14} />}
-            label={`${activeCount} active`}
+            label={loading ? "Checking status…" : `${activeCount} active`}
             variant="outlined"
             sx={{
               fontWeight: 600,
@@ -261,7 +274,8 @@ export default function SiteAdminEmployees() {
       {error && !dialogOpen && (
         <Alert
           severity="error"
-          sx={{ mb: 2, borderRadius: 2 }}
+          role="alert"
+          sx={{ mb: 2, borderRadius: 2, overflowWrap: "anywhere" }}
           onClose={() => setError("")}
         >
           {error}
@@ -270,7 +284,9 @@ export default function SiteAdminEmployees() {
       {notice && (
         <Alert
           severity="success"
-          sx={{ mb: 2, borderRadius: 2 }}
+          role="status"
+          aria-live="polite"
+          sx={{ mb: 2, borderRadius: 2, overflowWrap: "anywhere" }}
           onClose={() => setNotice("")}
         >
           {notice}
@@ -292,8 +308,8 @@ export default function SiteAdminEmployees() {
             }}
           >
             <Box>
-              <Typography variant="h6" fontWeight={700}>
-                Team directory
+              <Typography component="h2" variant="h6" fontWeight={700}>
+                Team Directory
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Click a row's edit button to update details.
@@ -309,7 +325,9 @@ export default function SiteAdminEmployees() {
                 textTransform: "none",
                 fontWeight: 700,
                 px: 2.5,
-                alignSelf: { xs: "flex-start", sm: "center" },
+                alignSelf: { xs: "stretch", sm: "center" },
+                minHeight: 44,
+                touchAction: "manipulation",
                 boxShadow: `0 4px 12px ${alpha(
                   theme.palette.primary.main,
                   0.25,
@@ -323,8 +341,15 @@ export default function SiteAdminEmployees() {
         <Divider />
 
         {loading ? (
-          <Box sx={{ display: "grid", placeItems: "center", py: 8 }}>
-            <CircularProgress />
+          <Box
+            role="status"
+            aria-live="polite"
+            sx={{ display: "grid", placeItems: "center", gap: 1.5, py: 8 }}
+          >
+            <CircularProgress aria-hidden="true" />
+            <Typography variant="body2" color="text.secondary">
+              Loading employees…
+            </Typography>
           </Box>
         ) : employees.length === 0 ? (
           <Box
@@ -349,8 +374,8 @@ export default function SiteAdminEmployees() {
             >
               <EmployeesIcon size={28} />
             </Box>
-            <Typography fontWeight={700} variant="h6">
-              No employees yet
+            <Typography component="h3" fontWeight={700} variant="h6">
+              No Employees Yet
             </Typography>
             <Typography
               variant="body2"
@@ -363,14 +388,30 @@ export default function SiteAdminEmployees() {
               variant="outlined"
               startIcon={<AddIcon size={16} />}
               onClick={() => openDialog(null)}
-              sx={{ borderRadius: 2, textTransform: "none", fontWeight: 600 }}
+              sx={{
+                borderRadius: 2,
+                textTransform: "none",
+                fontWeight: 600,
+                minHeight: 44,
+                touchAction: "manipulation",
+              }}
             >
-              Add employee
+              Add Employee
             </Button>
           </Box>
         ) : (
-          <TableContainer>
-            <Table>
+          <TableContainer
+            tabIndex={0}
+            aria-label="Employee directory. Scroll horizontally to view all columns on smaller screens."
+            sx={{
+              overflowX: "auto",
+              "&:focus-visible": {
+                outline: `3px solid ${alpha(theme.palette.primary.main, 0.35)}`,
+                outlineOffset: -3,
+              },
+            }}
+          >
+            <Table sx={{ minWidth: 760 }}>
               <TableHead>
                 <TableRow
                   sx={{ bgcolor: alpha(theme.palette.primary.main, 0.03) }}
@@ -524,7 +565,7 @@ export default function SiteAdminEmployees() {
                     <TableCell>
                       <Chip
                         size="small"
-                        label={employee.status}
+                        label={employee.status || "unknown"}
                         sx={{
                           textTransform: "capitalize",
                           fontWeight: 700,
@@ -549,13 +590,16 @@ export default function SiteAdminEmployees() {
                       >
                         <Tooltip title="Edit">
                           <IconButton
-                            aria-label={`Edit ${employee.name}`}
+                            aria-label={`Edit ${employee.name || "employee"}`}
                             onClick={() => openDialog(employee)}
                             size="small"
                             disabled={deletingId === employee.id}
                             sx={{
+                              width: 44,
+                              height: 44,
                               borderRadius: 1.5,
                               color: "text.secondary",
+                              touchAction: "manipulation",
                               "&:hover": {
                                 color: "primary.main",
                                 bgcolor: alpha(
@@ -570,13 +614,16 @@ export default function SiteAdminEmployees() {
                         </Tooltip>
                         <Tooltip title="Delete">
                           <IconButton
-                            aria-label={`Delete ${employee.name}`}
+                            aria-label={`Delete ${employee.name || "employee"}`}
                             onClick={() => deleteEmployee(employee)}
                             size="small"
                             disabled={deletingId === employee.id}
                             sx={{
+                              width: 44,
+                              height: 44,
                               borderRadius: 1.5,
                               color: "text.secondary",
+                              touchAction: "manipulation",
                               "&:hover": {
                                 color: "error.main",
                                 bgcolor: alpha(theme.palette.error.main, 0.08),
@@ -606,7 +653,9 @@ export default function SiteAdminEmployees() {
         onClose={() => !saving && setDialogOpen(false)}
         fullWidth
         maxWidth="sm"
-        PaperProps={{ sx: { borderRadius: 3 } }}
+        aria-labelledby="employee-dialog-title"
+        aria-describedby="employee-dialog-description"
+        PaperProps={{ sx: { borderRadius: { xs: 0, sm: 3 }, m: { xs: 0, sm: 4 }, maxHeight: { xs: "100dvh", sm: "calc(100% - 64px)" } } }}
       >
         <Box component="form" onSubmit={saveEmployee}>
           <DialogTitle sx={{ pb: 1 }}>
@@ -629,13 +678,22 @@ export default function SiteAdminEmployees() {
                 {employeeId ? <EditIcon size={18} /> : <AddIcon size={18} />}
               </Box>
               <Box>
-                <Typography fontWeight={700} sx={{ lineHeight: 1.2 }}>
-                  {employeeId ? "Edit employee" : "Add employee"}
+                <Typography
+                  id="employee-dialog-title"
+                  component="h2"
+                  fontWeight={700}
+                  sx={{ lineHeight: 1.2 }}
+                >
+                  {employeeId ? "Edit Employee" : "Add Employee"}
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
+                <Typography
+                  id="employee-dialog-description"
+                  variant="caption"
+                  color="text.secondary"
+                >
                   {employeeId
                     ? "Update the details and save."
-                    : "Enter the new team member's details."}
+                    : "Enter the new team member’s details."}
                 </Typography>
               </Box>
             </Stack>
@@ -643,7 +701,11 @@ export default function SiteAdminEmployees() {
           <Divider />
           <DialogContent sx={{ pt: 2.5 }}>
             {error && (
-              <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+              <Alert
+                severity="error"
+                role="alert"
+                sx={{ mb: 2, borderRadius: 2, overflowWrap: "anywhere" }}
+              >
                 {error}
               </Alert>
             )}
@@ -653,6 +715,8 @@ export default function SiteAdminEmployees() {
                   label="Name"
                   value={form.name}
                   onChange={(e) => updateForm("name", e.target.value)}
+                  name="employeeName"
+                  autoComplete="name"
                   slotProps={{ htmlInput: { maxLength: 150 } }}
                   required
                   fullWidth
@@ -664,6 +728,8 @@ export default function SiteAdminEmployees() {
                   label="Job title"
                   value={form.jobTitle}
                   onChange={(e) => updateForm("jobTitle", e.target.value)}
+                  name="jobTitle"
+                  autoComplete="organization-title"
                   slotProps={{ htmlInput: { maxLength: 120 } }}
                   required
                   fullWidth
@@ -674,8 +740,11 @@ export default function SiteAdminEmployees() {
                 <TextField
                   label="Email"
                   type="email"
+                  name="email"
+                  autoComplete="email"
                   value={form.email || ""}
                   onChange={(e) => updateForm("email", e.target.value)}
+                  slotProps={{ htmlInput: { spellCheck: false } }}
                   fullWidth
                   size="small"
                 />
@@ -683,9 +752,12 @@ export default function SiteAdminEmployees() {
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   label="Phone"
+                  type="tel"
+                  name="phone"
+                  autoComplete="tel"
                   value={form.phone || ""}
                   onChange={(e) => updateForm("phone", e.target.value)}
-                  slotProps={{ htmlInput: { maxLength: 30 } }}
+                  slotProps={{ htmlInput: { maxLength: 30, inputMode: "tel" } }}
                   fullWidth
                   size="small"
                 />
@@ -694,6 +766,7 @@ export default function SiteAdminEmployees() {
                 <TextField
                   select
                   label="Status"
+                  name="status"
                   value={form.status}
                   onChange={(e) => updateForm("status", e.target.value)}
                   fullWidth
@@ -706,11 +779,25 @@ export default function SiteAdminEmployees() {
             </Grid>
           </DialogContent>
           <Divider />
-          <DialogActions sx={{ px: 3, py: 2 }}>
+          <DialogActions
+            sx={{
+              px: { xs: 2, sm: 3 },
+              py: 2,
+              flexDirection: { xs: "column-reverse", sm: "row" },
+              alignItems: "stretch",
+              "& > :not(style) ~ :not(style)": { ml: { xs: 0, sm: 1 }, mb: { xs: 1, sm: 0 } },
+            }}
+          >
             <Button
               onClick={() => setDialogOpen(false)}
               disabled={saving}
-              sx={{ borderRadius: 2, textTransform: "none", fontWeight: 600 }}
+              sx={{
+                borderRadius: 2,
+                textTransform: "none",
+                fontWeight: 600,
+                minHeight: 44,
+                touchAction: "manipulation",
+              }}
             >
               Cancel
             </Button>

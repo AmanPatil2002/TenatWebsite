@@ -17,6 +17,12 @@ import {
   useTheme,
   Stack,
   Avatar,
+  ButtonBase,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import AdminProfileDialog from "./AdminProfileDialog";
@@ -39,7 +45,7 @@ import PaymentIcon from "@mui/icons-material/Payment";
 import ReorderIcon from "@mui/icons-material/Reorder";
 import BugReportOutlinedIcon from "@mui/icons-material/BugReportOutlined";
 import EditIcon from "@mui/icons-material/Edit";
-import { useLocation, useNavigate, useOutlet } from "react-router-dom";
+import { Link, useLocation, useNavigate, useOutlet } from "react-router-dom";
 import AdminDashboard from "../../Mycomponent/AdminDashboard";
 
 const FULL_WIDTH = 260;
@@ -145,6 +151,7 @@ export default function Admin() {
       : FULL_WIDTH;
   const [email, setEmail] = useState(localStorage.getItem("email"));
   const [profileOpen, setProfileOpen] = useState(false);
+  const [logoutOpen, setLogoutOpen] = useState(false);
 
   const handleProfileSaved = (profile) => {
     localStorage.setItem("email", profile.email.trim());
@@ -165,6 +172,31 @@ export default function Admin() {
 
   return (
     <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#f8fafc" }}>
+      <Box
+        component="a"
+        href="#admin-main-content"
+        sx={{
+          position: "fixed",
+          top: 8,
+          left: 8,
+          zIndex: (muiTheme) => muiTheme.zIndex.modal + 1,
+          px: 2,
+          py: 1,
+          borderRadius: 1.5,
+          bgcolor: BRAND.ink,
+          color: "common.white",
+          fontWeight: 700,
+          textDecoration: "none",
+          transform: "translateY(-160%)",
+          transition: theme.transitions.create("transform", {
+            duration: theme.transitions.duration.shortest,
+          }),
+          "&:focus-visible": { transform: "translateY(0)" },
+        }}
+      >
+        Skip to Main Content
+      </Box>
+
       {/* ----------------------------- APP BAR ----------------------------- */}
       <AppBar
         position="fixed"
@@ -235,22 +267,30 @@ export default function Admin() {
 
           <Stack direction="row" spacing={1} alignItems="center">
             {/* Desktop profile chip */}
-            <Box
+            <ButtonBase
               onClick={() => setProfileOpen(true)}
+              aria-label={`Edit profile for ${email || "Admin"}`}
               sx={{
                 display: { xs: "none", sm: "flex" },
+                minHeight: 44,
                 alignItems: "center",
                 gap: 1,
                 px: 1,
                 py: 0.5,
                 borderRadius: 2,
-                cursor: "pointer",
                 border: "1px solid",
                 borderColor: "divider",
-                transition: "all 0.2s ease",
+                transition: theme.transitions.create(
+                  ["background-color", "border-color"],
+                  { duration: theme.transitions.duration.shortest },
+                ),
                 "&:hover": {
                   borderColor: alpha(BRAND.indigo, 0.35),
                   bgcolor: alpha(BRAND.indigo, 0.04),
+                },
+                "&:focus-visible": {
+                  outline: `3px solid ${alpha(BRAND.indigo, 0.35)}`,
+                  outlineOffset: 2,
                 },
               }}
             >
@@ -279,8 +319,11 @@ export default function Admin() {
               >
                 {email || "Admin"}
               </Typography>
-              <EditIcon sx={{ fontSize: 15, color: BRAND.muted }} />
-            </Box>
+              <EditIcon
+                aria-hidden="true"
+                sx={{ fontSize: 15, color: BRAND.muted }}
+              />
+            </ButtonBase>
 
             {/* Mobile profile icon */}
             <IconButton
@@ -288,6 +331,8 @@ export default function Admin() {
               aria-label="Edit my profile"
               sx={{
                 display: { xs: "inline-flex", sm: "none" },
+                width: 44,
+                height: 44,
                 borderRadius: 2,
                 "&:hover": { bgcolor: alpha(BRAND.indigo, 0.08) },
               }}
@@ -321,6 +366,10 @@ export default function Admin() {
         open={isSmallScreen ? mobileOpen : true}
         onClose={() => setMobileOpen(false)}
         ModalProps={{ keepMounted: true }}
+        PaperProps={{
+          component: "nav",
+          "aria-label": "Platform administration",
+        }}
         sx={{
           width: { xs: 0, md: drawerWidth },
           flexShrink: 0,
@@ -346,6 +395,7 @@ export default function Admin() {
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
+            overscrollBehavior: "contain",
           }}
         >
           {/* Brand */}
@@ -456,19 +506,29 @@ export default function Admin() {
                         arrow
                       >
                         <ListItemButton
+                          component={Link}
+                          to={item.path}
                           selected={isActive}
+                          aria-current={isActive ? "page" : undefined}
                           onClick={() => {
-                            navigate(item.path);
                             if (isSmallScreen) setMobileOpen(false);
                           }}
                           sx={{
                             borderRadius: 2,
-                            minHeight: 42,
+                            minHeight: 44,
                             justifyContent: showLabel ? "flex-start" : "center",
+                            touchAction: "manipulation",
                             px: showLabel ? 1.75 : 1,
                             mx: 0.5,
                             color: alpha("#fff", 0.85), // was 0.72 — clearer text
-                            transition: "all 0.15s ease",
+                            transition: theme.transitions.create(
+                              ["background-color", "color", "box-shadow"],
+                              { duration: theme.transitions.duration.shortest },
+                            ),
+                            "&:focus-visible": {
+                              outline: `3px solid ${alpha("#fff", 0.45)}`,
+                              outlineOffset: -2,
+                            },
                             "& .MuiListItemIcon-root": {
                               color: alpha("#fff", 0.7), // was 0.55
                               minWidth: 0,
@@ -493,7 +553,9 @@ export default function Admin() {
                             },
                           }}
                         >
-                          <ListItemIcon>{item.icon}</ListItemIcon>
+                          <ListItemIcon aria-hidden="true">
+                            {item.icon}
+                          </ListItemIcon>
                           {showLabel && (
                             <ListItemText
                               primary={item.text}
@@ -529,16 +591,22 @@ export default function Admin() {
             >
               <ListItemButton
                 onClick={() => {
-                  handleLogout();
+                  setLogoutOpen(true);
                   if (isSmallScreen) setMobileOpen(false);
                 }}
+                aria-label="Log out of the admin account"
                 sx={{
                   borderRadius: 2,
-                  minHeight: 42,
+                  minHeight: 44,
+                  touchAction: "manipulation",
                   justifyContent:
                     isSmallScreen || !collapsed ? "flex-start" : "center",
                   px: isSmallScreen || !collapsed ? 1.75 : 1,
                   color: "#f87171", // base red (text + icon)
+                  "&:focus-visible": {
+                    outline: `3px solid ${alpha("#fff", 0.45)}`,
+                    outlineOffset: -2,
+                  },
                   "& .MuiListItemIcon-root": {
                     color: "inherit", // follows button color
                     minWidth: 0,
@@ -552,7 +620,7 @@ export default function Admin() {
                   },
                 }}
               >
-                <ListItemIcon>
+                <ListItemIcon aria-hidden="true">
                   <LogoutIcon />
                 </ListItemIcon>
                 {(isSmallScreen || !collapsed) && (
@@ -575,11 +643,16 @@ export default function Admin() {
       {/* ----------------------------- MAIN ----------------------------- */}
       <Box
         component="main"
+        id="admin-main-content"
+        tabIndex={-1}
         sx={{
           flexGrow: 1,
           minWidth: 0,
+          overflowX: "hidden",
           p: { xs: 2, sm: 3, md: 4 },
+          pt: { xs: 2.5, sm: 3, md: 4 },
           mt: 8,
+          scrollMarginTop: 80,
           bgcolor: "#f8fafc",
           minHeight: "100vh",
           display: "flex",
@@ -610,6 +683,39 @@ export default function Admin() {
           )}
         </Box>
       </Box>
+
+      <Dialog
+        open={logoutOpen}
+        onClose={() => setLogoutOpen(false)}
+        aria-labelledby="logout-dialog-title"
+        aria-describedby="logout-dialog-description"
+        PaperProps={{ sx: { borderRadius: 3, m: 2, width: "100%", maxWidth: 420 } }}
+      >
+        <DialogTitle id="logout-dialog-title" sx={{ fontWeight: 700 }}>
+          Log Out?
+        </DialogTitle>
+        <DialogContent>
+          <Typography id="logout-dialog-description" color="text.secondary">
+            You’ll need to sign in again to manage the platform.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+          <Button
+            onClick={() => setLogoutOpen(false)}
+            sx={{ minHeight: 44, textTransform: "none", fontWeight: 600 }}
+          >
+            Stay Signed In
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleLogout}
+            sx={{ minHeight: 44, textTransform: "none", fontWeight: 700 }}
+          >
+            Log Out
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

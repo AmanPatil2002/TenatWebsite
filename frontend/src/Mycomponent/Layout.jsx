@@ -17,7 +17,8 @@ function Layout() {
       <Box
         component="main"
         id="main-content"
-        sx={{ flex: 1, display: "flex", flexDirection: "column" }}
+        tabIndex={-1}
+        sx={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}
       >
         <Outlet />
       </Box>

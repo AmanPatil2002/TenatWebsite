@@ -15,185 +15,311 @@ import {
   alpha,
   useTheme,
 } from "@mui/material";
+import {
+  PieChart,
+  BarChart,
+} from "@mui/x-charts";
 
 /* ------------------------------------------------------------------ */
 /*  Resource metadata — mirrors RESOURCE_CONFIG in SiteAdminData       */
+/*  Uses a structured categorical palette (validated for CVD safety)  */
 /* ------------------------------------------------------------------ */
+
+// Categorical palette - 8 validated hues for light & dark modes
+// Slot order: blue, orange, aqua, yellow, magenta, green, violet, red
+const CATEGORICAL_PALETTE = {
+  light: ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"],
+  dark: ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"],
+};
+
+// Pack-color mapping: each pack gets a consistent hue from the categorical palette
+const PACK_COLOR_MAP = {
+  common: 0,      // blue
+  ecommerce: 1,   // orange
+  restaurant: 2,  // aqua
+  hotel: 3,       // yellow
+  realestate: 4,  // magenta
+  gym: 5,         // green
+  medical: 6,     // violet
+  school: 7,      // red
+  blog: 0,
+  portfolio: 1,
+  eventmanagement: 2,
+  ngo: 3,
+  spa: 4,
+  lawfirm: 5,
+  agriculture: 6,
+  consulting: 7,
+  petcare: 0,
+  daycare: 1,
+  dental: 2,
+  mobileapps: 3,
+  interiordesign: 4,
+  music: 5,
+  streaming: 6,
+  gaming: 7,
+  jewelry: 0,
+  furniture: 1,
+  grocery: 2,
+  cafe: 3,
+};
+
+// Get color for a pack (light mode default, dark handled by MUI theme)
+const getPackColor = (packKey) => {
+  const slot = PACK_COLOR_MAP[packKey] ?? 0;
+  return CATEGORICAL_PALETTE.light[slot];
+};
+
+// Generate resource colors consistently: each resource gets a shade from its pack's hue
+const generateResourceColors = () => {
+  const colors = {};
+  const packTables = {
+    common: ["headers", "pages", "news", "galleries", "slider", "employees"],
+    ecommerce: ["productcategories", "products", "orders", "orderitems", "payments", "customers", "shipments", "productreviews", "wishlists"],
+    restaurant: ["menucategories", "menuitems", "reservations", "orders", "orderitems", "reviews"],
+    hotel: ["roomtypes", "rooms", "bookings", "invoices", "roominventory", "hotelreviews"],
+    realestate: ["propertytypes", "properties", "agents", "propertyinquiries", "propertyviewings", "propertyfavorites"],
+    gym: ["trainers", "membershipplans", "members", "classbookings", "memberpayments", "attendance"],
+    medical: ["departments", "doctors", "appointments", "patients", "prescriptions", "doctoravailability"],
+    school: ["teachers", "classes", "students", "attendance", "examresults", "feepayments"],
+    blog: ["blogcategories", "blogposts", "comments"],
+    portfolio: ["projectcategories", "projects", "testimonials"],
+    eventmanagement: ["eventtypes", "events", "registrations", "tickets"],
+    ngo: ["causes", "donations", "volunteers", "donationreceipts"],
+    spa: ["servicecategories", "services", "appointments"],
+    lawfirm: ["practiceareas", "attorneys", "caseinquiries", "consultations", "casedocuments"],
+    agriculture: ["farmproducts", "farminquiries", "farmorders", "farmorderitems"],
+    consulting: ["consultingservices", "consultants", "consultationrequests", "proposals", "engagements"],
+    petcare: ["petservices", "veterinarians", "petappointments", "petrecords", "petpayments"],
+    daycare: ["daycareprograms", "caregivers", "admissionenquiries", "enrollments", "daycarepayments"],
+    dental: ["dentalservices", "dentists", "dentalappointments", "dentalpatients", "treatmentplans", "dentalpayments"],
+    mobileapps: ["appcategories", "mobileapps", "appreviews", "downloads", "apppurchases"],
+    interiordesign: ["designservices", "designprojects", "designinquiries", "sitevisits", "moodboards"],
+    music: ["artists", "albums", "tracks", "eventshows"],
+    streaming: ["genres", "movies", "subscriptionplans", "watchlist", "episodes", "subscriptions", "watchhistory"],
+    gaming: ["gamecategories", "games", "teams", "tournaments", "players", "teamrosters", "matches", "matchresults"],
+    jewelry: ["jewelrycategories", "jewelryproducts", "jewelryinquiries", "goldrates", "jewelryorders", "jewelryorderitems"],
+    furniture: ["furniturecategories", "furnitureproducts", "customorders", "furnitureorders", "furnitureorderitems", "deliveries"],
+    grocery: ["grocerycategories", "groceryproducts", "deliveryslots", "groceryorders", "groceryorderitems"],
+    cafe: ["cafecategories", "cafeitems", "tablebookings", "cafeorders", "cafeorderitems"],
+  };
+
+  Object.entries(packTables).forEach(([pack, tables]) => {
+    const baseColor = getPackColor(pack);
+    // Generate lighter/darker variants for each table in the pack
+    tables.forEach((table, index) => {
+      // Use the base color with slight variations for distinction
+      colors[table] = baseColor;
+    });
+  });
+
+  return colors;
+};
+
+const RESOURCE_COLORS = generateResourceColors();
+
 const RESOURCE_META = {
   // Common tables (all sites)
-  headers: { label: "Headers", color: "#607d8b" },
-  pages: { label: "Pages", color: "#3f51b5" },
-  news: { label: "News", color: "#ff9800" },
-  galleries: { label: "Galleries", color: "#9c27b0" },
-  slider: { label: "Slider", color: "#e91e63" },
-  employees: { label: "Employees", color: "#009688" },
+  headers: { label: "Headers", color: RESOURCE_COLORS.headers },
+  pages: { label: "Pages", color: RESOURCE_COLORS.pages },
+  news: { label: "News", color: RESOURCE_COLORS.news },
+  galleries: { label: "Galleries", color: RESOURCE_COLORS.galleries },
+  slider: { label: "Slider", color: RESOURCE_COLORS.slider },
+  employees: { label: "Employees", color: RESOURCE_COLORS.employees },
 
   // School pack
-  teachers: { label: "Teachers", color: "#2e7d32" },
-  classes: { label: "Classes", color: "#6a1b9a" },
-  students: { label: "Students", color: "#1976d2" },
+  teachers: { label: "Teachers", color: RESOURCE_COLORS.teachers },
+  classes: { label: "Classes", color: RESOURCE_COLORS.classes },
+  students: { label: "Students", color: RESOURCE_COLORS.students },
+  attendance: { label: "Attendance", color: RESOURCE_COLORS.attendance },
+  examresults: { label: "Exam results", color: RESOURCE_COLORS.examresults },
+  feepayments: { label: "Fee payments", color: RESOURCE_COLORS.feepayments },
 
   // Medical pack
-  departments: { label: "Departments", color: "#c62828" },
-  doctors: { label: "Doctors", color: "#00695c" },
+  departments: { label: "Departments", color: RESOURCE_COLORS.departments },
+  doctors: { label: "Doctors", color: RESOURCE_COLORS.doctors },
+  appointments: { label: "Appointments", color: RESOURCE_COLORS.appointments },
+  patients: { label: "Patients", color: RESOURCE_COLORS.patients },
+  prescriptions: { label: "Prescriptions", color: RESOURCE_COLORS.prescriptions },
+  doctoravailability: { label: "Doctor availability", color: RESOURCE_COLORS.doctoravailability },
 
   // E-commerce pack
-  productcategories: { label: "Product categories", color: "#ef6c00" },
-  products: { label: "Products", color: "#4527a0" },
+  productcategories: { label: "Product categories", color: RESOURCE_COLORS.productcategories },
+  products: { label: "Products", color: RESOURCE_COLORS.products },
+  orders: { label: "Orders", color: RESOURCE_COLORS.orders },
+  orderitems: { label: "Order items", color: RESOURCE_COLORS.orderitems },
+  payments: { label: "Payments", color: RESOURCE_COLORS.payments },
+  customers: { label: "Customers", color: RESOURCE_COLORS.customers },
+  shipments: { label: "Shipments", color: RESOURCE_COLORS.shipments },
+  productreviews: { label: "Product reviews", color: RESOURCE_COLORS.productreviews },
+  wishlists: { label: "Wishlists", color: RESOURCE_COLORS.wishlists },
 
   // Restaurant pack
-  menucategories: { label: "Menu categories", color: "#ad1457" },
-  menuitems: { label: "Menu items", color: "#3e2723" },
-  reservations: { label: "Reservations", color: "#5d4037" },
+  menucategories: { label: "Menu categories", color: RESOURCE_COLORS.menucategories },
+  menuitems: { label: "Menu items", color: RESOURCE_COLORS.menuitems },
+  reservations: { label: "Reservations", color: RESOURCE_COLORS.reservations },
+  reviews: { label: "Reviews", color: RESOURCE_COLORS.reviews },
 
   // Hotel pack
-  roomtypes: { label: "Room types", color: "#1565c0" },
-  rooms: { label: "Rooms", color: "#0277bd" },
-  bookings: { label: "Bookings", color: "#0288d1" },
+  roomtypes: { label: "Room types", color: RESOURCE_COLORS.roomtypes },
+  rooms: { label: "Rooms", color: RESOURCE_COLORS.rooms },
+  bookings: { label: "Bookings", color: RESOURCE_COLORS.bookings },
+  invoices: { label: "Invoices", color: RESOURCE_COLORS.invoices },
+  roominventory: { label: "Room inventory", color: RESOURCE_COLORS.roominventory },
+  hotelreviews: { label: "Hotel reviews", color: RESOURCE_COLORS.hotelreviews },
 
   // Real Estate pack
-  propertytypes: { label: "Property types", color: "#2e7d32" },
-  properties: { label: "Properties", color: "#388e3c" },
-  agents: { label: "Agents", color: "#43a047" },
+  propertytypes: { label: "Property types", color: RESOURCE_COLORS.propertytypes },
+  properties: { label: "Properties", color: RESOURCE_COLORS.properties },
+  agents: { label: "Agents", color: RESOURCE_COLORS.agents },
+  propertyinquiries: { label: "Property inquiries", color: RESOURCE_COLORS.propertyinquiries },
+  propertyviewings: { label: "Property viewings", color: RESOURCE_COLORS.propertyviewings },
+  propertyfavorites: { label: "Property favorites", color: RESOURCE_COLORS.propertyfavorites },
 
   // Gym pack
-  trainers: { label: "Trainers", color: "#f57f17" },
-  membershipplans: { label: "Membership plans", color: "#ff8f00" },
-  members: { label: "Members", color: "#ffa000" },
+  trainers: { label: "Trainers", color: RESOURCE_COLORS.trainers },
+  membershipplans: { label: "Membership plans", color: RESOURCE_COLORS.membershipplans },
+  members: { label: "Members", color: RESOURCE_COLORS.members },
+  classbookings: { label: "Class bookings", color: RESOURCE_COLORS.classbookings },
+  memberpayments: { label: "Member payments", color: RESOURCE_COLORS.memberpayments },
 
   // Blog pack
-  blogcategories: { label: "Blog categories", color: "#6a1b9a" },
-  blogposts: { label: "Blog posts", color: "#7b1fa2" },
-  comments: { label: "Comments", color: "#8e24aa" },
+  blogcategories: { label: "Blog categories", color: RESOURCE_COLORS.blogcategories },
+  blogposts: { label: "Blog posts", color: RESOURCE_COLORS.blogposts },
+  comments: { label: "Comments", color: RESOURCE_COLORS.comments },
 
   // Portfolio pack
-  projectcategories: { label: "Project categories", color: "#c62828" },
-  projects: { label: "Projects", color: "#d32f2f" },
-  testimonials: { label: "Testimonials", color: "#e53935" },
+  projectcategories: { label: "Project categories", color: RESOURCE_COLORS.projectcategories },
+  projects: { label: "Projects", color: RESOURCE_COLORS.projects },
+  testimonials: { label: "Testimonials", color: RESOURCE_COLORS.testimonials },
 
   // Event Management pack
-  eventtypes: { label: "Event types", color: "#00695c" },
-  events: { label: "Events", color: "#00796b" },
-  registrations: { label: "Registrations", color: "#00897b" },
+  eventtypes: { label: "Event types", color: RESOURCE_COLORS.eventtypes },
+  events: { label: "Events", color: RESOURCE_COLORS.events },
+  registrations: { label: "Registrations", color: RESOURCE_COLORS.registrations },
+  tickets: { label: "Tickets", color: RESOURCE_COLORS.tickets },
 
   // NGO pack
-  causes: { label: "Causes", color: "#4a148c" },
-  donations: { label: "Donations", color: "#6a1b9a" },
-  volunteers: { label: "Volunteers", color: "#7b1fa2" },
+  causes: { label: "Causes", color: RESOURCE_COLORS.causes },
+  donations: { label: "Donations", color: RESOURCE_COLORS.donations },
+  volunteers: { label: "Volunteers", color: RESOURCE_COLORS.volunteers },
+  donationreceipts: { label: "Donation receipts", color: RESOURCE_COLORS.donationreceipts },
 
   // Spa pack
-  servicecategories: { label: "Service categories", color: "#1a237e" },
-  services: { label: "Services", color: "#283593" },
-  appointments: { label: "Appointments", color: "#303f9f" },
+  servicecategories: { label: "Service categories", color: RESOURCE_COLORS.servicecategories },
+  services: { label: "Services", color: RESOURCE_COLORS.services },
+  appointments: { label: "Appointments", color: RESOURCE_COLORS.appointments },
 
   // Law Firm pack
-  practiceareas: { label: "Practice areas", color: "#bf360c" },
-  attorneys: { label: "Attorneys", color: "#d84315" },
-  caseinquiries: { label: "Case inquiries", color: "#e64a19" },
+  practiceareas: { label: "Practice areas", color: RESOURCE_COLORS.practiceareas },
+  attorneys: { label: "Attorneys", color: RESOURCE_COLORS.attorneys },
+  caseinquiries: { label: "Case inquiries", color: RESOURCE_COLORS.caseinquiries },
+  consultations: { label: "Consultations", color: RESOURCE_COLORS.consultations },
+  casedocuments: { label: "Case documents", color: RESOURCE_COLORS.casedocuments },
 
   // Agriculture pack
-  farmproducts: { label: "Farm products", color: "#1b5e20" },
-  farminquiries: { label: "Farm inquiries", color: "#2e7d32" },
-  farmorders: { label: "Farm orders", color: "#388e3c" },
-  farmorderitems: { label: "Farm order items", color: "#43a047" },
+  farmproducts: { label: "Farm products", color: RESOURCE_COLORS.farmproducts },
+  farminquiries: { label: "Farm inquiries", color: RESOURCE_COLORS.farminquiries },
+  farmorders: { label: "Farm orders", color: RESOURCE_COLORS.farmorders },
+  farmorderitems: { label: "Farm order items", color: RESOURCE_COLORS.farmorderitems },
 
   // Consulting pack
-  consultingservices: { label: "Consulting services", color: "#0d47a1" },
-  consultants: { label: "Consultants", color: "#1565c0" },
-  consultationrequests: { label: "Consultation requests", color: "#1976d2" },
-  proposals: { label: "Proposals", color: "#1e88e5" },
-  engagements: { label: "Engagements", color: "#2196f3" },
+  consultingservices: { label: "Consulting services", color: RESOURCE_COLORS.consultingservices },
+  consultants: { label: "Consultants", color: RESOURCE_COLORS.consultants },
+  consultationrequests: { label: "Consultation requests", color: RESOURCE_COLORS.consultationrequests },
+  proposals: { label: "Proposals", color: RESOURCE_COLORS.proposals },
+  engagements: { label: "Engagements", color: RESOURCE_COLORS.engagements },
 
   // Petcare pack
-  petservices: { label: "Pet services", color: "#4a148c" },
-  veterinarians: { label: "Veterinarians", color: "#6a1b9a" },
-  petappointments: { label: "Pet appointments", color: "#7b1fa2" },
-  petrecords: { label: "Pet records", color: "#8e24aa" },
-  petpayments: { label: "Pet payments", color: "#9c27b0" },
+  petservices: { label: "Pet services", color: RESOURCE_COLORS.petservices },
+  veterinarians: { label: "Veterinarians", color: RESOURCE_COLORS.veterinarians },
+  petappointments: { label: "Pet appointments", color: RESOURCE_COLORS.petappointments },
+  petrecords: { label: "Pet records", color: RESOURCE_COLORS.petrecords },
+  petpayments: { label: "Pet payments", color: RESOURCE_COLORS.petpayments },
 
   // Daycare pack
-  daycareprograms: { label: "Daycare programs", color: "#e65100" },
-  caregivers: { label: "Caregivers", color: "#ef6c00" },
-  admissionenquiries: { label: "Admission enquiries", color: "#f57c00" },
-  enrollments: { label: "Enrollments", color: "#fb8c00" },
-  daycarepayments: { label: "Daycare payments", color: "#ff9800" },
+  daycareprograms: { label: "Daycare programs", color: RESOURCE_COLORS.daycareprograms },
+  caregivers: { label: "Caregivers", color: RESOURCE_COLORS.caregivers },
+  admissionenquiries: { label: "Admission enquiries", color: RESOURCE_COLORS.admissionenquiries },
+  enrollments: { label: "Enrollments", color: RESOURCE_COLORS.enrollments },
+  daycarepayments: { label: "Daycare payments", color: RESOURCE_COLORS.daycarepayments },
 
   // Dental pack
-  dentalservices: { label: "Dental services", color: "#004d40" },
-  dentists: { label: "Dentists", color: "#00695c" },
-  dentalappointments: { label: "Dental appointments", color: "#00796b" },
-  dentalpatients: { label: "Dental patients", color: "#00897b" },
-  treatmentplans: { label: "Treatment plans", color: "#009688" },
-  dentalpayments: { label: "Dental payments", color: "#26a69a" },
+  dentalservices: { label: "Dental services", color: RESOURCE_COLORS.dentalservices },
+  dentists: { label: "Dentists", color: RESOURCE_COLORS.dentists },
+  dentalappointments: { label: "Dental appointments", color: RESOURCE_COLORS.dentalappointments },
+  dentalpatients: { label: "Dental patients", color: RESOURCE_COLORS.dentalpatients },
+  treatmentplans: { label: "Treatment plans", color: RESOURCE_COLORS.treatmentplans },
+  dentalpayments: { label: "Dental payments", color: RESOURCE_COLORS.dentalpayments },
 
   // Mobile Apps pack
-  appcategories: { label: "App categories", color: "#311b92" },
-  mobileapps: { label: "Mobile apps", color: "#4527a0" },
-  appreviews: { label: "App reviews", color: "#5e35b1" },
-  downloads: { label: "Downloads", color: "#673ab7" },
-  apppurchases: { label: "App purchases", color: "#7e57c2" },
+  appcategories: { label: "App categories", color: RESOURCE_COLORS.appcategories },
+  mobileapps: { label: "Mobile apps", color: RESOURCE_COLORS.mobileapps },
+  appreviews: { label: "App reviews", color: RESOURCE_COLORS.appreviews },
+  downloads: { label: "Downloads", color: RESOURCE_COLORS.downloads },
+  apppurchases: { label: "App purchases", color: RESOURCE_COLORS.apppurchases },
 
   // Interior Design pack
-  designservices: { label: "Design services", color: "#880e4f" },
-  designprojects: { label: "Design projects", color: "#ad1457" },
-  designinquiries: { label: "Design inquiries", color: "#c2185b" },
-  sitevisits: { label: "Site visits", color: "#d81b60" },
-  moodboards: { label: "Mood boards", color: "#ec407a" },
+  designservices: { label: "Design services", color: RESOURCE_COLORS.designservices },
+  designprojects: { label: "Design projects", color: RESOURCE_COLORS.designprojects },
+  designinquiries: { label: "Design inquiries", color: RESOURCE_COLORS.designinquiries },
+  sitevisits: { label: "Site visits", color: RESOURCE_COLORS.sitevisits },
+  moodboards: { label: "Mood boards", color: RESOURCE_COLORS.moodboards },
 
   // Music pack
-  artists: { label: "Artists", color: "#b71c1c" },
-  albums: { label: "Albums", color: "#c62828" },
-  tracks: { label: "Tracks", color: "#d32f2f" },
-  eventshows: { label: "Event shows", color: "#e53935" },
+  artists: { label: "Artists", color: RESOURCE_COLORS.artists },
+  albums: { label: "Albums", color: RESOURCE_COLORS.albums },
+  tracks: { label: "Tracks", color: RESOURCE_COLORS.tracks },
+  eventshows: { label: "Event shows", color: RESOURCE_COLORS.eventshows },
 
   // Streaming pack
-  genres: { label: "Genres", color: "#3e2723" },
-  movies: { label: "Movies", color: "#4e342e" },
-  subscriptionplans: { label: "Subscription plans", color: "#5d4037" },
-  watchlist: { label: "Watchlist", color: "#6d4c41" },
-  episodes: { label: "Episodes", color: "#795548" },
-  subscriptions: { label: "Subscriptions", color: "#8d6e63" },
-  watchhistory: { label: "Watch history", color: "#a1887f" },
+  genres: { label: "Genres", color: RESOURCE_COLORS.genres },
+  movies: { label: "Movies", color: RESOURCE_COLORS.movies },
+  subscriptionplans: { label: "Subscription plans", color: RESOURCE_COLORS.subscriptionplans },
+  watchlist: { label: "Watchlist", color: RESOURCE_COLORS.watchlist },
+  episodes: { label: "Episodes", color: RESOURCE_COLORS.episodes },
+  subscriptions: { label: "Subscriptions", color: RESOURCE_COLORS.subscriptions },
+  watchhistory: { label: "Watch history", color: RESOURCE_COLORS.watchhistory },
 
   // Gaming pack
-  gamecategories: { label: "Game categories", color: "#1a237e" },
-  games: { label: "Games", color: "#283593" },
-  teams: { label: "Teams", color: "#303f9f" },
-  tournaments: { label: "Tournaments", color: "#3f51b5" },
-  players: { label: "Players", color: "#5c6bc0" },
-  teamrosters: { label: "Team rosters", color: "#7986cb" },
-  matches: { label: "Matches", color: "#9fa8da" },
-  matchresults: { label: "Match results", color: "#c5cae9" },
+  gamecategories: { label: "Game categories", color: RESOURCE_COLORS.gamecategories },
+  games: { label: "Games", color: RESOURCE_COLORS.games },
+  teams: { label: "Teams", color: RESOURCE_COLORS.teams },
+  tournaments: { label: "Tournaments", color: RESOURCE_COLORS.tournaments },
+  players: { label: "Players", color: RESOURCE_COLORS.players },
+  teamrosters: { label: "Team rosters", color: RESOURCE_COLORS.teamrosters },
+  matches: { label: "Matches", color: RESOURCE_COLORS.matches },
+  matchresults: { label: "Match results", color: RESOURCE_COLORS.matchresults },
 
   // Jewelry pack
-  jewelrycategories: { label: "Jewelry categories", color: "#ff6f00" },
-  jewelryproducts: { label: "Jewelry products", color: "#ff8f00" },
-  jewelryinquiries: { label: "Jewelry inquiries", color: "#ffa000" },
-  goldrates: { label: "Gold rates", color: "#ffb300" },
-  jewelryorders: { label: "Jewelry orders", color: "#ffc107" },
-  jewelryorderitems: { label: "Jewelry order items", color: "#ffca28" },
+  jewelrycategories: { label: "Jewelry categories", color: RESOURCE_COLORS.jewelrycategories },
+  jewelryproducts: { label: "Jewelry products", color: RESOURCE_COLORS.jewelryproducts },
+  jewelryinquiries: { label: "Jewelry inquiries", color: RESOURCE_COLORS.jewelryinquiries },
+  goldrates: { label: "Gold rates", color: RESOURCE_COLORS.goldrates },
+  jewelryorders: { label: "Jewelry orders", color: RESOURCE_COLORS.jewelryorders },
+  jewelryorderitems: { label: "Jewelry order items", color: RESOURCE_COLORS.jewelryorderitems },
 
   // Furniture pack
-  furniturecategories: { label: "Furniture categories", color: "#263238" },
-  furnitureproducts: { label: "Furniture products", color: "#37474f" },
-  customorders: { label: "Custom orders", color: "#455a64" },
-  furnitureorders: { label: "Furniture orders", color: "#546e7a" },
-  furnitureorderitems: { label: "Furniture order items", color: "#607d8b" },
-  deliveries: { label: "Deliveries", color: "#78909c" },
+  furniturecategories: { label: "Furniture categories", color: RESOURCE_COLORS.furniturecategories },
+  furnitureproducts: { label: "Furniture products", color: RESOURCE_COLORS.furnitureproducts },
+  customorders: { label: "Custom orders", color: RESOURCE_COLORS.customorders },
+  furnitureorders: { label: "Furniture orders", color: RESOURCE_COLORS.furnitureorders },
+  furnitureorderitems: { label: "Furniture order items", color: RESOURCE_COLORS.furnitureorderitems },
+  deliveries: { label: "Deliveries", color: RESOURCE_COLORS.deliveries },
 
   // Grocery pack
-  grocerycategories: { label: "Grocery categories", color: "#1b5e20" },
-  groceryproducts: { label: "Grocery products", color: "#2e7d32" },
-  deliveryslots: { label: "Delivery slots", color: "#388e3c" },
-  groceryorders: { label: "Grocery orders", color: "#43a047" },
-  groceryorderitems: { label: "Grocery order items", color: "#4caf50" },
+  grocerycategories: { label: "Grocery categories", color: RESOURCE_COLORS.grocerycategories },
+  groceryproducts: { label: "Grocery products", color: RESOURCE_COLORS.groceryproducts },
+  deliveryslots: { label: "Delivery slots", color: RESOURCE_COLORS.deliveryslots },
+  groceryorders: { label: "Grocery orders", color: RESOURCE_COLORS.groceryorders },
+  groceryorderitems: { label: "Grocery order items", color: RESOURCE_COLORS.groceryorderitems },
 
   // Cafe pack
-  cafecategories: { label: "Cafe categories", color: "#3e2723" },
-  cafeitems: { label: "Cafe items", color: "#4e342e" },
-  tablebookings: { label: "Table bookings", color: "#5d4037" },
-  cafeorders: { label: "Cafe orders", color: "#6d4c41" },
-  cafeorderitems: { label: "Cafe order items", color: "#795548" },
+  cafecategories: { label: "Cafe categories", color: RESOURCE_COLORS.cafecategories },
+  cafeitems: { label: "Cafe items", color: RESOURCE_COLORS.cafeitems },
+  tablebookings: { label: "Table bookings", color: RESOURCE_COLORS.tablebookings },
+  cafeorders: { label: "Cafe orders", color: RESOURCE_COLORS.cafeorders },
+  cafeorderitems: { label: "Cafe order items", color: RESOURCE_COLORS.cafeorderitems },
 };
 
 const RESOURCE_ORDER = [
@@ -424,6 +550,13 @@ const DatabaseIcon = (props) => (
   </SvgIcon>
 );
 
+const ChartIcon = (props) => (
+  <SvgIcon {...props}>
+    <path d="M3 3v18h18" />
+    <path d="m19 9-5 5-4-4-3 3-2-2-3 3" />
+  </SvgIcon>
+);
+
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
@@ -549,6 +682,157 @@ function DetailItem({ icon, label, value }) {
     </Stack>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/*  Chart Components                                                   */
+/* ------------------------------------------------------------------ */
+
+function DataDistributionDonut({ resources }) {
+  const theme = useTheme();
+
+  if (!resources.length) return null;
+
+  // Prepare data for donut chart - use top 8 resources + "Other"
+  const sorted = [...resources].sort((a, b) => b[1] - a[1]);
+  const topResources = sorted.slice(0, 7);
+  const otherCount = sorted.slice(7).reduce((sum, [, count]) => sum + count, 0);
+
+  const chartData = topResources.map(([name, count]) => ({
+    name: RESOURCE_META[name]?.label || name,
+    value: count,
+    color: RESOURCE_META[name]?.color || theme.palette.primary.main,
+  }));
+
+  if (otherCount > 0) {
+    chartData.push({
+      name: "Other",
+      value: otherCount,
+      color: theme.palette.grey[500],
+    });
+  }
+
+  return (
+    <Card variant="outlined" sx={{ borderRadius: 3, height: "100%" }}>
+      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ alignItems: "center", mb: 2 }}
+        >
+          <Box
+            sx={{
+              width: 32,
+              height: 32,
+              borderRadius: 1.5,
+              display: "grid",
+              placeItems: "center",
+              bgcolor: alpha(theme.palette.info.main, 0.1),
+              color: theme.palette.info.main,
+            }}
+          >
+            <ChartIcon size={18} />
+          </Box>
+          <Typography variant="h6" fontWeight={700}>
+            Data Distribution
+          </Typography>
+        </Stack>
+        <PieChart
+          height={320}
+          series={[
+            {
+              data: chartData.map((item, index) => ({
+                id: index,
+                label: item.name,
+                value: item.value,
+                color: item.color,
+              })),
+              innerRadius: 70,
+              cornerRadius: 4,
+              paddingAngle: 2,
+              arcLabel: ({ label, value }) => `${label}: ${value}`,
+              arcLabelRadius: 90,
+              arcLabelMinAngle: 36,
+            },
+          ]}
+          margin={{ top: 20, bottom: 20, left: 20, right: 20 }}
+          slotProps={{
+            legend: {
+              direction: "horizontal",
+              position: { vertical: "bottom", horizontal: "center" },
+            },
+          }}
+        />
+      </CardContent>
+    </Card>
+  );
+}
+
+function TopResourcesBarChart({ resources }) {
+  const theme = useTheme();
+
+  if (!resources.length) return null;
+
+  // Top 10 resources by count
+  const topResources = [...resources]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([name, count]) => ({
+      name: RESOURCE_META[name]?.label || name,
+      value: count,
+      color: RESOURCE_META[name]?.color || theme.palette.primary.main,
+    }));
+
+  return (
+    <Card variant="outlined" sx={{ borderRadius: 3, height: "100%" }}>
+      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ alignItems: "center", mb: 2 }}
+        >
+          <Box
+            sx={{
+              width: 32,
+              height: 32,
+              borderRadius: 1.5,
+              display: "grid",
+              placeItems: "center",
+              bgcolor: alpha(theme.palette.success.main, 0.1),
+              color: theme.palette.success.main,
+            }}
+          >
+            <ChartIcon size={18} />
+          </Box>
+          <Typography variant="h6" fontWeight={700}>
+            Top Resources
+          </Typography>
+        </Stack>
+        <BarChart
+          height={320}
+          series={[
+            {
+              data: topResources.map((item) => item.value),
+              label: "Records",
+              color: theme.palette.success.main,
+            },
+          ]}
+          xAxis={[
+            {
+              scaleType: "band",
+              data: topResources.map((item) => item.name),
+              tickLabelStyle: { fontSize: 11 },
+            },
+          ]}
+          yAxis={[{ tickLabelStyle: { fontSize: 11 } }]}
+          grid={{ horizontal: true }}
+          hideLegend
+          margin={{ top: 20, bottom: 60, left: 10, right: 20 }}
+        />
+      </CardContent>
+    </Card>
+  );
+}
+
 
 /* ------------------------------------------------------------------ */
 /*  Main component                                                     */
@@ -764,6 +1048,20 @@ export default function SiteAdminDashboard() {
           </Grid>
         )}
       </Grid>
+
+      {/* ---------- Charts Section ---------- */}
+      {!countsLoading && populatedResources.length > 0 && (
+        <Grid container spacing={2}>
+          {/* Donut Chart - Data Distribution */}
+          <Grid size={{ xs: 12, lg: 6 }}>
+            <DataDistributionDonut resources={populatedResources} />
+          </Grid>
+          {/* Bar Chart - Top Resources */}
+          <Grid size={{ xs: 12, lg: 6 }}>
+            <TopResourcesBarChart resources={populatedResources} />
+          </Grid>
+        </Grid>
+      )}
 
       {/* ---------- Site details ---------- */}
       <Card variant="outlined" sx={{ borderRadius: 3 }}>

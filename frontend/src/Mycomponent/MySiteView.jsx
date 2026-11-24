@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import {
   Alert,
@@ -19,6 +19,8 @@ import {
 } from "@mui/material";
 import { createSiteSlug } from "../utils/siteSlug";
 import { buildSiteTheme } from "../utils/siteTheme";
+import { installSiteFormHandler, SITE_FORM_SCRIPT } from "../utils/siteForms";
+import { renderSlider } from "../utils/siteSlider";
 
 /* ------------------------------------------------------------------ */
 /* Inline SVG icons (no @mui/icons-material dependency)                */
@@ -167,6 +169,34 @@ const getToken = () =>
 
 const pageKey = (page) => String(page.sitePageId ?? page.pagesId);
 
+const PAGE_HASH_PREFIX = "#tenant-page-";
+const pageAnchorId = (id) =>
+  `${PAGE_HASH_PREFIX.slice(1)}${encodeURIComponent(String(id))}`;
+const pageHref = (id) => `#${pageAnchorId(id)}`;
+const pageIdFromHash = () => {
+  if (!window.location.hash.startsWith(PAGE_HASH_PREFIX)) return "";
+  try {
+    return decodeURIComponent(window.location.hash.slice(PAGE_HASH_PREFIX.length));
+  } catch {
+    return "";
+  }
+};
+
+const handlePageAnchorClick = (event, id, onNavigate, options) => {
+  if (
+    event.button !== 0 ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.shiftKey ||
+    event.altKey
+  ) {
+    return;
+  }
+
+  event.preventDefault();
+  onNavigate(id, options);
+};
+
 const escapeHtml = (value) =>
   String(value ?? "").replace(
     /[&<>"']/g,
@@ -208,52 +238,194 @@ const renderGallery = (items) => {
       const caption = description
         ? `<figcaption>${escapeHtml(description)}</figcaption>`
         : "";
-      return `<figure><img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.altText || title)}" loading="lazy" />${caption}</figure>`;
+      return `<figure><img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.altText || title)}" width="640" height="480" loading="lazy" decoding="async" />${caption}</figure>`;
     })
     .filter(Boolean)
     .join("");
 
   if (!cards) return "";
-  return `<section class="site-gallery"><div class="site-gallery-grid">${cards}</div></section>`;
+  return `<section class="site-gallery" aria-labelledby="site-gallery-title"><h2 id="site-gallery-title" class="site-visually-hidden">Gallery</h2><div class="site-gallery-grid">${cards}</div></section>`;
 };
 
-const renderSlider = (items) => {
-  if (!Array.isArray(items)) return "";
-  const slides = items
-    .filter((item) => resolveMediaImage(item.imageUrl))
-    .map((item) => {
-      const title = item.title || "Site slide";
-      return `<div class="site-slide"><img src="${escapeHtml(resolveMediaImage(item.imageUrl))}" alt="${escapeHtml(title)}" /><span>${escapeHtml(title)}</span></div>`;
+// const renderSlider = (items) => {
+//   if (!Array.isArray(items)) return "";
+//   const slides = items
+//     .filter((item) => resolveMediaImage(item.imageUrl))
+//     .map((item, index) => {
+//       const title = item.title || `Slide ${index + 1}`;
+//       const loading = index === 0 ? "eager" : "lazy";
+//       const fetchPriority = index === 0 ? ' fetchpriority="high"' : "";
+//       return `<figure class="site-slide"><img src="${escapeHtml(resolveMediaImage(item.imageUrl))}" alt="${escapeHtml(title)}" width="1600" height="900" loading="${loading}" decoding="async"${fetchPriority} /><figcaption>${escapeHtml(title)}</figcaption></figure>`;
+//     });
+
+//   if (!slides.length) return "";
+//   const hasMotion = slides.length > 1;
+//   const animation = hasMotion
+//     ? `animation: siteSlider ${slides.length * 5}s ease-in-out infinite;`
+//     : "";
+//   const keyframes = hasMotion
+//     ? `@keyframes siteSlider { ${slides
+//         .map((_, index) => {
+//           const start = (index / slides.length) * 100;
+//           const holdEnd =
+//             index === slides.length - 1
+//               ? 100
+//               : ((index + 1) / slides.length) * 100 - 1;
+//           return `${start}% , ${holdEnd}% { transform: translateX(-${index * 100}%); }`;
+//         })
+//         .join(" ")} }`
+//     : "";
+
+//   return `<section class="site-home-slider" aria-label="Featured images"><button class="site-slider-pause" type="button" aria-pressed="false"${hasMotion ? "" : " hidden"}>Pause slideshow</button><div class="site-slider-track"${animation ? ` style="${animation}"` : ""}>${slides.join("")}</div></section><style>${keyframes}</style>`;
+// };
+
+// Must match Site.jsx exactly
+const SLIDER_MARKER = /<!--\s*SITE_SLIDER\s*-->/i;
+
+const SITE_IFRAME_UX_SCRIPT = `
+<script>
+(() => {
+  const postFrameMessage = (type, details = {}) => {
+    parent.postMessage({ type, ...details }, '*');
+  };
+
+  let resizeFrame = 0;
+  const reportHeight = () => {
+  resizeFrame = 0;
+  const height = Math.ceil(
+    document.documentElement.getBoundingClientRect().height,
+  );
+  postFrameMessage('tenant-site-frame-resize', { height });
+};
+  const scheduleHeight = () => {
+    if (resizeFrame) cancelAnimationFrame(resizeFrame);
+    resizeFrame = requestAnimationFrame(reportHeight);
+  };
+
+  const getFormStatus = (form, index) => {
+    let status = form.querySelector('[data-form-status]');
+    if (!status) {
+      status = document.createElement('p');
+      status.setAttribute('data-form-status', '');
+      form.appendChild(status);
+    }
+    if (!status.id) status.id = 'tenant-form-status-' + index;
+    status.setAttribute('role', 'status');
+    status.setAttribute('aria-live', 'polite');
+    status.setAttribute('aria-atomic', 'true');
+    const describedBy = new Set(
+      (form.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean),
+    );
+    describedBy.add(status.id);
+    form.setAttribute('aria-describedby', Array.from(describedBy).join(' '));
+    return status;
+  };
+
+  document.querySelectorAll('form[data-form]').forEach((form, index) => {
+    const status = getFormStatus(form, index);
+    form.querySelectorAll('input, select, textarea').forEach((control) => {
+      if (control.type === 'hidden') return;
+      const hasLabel = control.id && document.querySelector('label[for="' + CSS.escape(control.id) + '"]');
+      if (!hasLabel && !control.getAttribute('aria-label') && !control.getAttribute('aria-labelledby')) {
+        const fallbackLabel = control.getAttribute('placeholder') || control.getAttribute('name');
+        if (fallbackLabel) control.setAttribute('aria-label', fallbackLabel.replace(/[-_]+/g, ' '));
+      }
     });
+    form.addEventListener('submit', () => {
+      form.setAttribute('aria-busy', 'true');
+      status.setAttribute('role', 'status');
+      status.setAttribute('aria-live', 'polite');
+      status.setAttribute('data-state', 'pending');
+      window.setTimeout(() => {
+        status.textContent = 'Submitting…';
+        scheduleHeight();
+      }, 0);
+    });
+  });
 
-  if (!slides.length) return "";
-  const animation =
-    slides.length > 1
-      ? `animation: siteSlider ${slides.length * 5}s linear infinite;`
-      : "";
-  const keyframes =
-    slides.length > 1
-      ? `@keyframes siteSlider { ${slides
-          .map((_, index) => {
-            const start = (index / slides.length) * 100;
-            const holdEnd =
-              index === slides.length - 1
-                ? 100
-                : ((index + 1) / slides.length) * 100 - 1;
-            return `${start}% , ${holdEnd}% { transform: translateX(-${index * 100}%); }`;
-          })
-          .join(" ")} }`
-      : "";
+  window.addEventListener('message', (message) => {
+    if (message.data?.type !== 'tenant-site-form-result') return;
+    window.setTimeout(() => {
+      document.querySelectorAll('form[aria-busy="true"]').forEach((form, index) => {
+        const status = getFormStatus(form, index);
+        const success = message.data.success === true;
+        form.removeAttribute('aria-busy');
+        status.setAttribute('role', success ? 'status' : 'alert');
+        status.setAttribute('aria-live', success ? 'polite' : 'assertive');
+        status.setAttribute('data-state', success ? 'success' : 'error');
+        status.textContent = String(
+          message.data.message ||
+            (success ? 'Submission received successfully.' : 'Could not submit the form. Please try again.'),
+        );
+      });
+      scheduleHeight();
+    }, 0);
+  });
 
-  return `<section class="site-home-slider" aria-label="Image slider"><div class="site-slider-track" style="${animation}">${slides.join("")}</div></section><style>${keyframes}</style>`;
-};
+  const slider = document.querySelector('.site-home-slider');
+  const sliderTrack = slider?.querySelector('.site-slider-track');
+  const pauseButton = slider?.querySelector('.site-slider-pause');
+  if (sliderTrack && pauseButton) {
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reducedMotion) {
+      sliderTrack.style.animation = 'none';
+      pauseButton.hidden = true;
+    } else {
+      pauseButton.addEventListener('click', () => {
+        const paused = sliderTrack.style.animationPlayState === 'paused';
+        sliderTrack.style.animationPlayState = paused ? 'running' : 'paused';
+        pauseButton.setAttribute('aria-pressed', String(!paused));
+        pauseButton.textContent = paused ? 'Pause slideshow' : 'Play slideshow';
+      });
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) sliderTrack.style.animationPlayState = 'paused';
+      });
+    }
+  }
 
+  document.querySelectorAll('a[target="_blank"]').forEach((link) => {
+    link.setAttribute('rel', 'noopener noreferrer');
+  });
+  document.querySelectorAll('img').forEach((image, index) => {
+    if (!image.hasAttribute('alt')) image.setAttribute('alt', '');
+    image.decoding = 'async';
+    if (!image.hasAttribute('loading') && index > 0) image.loading = 'lazy';
+    const setDimensions = () => {
+      if (!image.hasAttribute('width') && image.naturalWidth) image.width = image.naturalWidth;
+      if (!image.hasAttribute('height') && image.naturalHeight) image.height = image.naturalHeight;
+      scheduleHeight();
+    };
+    if (image.complete) setDimensions();
+    else image.addEventListener('load', setDimensions, { once: true });
+  });
+
+  if ('ResizeObserver' in window) {
+    const resizeObserver = new ResizeObserver(scheduleHeight);
+    resizeObserver.observe(document.documentElement);
+    if (document.body) resizeObserver.observe(document.body);
+  }
+  window.addEventListener('load', scheduleHeight, { once: true });
+  window.addEventListener('error', (event) => {
+    if (!event.error) return;
+    postFrameMessage('tenant-site-frame-error', {
+      message: 'Some page content could not load. Refresh the page or choose another page.',
+    });
+  });
+  window.addEventListener('unhandledrejection', () => {
+    postFrameMessage('tenant-site-frame-error', {
+      message: 'Some page content could not load. Refresh the page or choose another page.',
+    });
+  });
+
+  postFrameMessage('tenant-site-frame-ready');
+  scheduleHeight();
+})();
+</script>`;
 
 /* ------------------------------------------------------------------ */
 /* Hydration: relationships                                            */
 /* ------------------------------------------------------------------ */
 
-// Helper: describe "this foreign key points at <entity>; copy <source> into <field>".
 const rel = (entity, field, source = "name", fallback) => ({
   entity,
   fields: { [field]: source },
@@ -382,24 +554,19 @@ const HYDRATION_RELATIONSHIPS = {
   admissionenquiries: { programId: rel("daycareprograms", "programName") },
 };
 
-/* Statuses that should never be shown on a public page.
-   Everything else (active, available, upcoming, published, ...) is shown. */
 const HIDDEN_STATUSES = new Set([
   "inactive",
   "draft",
   "archived",
   "unsubscribed",
   "spam",
+  "pending",
   "rejected",
   "cancelled",
   "expired",
   "suspended",
   "paused",
 ]);
-
-/* --------------------------------
-   Utility functions
---------------------------------- */
 
 const isEmpty = (value) =>
   value === null || value === undefined || value === "";
@@ -420,15 +587,9 @@ const resolveEntity = (entity, siteData) => {
   return siteData[entity] ?? siteData[aliases[entity] || entity];
 };
 
-/* --------------------------------
-   Value formatting
-   <span data-field="price" data-format="currency" data-currency="INR">
---------------------------------- */
-
 const formatValue = (value, format, element) => {
   if (isEmpty(value)) return value;
 
-  // JSON columns (features, amenities, tags...) arrive as arrays.
   if (Array.isArray(value)) return value.join(", ");
 
   if (!format) return value;
@@ -482,10 +643,6 @@ const formatValue = (value, format, element) => {
   return value;
 };
 
-/* --------------------------------
-   Relationship maps
---------------------------------- */
-
 const createEntityMaps = (siteData) => {
   const maps = {};
 
@@ -503,10 +660,6 @@ const createEntityMaps = (siteData) => {
 
   return maps;
 };
-
-/* --------------------------------
-   Entity enrichment
---------------------------------- */
 
 const enrichEntity = (entity, item, maps) => {
   const result = { ...item };
@@ -539,10 +692,6 @@ const enrichEntity = (entity, item, maps) => {
   return result;
 };
 
-/* --------------------------------
-   Safe attribute rendering
---------------------------------- */
-
 const renderField = (element, item) => {
   const field = element.getAttribute("data-field");
 
@@ -560,6 +709,9 @@ const renderField = (element, item) => {
     );
 
     element.textContent = isEmpty(shown) ? (fallback ?? "—") : String(shown);
+    if (element.hasAttribute("data-format")) {
+      element.style.fontVariantNumeric = "tabular-nums";
+    }
 
     return;
   }
@@ -576,17 +728,18 @@ const renderField = (element, item) => {
 
   if (!allowedAttributes.includes(attr)) return;
 
-    let output = value;
+  let output = value;
 
   if (attr === "src" && !isEmpty(value)) {
     output = resolveMediaImage(value);
   }
 
-  // data-prefix="tel:" / "mailto:" builds the link from a raw value
   const prefix = element.getAttribute("data-prefix");
   if (attr === "href" && prefix && !isEmpty(value)) {
     const clean =
-      prefix === "tel:" ? String(value).replace(/[^\d+]/g, "") : String(value).trim();
+      prefix === "tel:"
+        ? String(value).replace(/[^\d+]/g, "")
+        : String(value).trim();
     output = `${prefix}${clean}`;
   }
 
@@ -608,7 +761,6 @@ const renderField = (element, item) => {
     }
   }
 
-  // Attributes honour data-fallback too (e.g. placeholder images).
   if (isEmpty(output) && !isEmpty(fallback)) {
     output = fallback;
   }
@@ -622,11 +774,13 @@ const renderField = (element, item) => {
   if (attr === "target" && output === "_blank") {
     element.setAttribute("rel", "noopener noreferrer");
   }
-};
 
-/* --------------------------------
-   Recursive hydration
---------------------------------- */
+  if (attr === "src" && element.tagName === "IMG") {
+    if (!element.hasAttribute("alt")) element.setAttribute("alt", "");
+    if (!element.hasAttribute("loading")) element.setAttribute("loading", "lazy");
+    element.setAttribute("decoding", "async");
+  }
+};
 
 const hydrateContainer = (container, siteData, maps) => {
   const entity = container.getAttribute("data-entity");
@@ -639,13 +793,16 @@ const hydrateContainer = (container, siteData, maps) => {
 
   if (!template || !Array.isArray(source)) return;
 
-  // Clone before clearing the original holder.
   const holder = template.parentElement;
   const rowTemplate = template.cloneNode(true);
 
-  // Hide only unwanted statuses; available / upcoming / published etc. are shown.
   const rows = source.filter(
-    (record) => !HIDDEN_STATUSES.has(String(record.status ?? "").toLowerCase()),
+    (record) =>
+      record.isApproved !== false &&
+      record.isApproved !== 0 &&
+      record.approved !== false &&
+      record.approved !== 0 &&
+      !HIDDEN_STATUSES.has(String(record.status ?? "").toLowerCase()),
   );
 
   holder.replaceChildren();
@@ -654,11 +811,10 @@ const hydrateContainer = (container, siteData, maps) => {
     const empty = container.ownerDocument.createElement("p");
 
     empty.className = "hydration-empty-state";
+    empty.setAttribute("role", "status");
 
     empty.textContent =
-      container.getAttribute("data-empty-text") || "No records added yet.";
-
-    empty.style.cssText = "text-align:center;opacity:.7;padding:16px;";
+      container.getAttribute("data-empty-text") || "No published items yet.";
 
     holder.appendChild(empty);
 
@@ -670,15 +826,12 @@ const hydrateContainer = (container, siteData, maps) => {
 
     const row = rowTemplate.cloneNode(true);
 
-    // The row element itself may carry data-field.
     if (row.hasAttribute?.("data-field")) renderField(row, item);
 
-    // Hydrate fields belonging to this row.
     row
       .querySelectorAll("[data-field]")
       .forEach((element) => renderField(element, item));
 
-    // Hydrate nested entity containers independently.
     row.querySelectorAll("[data-entity]").forEach((nestedContainer) => {
       hydrateContainer(nestedContainer, siteData, maps);
     });
@@ -686,10 +839,6 @@ const hydrateContainer = (container, siteData, maps) => {
     holder.appendChild(row);
   });
 };
-
-/* --------------------------------
-   Main function
---------------------------------- */
 
 const hydrateSiteData = (html, siteData = {}) => {
   if (typeof html !== "string" || !html.includes("data-entity")) {
@@ -707,7 +856,6 @@ const hydrateSiteData = (html, siteData = {}) => {
 
   const maps = createEntityMaps(siteData);
 
-  // Process only top-level entity containers.
   const containers = Array.from(root.querySelectorAll("[data-entity]")).filter(
     (container) => {
       return !container.parentElement.closest("[data-entity]");
@@ -721,13 +869,12 @@ const hydrateSiteData = (html, siteData = {}) => {
   return root.innerHTML;
 };
 
-// Define the marker ONCE, at module scope, and use the same token in CKEditor
-const SLIDER_MARKER = /\{\{\s*SLIDER\s*\}\}/;
-
+/* ------------------------------------------------------------------ */
+/* Build iframe srcdoc                                                 */
+/* ------------------------------------------------------------------ */
 const buildSrcDoc = ({
   html,
-  background,
-  color,
+  themeConfig,
   pageTitle,
   galleries,
   slides,
@@ -736,24 +883,14 @@ const buildSrcDoc = ({
   const isHome = /home/i.test(pageTitle);
   const isGallery = /gall[ae]ry/i.test(pageTitle);
 
-  const sliderHtml = isHome ? renderSlider(slides) : "";
+  const sliderHtml = isHome ? renderSlider(slides, resolveMediaImage, escapeHtml) : "";
+
   const pageHtml =
     hydrateSiteData(html, siteData) || "<p>This page has no content yet.</p>";
 
-  // If the marker exists, place the slider there.
-  // If not (non-home pages, or old content), DON'T prepend — just show pageHtml.
-  let bodyHtml = pageHtml;
-  if (SLIDER_MARKER.test(pageHtml)) {
-    bodyHtml = pageHtml.replace(SLIDER_MARKER, () => sliderHtml);
-  } else if (isHome && sliderHtml) {
-    // Fallback for home pages without marker: place after hero/intro if possible
-    bodyHtml = pageHtml.replace(
-      /(<section class="intro">[\s\S]*?<\/section>)/,
-      `$1${sliderHtml}`
-    );
-    // If still not inserted (no .intro), append at end rather than prepend
-    if (bodyHtml === pageHtml) bodyHtml = `${pageHtml}${sliderHtml}`;
-  }
+  const bodyHtml = SLIDER_MARKER.test(pageHtml)
+    ? pageHtml.replace(SLIDER_MARKER, () => sliderHtml)
+    : `${sliderHtml}${pageHtml}`;
 
   return `<!DOCTYPE html>
 <html>
@@ -762,7 +899,14 @@ const buildSrcDoc = ({
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <style>
       :root {
-        --site-header-bg: color-mix(in srgb, ${color} 6%, ${background});
+        --site-primary: ${themeConfig.primaryColor || themeConfig.color || "#0284c7"};
+        --site-secondary: ${themeConfig.secondaryColor || themeConfig.color || "#0369a1"};
+        --site-bg: ${themeConfig.background || "#ffffff"};
+        --site-text: ${themeConfig.textColor || themeConfig.color || "#0f172a"};
+        --site-header-bg: ${themeConfig.headerBackground || themeConfig.headerBg || "#ffffff"};
+        --site-footer-bg: ${themeConfig.footerBackground || themeConfig.footerBg || "#0f172a"};
+        --site-button-bg: ${themeConfig.buttonBackground || themeConfig.primaryColor || "#0284c7"};
+        --site-button-text: ${themeConfig.buttonTextColor || "#ffffff"};
       }
       * { box-sizing: border-box; }
       html { scroll-behavior: smooth; }
@@ -771,27 +915,77 @@ const buildSrcDoc = ({
         margin: 0;
         padding: 0;
         overflow-x: hidden;
-        background: ${background};
-        color: ${color};
-        font-family: Arial, Helvetica, sans-serif;
+        background: var(--site-bg);
+        color: var(--site-text);
+        font-family: ${themeConfig.fontFamily || "Arial, sans-serif"};
+        line-height: 1.5;
+        overflow-wrap: anywhere;
       }
-      .site-page { padding: 16px; }
-      img { max-width: 100%; height: auto; }
-      table { max-width: 100%; }
-      .site-home-slider { width: 100%; margin: 22px auto 28px; overflow: hidden; border-radius: 12px; background: #f0f0f0; }
-      .site-slider-track { display: flex; width: 100%; }
-      .site-slide { position: relative; flex: 0 0 100%; height: clamp(220px, 42vw, 520px); }
-      .site-slide img { width: 100%; height: 100%; object-fit: cover; }
-      .site-slide span { position: absolute; inset: auto 0 0; padding: 18px 22px; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,.7)); font-size: 1.15rem; text-align: left; }
+      .site-page { width: min(100%, 1200px); margin-inline: auto; padding: clamp(12px, 3vw, 32px); }
+      .site-page > :first-child { margin-top: 0; }
+      h1, h2, h3, h4, h5, h6 { scroll-margin-top: 24px; text-wrap: balance; overflow-wrap: anywhere; }
+      p, li, figcaption { text-wrap: pretty; overflow-wrap: anywhere; }
+      img, video, svg, canvas { max-width: 100%; height: auto; }
+      iframe { max-width: 100%; }
+      table { width: 100%; max-width: 100%; border-collapse: collapse; }
+      th, td { overflow-wrap: anywhere; }
+      .site-visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
+      .hydration-empty-state { margin: 16px 0; padding: 24px 16px; border: 1px dashed color-mix(in srgb, var(--site-text) 30%, transparent); border-radius: ${themeConfig.borderRadius || "8px"}; text-align: center; opacity: .8; }
+
+      button, .btn, input, select, textarea { font: inherit; }
+      button, .btn {
+        min-height: 44px;
+        background: var(--site-button-bg);
+        color: var(--site-button-text);
+        border-radius: ${themeConfig.borderRadius || "4px"};
+        padding: 10px 16px;
+        border: none;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+      button:hover, .btn:hover { filter: brightness(.94); }
+      button:disabled, .btn:disabled { cursor: wait; opacity: .7; }
+      a, button, .btn, input, select, textarea { scroll-margin-block: 24px; }
+      :where(a, button, .btn, input, select, textarea):focus-visible { outline: 3px solid var(--site-primary); outline-offset: 3px; }
+      input, select, textarea { max-width: 100%; }
+      [data-form-status] { min-height: 1.5em; margin-block: 12px 0; font-weight: 600; }
+      [data-form-status][data-state="error"] { color: #b91c1c; }
+      [data-form-status][data-state="success"] { color: #166534; }
+
+      .site-home-slider { position: relative; width: 100%; margin: 22px auto 28px; overflow: hidden; border-radius: ${themeConfig.borderRadius || "12px"}; background: #f0f0f0; }
+      .site-slider-track { display: flex; width: 100%; will-change: transform; }
+      .site-slider-pause { position: absolute; z-index: 2; top: 12px; right: 12px; min-height: 40px; padding: 8px 12px; background: rgba(0, 0, 0, .78); color: #fff; }
+      .site-slide { position: relative; flex: 0 0 100%; margin: 0; aspect-ratio: var(--slide-ratio, 16 / 9); min-height: 160px; }
+      .site-slide img { display: block; width: 100%; height: 100%; object-fit: cover; }
+      .site-slide figcaption { position: absolute; inset: auto 0 0; padding: 38px 22px 18px; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,.78)); font-size: 1.15rem; text-align: left; }
       .site-gallery { margin-top: 32px; }
       .site-gallery-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 16px; }
-      .site-gallery figure { margin: 0; overflow: hidden; border-radius: 10px; background: var(--site-header-bg); }
-      .site-gallery img { display: block; width: 100%; height: 240px; object-fit: cover; transition: transform 0.4s ease; }
-      .site-gallery figure:hover img { transform: scale(1.06); }
+      .site-gallery figure { min-width: 0; margin: 0; overflow: hidden; border-radius: ${themeConfig.borderRadius || "10px"}; background: var(--site-header-bg); }
+      .site-gallery img { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; transition: transform 0.4s ease; }
+      .site-gallery figure:hover img { transform: scale(1.04); }
       .site-gallery figcaption { padding: 10px 12px; }
+      main, div, section, p, h1, h2, h3, h4, h5, h6, span, a, li, ul, ol { color: inherit; }
+
+      @media (max-width: 640px) {
+        .site-page { padding: 12px; }
+       
+        .site-slide figcaption { padding: 32px 14px 14px; font-size: 1rem; }
+        .site-slider-pause { top: 8px; right: 8px; }
+        table { display: block; overflow-x: auto; overscroll-behavior-inline: contain; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+        *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+        .site-slider-track { animation: none !important; transform: none !important; }
+        .site-slider-pause { display: none; }
+        .site-gallery figure:hover img { transform: none; }
+      }
+      @media (forced-colors: active) {
+        :where(a, button, .btn, input, select, textarea):focus-visible { outline-color: Highlight; }
+      }
     </style>
   </head>
-  <body><main class="site-page">${bodyHtml}${isGallery ? renderGallery(galleries) : ""}</main></body>
+  <body><main class="site-page">${bodyHtml}${isGallery ? renderGallery(galleries) : ""}</main>${SITE_FORM_SCRIPT}${SITE_IFRAME_UX_SCRIPT}</body>
 </html>`;
 };
 
@@ -818,11 +1012,11 @@ function SiteHeader({
       sx={{
         position: "sticky",
         top: 0,
-        zIndex: 5,
-        color: theme.color,
+        zIndex: 1100,
+        color: theme.textColor || theme.color,
         borderBottom: `1px solid ${theme.border}`,
-        backgroundColor: theme.background,
-        backgroundImage: `linear-gradient(${theme.headerBg}, ${theme.headerBg})`,
+        backgroundColor:
+          theme.headerBackground || theme.headerBg || theme.background,
       }}
     >
       <Box
@@ -837,19 +1031,29 @@ function SiteHeader({
           gap: stacked ? 1 : 4,
         }}
       >
-        {/* Logo + title — never grows past its space */}
         {(logo || title) && (
           <Box
             component="a"
-            href="#"
+            href={pages[0] ? pageHref(pageKey(pages[0])) : "#main-content"}
             onClick={(event) => {
-              event.preventDefault();
-              if (pages[0]) onNavigate(pageKey(pages[0]));
+              if (pages[0]) {
+                handlePageAnchorClick(
+                  event,
+                  pageKey(pages[0]),
+                  onNavigate,
+                  { focus: true },
+                );
+              }
             }}
             sx={{
               display: "flex",
               alignItems: "center",
               gap: 1.25,
+              borderRadius: 1,
+              "&:focus-visible": {
+                outline: `3px solid ${theme.primaryColor || theme.color}`,
+                outlineOffset: 3,
+              },
               py: 1,
               minHeight: small ? 56 : 64,
               color: "inherit",
@@ -861,29 +1065,21 @@ function SiteHeader({
           >
             {logo && (
               <Box
+                component="img"
+                src={logo}
+                alt={title ? `${title} logo` : "Site logo"}
+                width={44}
+                height={44}
+                fetchPriority="high"
                 sx={{
+                  display: "block",
                   width: small ? 36 : 44,
                   height: small ? 36 : 44,
                   borderRadius: "50%",
-                  overflow: "hidden",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
+                  objectFit: "cover",
                   flexShrink: 0,
                 }}
-              >
-                <Box
-                  component="img"
-                  src={logo}
-                  alt={title || "Site logo"}
-                  sx={{
-                    display: "block",
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                  }}
-                />
-              </Box>
+              />
             )}
             {title && (
               <Typography
@@ -905,7 +1101,6 @@ function SiteHeader({
           </Box>
         )}
 
-        {/* Navigation — scrollable so many pages stay usable */}
         <Box
           sx={{
             minWidth: 0,
@@ -924,15 +1119,15 @@ function SiteHeader({
             sx={{
               minHeight: 48,
               minWidth: 0,
-              color: theme.color,
+              color: theme.textColor || theme.color,
               "& .MuiTabs-flexContainer": { gap: 0.5 },
               "& .MuiTabs-indicator": {
-                backgroundColor: theme.color,
+                backgroundColor: theme.primaryColor || theme.color,
                 height: 3,
                 borderRadius: "3px 3px 0 0",
               },
               "& .MuiTabScrollButton-root": {
-                color: theme.color,
+                color: theme.textColor || theme.color,
                 width: 32,
               },
               "& .MuiTab-root": {
@@ -943,7 +1138,7 @@ function SiteHeader({
                 textTransform: "none",
                 fontWeight: 600,
                 fontSize: "0.95rem",
-                color: theme.color,
+                color: theme.textColor || theme.color,
                 opacity: 0.7,
                 borderRadius: 1,
                 whiteSpace: "nowrap",
@@ -951,21 +1146,36 @@ function SiteHeader({
                 textOverflow: "ellipsis",
                 transition: "opacity .2s, background-color .2s",
                 "&:hover": { opacity: 1, bgcolor: theme.hover },
+                "&:focus-visible": {
+                  opacity: 1,
+                  outline: `3px solid ${theme.primaryColor || theme.color}`,
+                  outlineOffset: -3,
+                },
               },
               "& .MuiTab-root.Mui-selected": {
-                color: theme.color,
+                color: theme.textColor || theme.color,
                 opacity: 1,
               },
             }}
           >
-            {pages.map((p) => (
-              <Tab
-                key={pageKey(p)}
-                value={pageKey(p)}
-                label={p.title}
-                title={p.title}
-              />
-            ))}
+            {pages.map((p) => {
+              const id = pageKey(p);
+              const label = p.title || "Untitled page";
+              return (
+                <Tab
+                  key={id}
+                  component="a"
+                  href={pageHref(id)}
+                  value={id}
+                  label={label}
+                  title={label}
+                  aria-current={id === activeId ? "page" : undefined}
+                  onClick={(event) =>
+                    handlePageAnchorClick(event, id, onNavigate, { focus: true })
+                  }
+                />
+              );
+            })}
           </Tabs>
         </Box>
       </Box>
@@ -974,7 +1184,7 @@ function SiteHeader({
 }
 
 /* ------------------------------------------------------------------ */
-/* Site Footer                                                         */
+/* Site Footer                                                        */
 /* ------------------------------------------------------------------ */
 function FooterHeading({ children }) {
   return (
@@ -1045,14 +1255,19 @@ function SiteFooter({
         ? "repeat(2, 1fr)"
         : "repeat(auto-fit, minmax(210px, 1fr))";
 
-  // Cap the height of very long link lists so the footer stays balanced.
   const linkCap = pages.length > 12;
 
   const linkSx = {
     color: "inherit",
     textDecoration: "none",
     opacity: 0.85,
+    borderRadius: 0.5,
     "&:hover": { opacity: 1, textDecoration: "underline" },
+    "&:focus-visible": {
+      opacity: 1,
+      outline: `3px solid ${theme.primaryColor || theme.color}`,
+      outlineOffset: 3,
+    },
   };
 
   if (
@@ -1069,9 +1284,9 @@ function SiteFooter({
     <Box
       component="footer"
       sx={{
-        backgroundColor: theme.background,
-        backgroundImage: `linear-gradient(${theme.footerBg}, ${theme.footerBg})`,
-        color: theme.color,
+        backgroundColor:
+          theme.footerBackground || theme.footerBg || theme.background,
+        color: theme.textColor || theme.color,
         borderTop: `1px solid ${theme.border}`,
       }}
     >
@@ -1113,7 +1328,6 @@ function SiteFooter({
             </Box>
           )}
 
-          {/* ---- Quick links: responsive multi-column grid ---- */}
           {hasLinks && (
             <Box
               component="nav"
@@ -1124,7 +1338,6 @@ function SiteFooter({
               <Box
                 sx={{
                   display: "grid",
-                  // Flows into multiple columns as the number of pages grows
                   gridTemplateColumns: {
                     xs: "1fr",
                     sm: "repeat(2, minmax(0, 1fr))",
@@ -1142,11 +1355,18 @@ function SiteFooter({
                   return (
                     <Link
                       key={pageKey(p)}
-                      component="button"
-                      type="button"
-                      onClick={() => onNavigate(pageKey(p))}
+                      component="a"
+                      href={pageHref(pageKey(p))}
+                      onClick={(event) =>
+                        handlePageAnchorClick(
+                          event,
+                          pageKey(p),
+                          onNavigate,
+                          { focus: true },
+                        )
+                      }
                       aria-current={isActive ? "page" : undefined}
-                      title={p.title}
+                      title={p.title || "Untitled page"}
                       sx={{
                         ...linkSx,
                         display: "block",
@@ -1160,7 +1380,7 @@ function SiteFooter({
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {p.title}
+                      {p.title || "Untitled page"}
                     </Link>
                   );
                 })}
@@ -1222,11 +1442,15 @@ function SiteFooter({
                     rel="noopener noreferrer"
                     aria-label={label}
                     sx={{
-                      color: theme.color,
+                      color: theme.textColor || theme.color,
                       border: `1px solid ${theme.border}`,
                       width: 40,
                       height: 40,
                       "&:hover": { bgcolor: theme.hover },
+                      "&:focus-visible": {
+                        outline: `3px solid ${theme.primaryColor || theme.color}`,
+                        outlineOffset: 2,
+                      },
                     }}
                   >
                     <Icon />
@@ -1288,8 +1512,13 @@ export default function MySiteView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [themeConfig, setThemeConfig] = useState(null);
+  const [targetSiteId, setTargetSiteId] = useState("");
+  const [submissionVersion, setSubmissionVersion] = useState(0);
+  const [frameLoading, setFrameLoading] = useState(true);
+  const [frameError, setFrameError] = useState("");
   const scrollRef = useRef(null);
-  const observerRef = useRef(null);
+  const iframeRef = useRef(null);
+  const mainRef = useRef(null);
 
   const handleDevices = (_, value) => {
     if (value) setDevices(value);
@@ -1336,6 +1565,7 @@ export default function MySiteView() {
           }
           targetSiteId = meta.id;
         }
+        setTargetSiteId(targetSiteId);
 
         const pagesUrl = siteAdminMode
           ? `${API_URL}/sites/client-admin/${targetSiteId}/pages`
@@ -1353,10 +1583,13 @@ export default function MySiteView() {
         ]);
         if (cancelled) return;
 
-        const list = Array.isArray(pagesRes.data?.pages)
-          ? pagesRes.data.pages
-          : [];
-
+        // ---- MATCH Site.jsx: pages may be wrapped in `pages` ----
+        const pagesPayload = pagesRes.data;
+        const list = Array.isArray(pagesPayload)
+          ? pagesPayload
+          : Array.isArray(pagesPayload?.pages)
+            ? pagesPayload.pages
+            : [];
         setPages(list);
         setThemeConfig(themeRes.data);
 
@@ -1375,16 +1608,20 @@ export default function MySiteView() {
             : [],
         });
 
-        // Fetch site data resources.
-        // Each resource is loaded independently so one failing table
-        // (e.g. not whitelisted on the backend) does not blank the others.
+        // Fetch site data resources (support `sections` array shape used by Site.jsx)
         try {
           const base = siteAdminMode
             ? `${API_URL}/sites/client-admin/${targetSiteId}/data`
             : `${API_URL}/sites/${targetSiteId}/data`;
           const dataRes = await axios.get(base, { headers });
           if (cancelled) return;
-          const resources = Array.isArray(dataRes.data) ? dataRes.data : [];
+
+          const resources = Array.isArray(dataRes.data?.sections)
+            ? dataRes.data.sections.map((s) => s.resource)
+            : Array.isArray(dataRes.data)
+              ? dataRes.data
+              : [];
+
           const dataMap = {};
           await Promise.all(
             resources.map(async (resource) => {
@@ -1410,7 +1647,10 @@ export default function MySiteView() {
           console.warn("Could not load site data resources", e);
         }
 
-        setActiveId(list[0] ? pageKey(list[0]) : "");
+        const requestedPageId = pageIdFromHash();
+        const initialPage =
+          list.find((page) => pageKey(page) === requestedPageId) || list[0];
+        setActiveId(initialPage ? pageKey(initialPage) : "");
         setSite({
           color: meta?.color || pagesRes.data?.color || "#222222",
           background:
@@ -1435,10 +1675,26 @@ export default function MySiteView() {
     return () => {
       cancelled = true;
     };
-  }, [routeSiteKey, siteSlug, navigate, siteAdminMode]);
+  }, [routeSiteKey, siteSlug, navigate, siteAdminMode, submissionVersion]);
+
+  useEffect(
+    () =>
+      installSiteFormHandler({
+        siteId: targetSiteId,
+        iframeRef,
+        onSubmitted: () => {
+          setSubmissionVersion((version) => version + 1);
+        },
+      }),
+    [targetSiteId],
+  );
 
   useEffect(() => {
     if (!media.news.length) return undefined;
+    const reducedMotion = window.matchMedia?.(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    if (reducedMotion) return undefined;
 
     let nextIndex = 0;
     const timer = window.setInterval(
@@ -1453,7 +1709,35 @@ export default function MySiteView() {
     return () => window.clearInterval(timer);
   }, [media.news]);
 
-  useEffect(() => () => observerRef.current?.disconnect(), []);
+  useEffect(() => {
+    const onFrameMessage = (event) => {
+      if (event.source !== iframeRef.current?.contentWindow) return;
+
+      if (event.data?.type === "tenant-site-frame-ready") {
+        setFrameLoading(false);
+        return;
+      }
+
+      if (event.data?.type === "tenant-site-frame-resize") {
+        const height = Number(event.data.height);
+        if (Number.isFinite(height) && height > 0 && iframeRef.current) {
+          iframeRef.current.style.height = `${Math.ceil(height)}px`;
+        }
+        return;
+      }
+
+      if (event.data?.type === "tenant-site-frame-error") {
+        setFrameLoading(false);
+        setFrameError(
+          event.data.message ||
+            "Some page content could not load. Refresh the page or choose another page.",
+        );
+      }
+    };
+
+    window.addEventListener("message", onFrameMessage);
+    return () => window.removeEventListener("message", onFrameMessage);
+  }, []);
 
   const activePage = useMemo(
     () => pages.find((p) => pageKey(p) === String(activeId)),
@@ -1469,52 +1753,98 @@ export default function MySiteView() {
       ),
     [site.background, site.color, themeConfig],
   );
+  // after `theme` useMemo, before `srcDoc`
+  const resolvedHeader = useMemo(() => {
+    // The SAME row hydration uses for `data-entity="headers"`
+    const headersRow = Array.isArray(siteData?.headers)
+      ? siteData.headers[0]
+      : null;
 
-  const srcDoc = useMemo(
+    // Fallback: some sites put contact on a `contacts`/`contact` resource
+    const contactRow =
+      (Array.isArray(siteData?.contacts) && siteData.contacts[0]) ||
+      (Array.isArray(siteData?.contact) && siteData.contact[0]) ||
+      null;
+
+    if (!headersRow && !contactRow) return site.header || {};
+
+    // Merge: page-level header branding wins, then headers row, then contacts row
+    return {
+      ...(headersRow || {}),
+      ...(contactRow || {}),
+      ...(site.header || {}),
+      // ensure these three always resolve from whichever row has them
+      footerAddress:
+        site.header?.footerAddress ??
+        headersRow?.footerAddress ??
+        contactRow?.footerAddress ??
+        contactRow?.address ??
+        "",
+      footerPhone:
+        site.header?.footerPhone ??
+        headersRow?.footerPhone ??
+        contactRow?.footerPhone ??
+        contactRow?.phone ??
+        "",
+      footerEmail:
+        site.header?.footerEmail ??
+        headersRow?.footerEmail ??
+        contactRow?.footerEmail ??
+        contactRow?.email ??
+        "",
+      // socials often live on the headers row too
+      socialLinks:
+        (site.header?.socialLinks &&
+          Object.keys(site.header.socialLinks).length &&
+          site.header.socialLinks) ||
+        headersRow?.socialLinks ||
+        contactRow?.socialLinks ||
+        {},
+    };
+  }, [site.header, siteData]);
+  // Force iframe remount when data set changes so tables re-hydrate
+  const dataVersion = useMemo(() => Object.keys(siteData).length, [siteData]);
+
+ const srcDoc = useMemo(
   () =>
     buildSrcDoc({
       html: activePage?.page,
-      background: theme.background,
-      color: theme.color,
+      themeConfig: theme,
       pageTitle: activePage?.title || "Site",
       galleries: media.galleries,
       slides: media.slider,
       siteData: {
         ...siteData,
         headers:
-          site.header && Object.keys(site.header).length
-            ? [site.header]
+          Object.keys(resolvedHeader).length
+            ? [resolvedHeader]
             : siteData.headers || [],
       },
     }),
-  [activePage, theme, media.galleries, media.slider, siteData, site.header],
+  [activePage, theme, media.galleries, media.slider, siteData, resolvedHeader],
 );
 
-  const handleNavigate = (id) => {
-    setActiveId(String(id));
-    scrollRef.current?.scrollTo({ top: 0 });
+  const handleNavigate = (id, { focus = false } = {}) => {
+    const nextId = String(id);
+    if (!pages.some((page) => pageKey(page) === nextId)) return;
+
+    setFrameLoading(true);
+    setFrameError("");
+    setActiveId(nextId);
+    window.history.replaceState(null, "", pageHref(nextId));
+    scrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
+    if (focus) window.requestAnimationFrame(() => mainRef.current?.focus());
   };
 
-  const handleFrameLoad = (event) => {
-    const frame = event.currentTarget;
-    const doc = frame.contentDocument;
-    if (!doc?.body) return;
+  const handleFrameLoad = () => {
+    // A sandboxed srcdoc has an opaque origin, so frame sizing is reported via postMessage.
+    window.setTimeout(() => setFrameLoading(false), 1500);
+  };
 
-    observerRef.current?.disconnect();
-    const resize = () => {
-      const height = Math.max(
-        doc.documentElement.scrollHeight,
-        doc.body.scrollHeight,
-      );
-      frame.style.height = `${height}px`;
-    };
-    resize();
-
-    if (typeof ResizeObserver !== "undefined") {
-      observerRef.current = new ResizeObserver(resize);
-      observerRef.current.observe(doc.documentElement);
-      observerRef.current.observe(doc.body);
-    }
+  const retryFrame = () => {
+    setFrameError("");
+    setFrameLoading(true);
+    setSubmissionVersion((version) => version + 1);
   };
 
   const framed = devices !== "laptop";
@@ -1727,15 +2057,15 @@ export default function MySiteView() {
               >
                 <Box
                   component="iframe"
-                  key={`${activeId}-${devices}`}
+                  key={`${activeId}-${devices}-${dataVersion}`}
                   title={activePage?.title || "Page preview"}
-                  sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+                  sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
                   srcDoc={srcDoc}
                   onLoad={handleFrameLoad}
                   sx={{
                     display: "block",
                     width: "100%",
-                    minHeight: 300,
+                    minHeight: "calc(100vh - 160px)",
                     border: 0,
                     bgcolor: theme.background,
                   }}
@@ -1743,7 +2073,7 @@ export default function MySiteView() {
               </Box>
 
               <SiteFooter
-                header={site.header}
+                header={resolvedHeader}
                 siteName={site.siteName}
                 pages={pages}
                 activeId={String(activeId)}
@@ -1786,6 +2116,10 @@ export default function MySiteView() {
               component="img"
               src={resolveMediaImage(media.news[newsIndex].imageUrl)}
               alt={media.news[newsIndex].title || "News"}
+              width={640}
+              height={360}
+              loading="lazy"
+              decoding="async"
               sx={{
                 display: "block",
                 width: "100%",
@@ -1832,6 +2166,8 @@ export default function MySiteView() {
                 color: "text.secondary",
                 lineHeight: 1.75,
                 textAlign: "center",
+                overflowWrap: "anywhere",
+                textWrap: "pretty",
               }}
             >
               {media.news[newsIndex].content}

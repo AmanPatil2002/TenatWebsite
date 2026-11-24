@@ -1,5 +1,12 @@
 import { useMemo } from 'react';
-import { STATUS_ONLY_TABLES, isReadOnly, isStatusOnly, getAllowedStatusField, getDerivedFields, hasDerivedFields } from '../config/readOnlyTables';
+import {
+  STATUS_ONLY_TABLES,
+  isReadOnly,
+  getDerivedFields,
+  hasDerivedFields,
+  getTablePermission,
+  getStatusField,
+} from '../config/readOnlyTables';
 
 /**
  * Custom hook to determine table permissions for admin panel.
@@ -10,24 +17,26 @@ import { STATUS_ONLY_TABLES, isReadOnly, isStatusOnly, getAllowedStatusField, ge
  */
 export const useTablePermissions = (vertical, table) => {
   const permissions = useMemo(() => {
+    // Fail closed: if vertical or table is missing, deny all write operations
     if (!vertical || !table) {
       return {
-        isReadOnly: false,
+        isReadOnly: true,
         isStatusOnly: false,
-        canCreate: true,
-        canUpdate: true,
-        canDelete: true,
+        canCreate: false,
+        canUpdate: false,
+        canDelete: false,
         allowedStatusField: null,
         allowedStatuses: [],
         derivedFields: [],
         hasDerivedFields: false,
-        getRestrictionMessage: () => null,
+        getRestrictionMessage: () => 'Table permissions unavailable',
       };
     }
 
-    const readOnly = isReadOnly(vertical, table);
-    const statusOnly = isStatusOnly(vertical, table);
-    const allowedStatusField = getAllowedStatusField(vertical, table);
+    const mode = getTablePermission(vertical, table);
+    const readOnly = mode === 'view' || (mode === 'full' && isReadOnly(vertical, table));
+    const statusOnly = mode === 'status';
+    const allowedStatusField = getStatusField(vertical, table);
     const allowedStatuses = STATUS_ONLY_TABLES[vertical]?.[table] || [];
     const derivedFields = getDerivedFields(vertical, table);
     const hasDerived = hasDerivedFields(vertical, table);
@@ -42,6 +51,7 @@ export const useTablePermissions = (vertical, table) => {
     }
 
     return {
+      mode,
       isReadOnly: readOnly && !statusOnly,
       isStatusOnly: statusOnly,
       canCreate: !readOnly && !statusOnly,
@@ -67,15 +77,37 @@ export const useTablePermissions = (vertical, table) => {
  * @returns {Object} Map of table -> permission object
  */
 export const useTablePermissionsMap = (vertical, tables = []) => {
-  const permissionsMap = useMemo(() => {
+  return useMemo(() => {
     const map = {};
     for (const table of tables) {
-      map[table] = useTablePermissions(vertical, table);
+      const mode = getTablePermission(vertical, table);
+      const readOnly = mode === 'view';
+      const statusOnly = mode === 'status';
+      map[table] = {
+        mode,
+        isReadOnly: readOnly,
+        isStatusOnly: statusOnly,
+        isHidden: mode === 'hidden',
+        canCreate: mode === 'full',
+        canUpdate: mode === 'full' || mode === 'status',
+        canDelete: mode === 'full',
+        allowedStatusField: getStatusField(vertical, table),
+        allowedStatuses: STATUS_ONLY_TABLES[vertical]?.[table] || [],
+        derivedFields: getDerivedFields(vertical, table),
+        hasDerivedFields: hasDerivedFields(vertical, table),
+        getRestrictionMessage: () => (
+          mode === 'view'
+            ? `Table '${table}' is read-only`
+            : mode === 'status'
+              ? `Table '${table}' allows only status updates`
+              : mode === 'hidden'
+                ? `Table '${table}' is hidden`
+                : null
+        ),
+      };
     }
     return map;
   }, [vertical, tables]);
-
-  return permissionsMap;
 };
 
 export default useTablePermissions;

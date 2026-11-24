@@ -19,6 +19,8 @@ import {
 } from "@mui/material";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const PASSWORD_MIN = 6;
+const PASSWORD_MAX = 72;
 
 function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -72,8 +74,12 @@ function ResetPassword() {
       setError("Enter the 6-digit code from your email.");
       return;
     }
-    if (newPassword.length < 6) {
-      setError("Password must be at least 6 characters.");
+    if (newPassword.length < PASSWORD_MIN) {
+      setError(`Password must be at least ${PASSWORD_MIN} characters.`);
+      return;
+    }
+    if (newPassword.length > PASSWORD_MAX) {
+      setError(`Password must be ${PASSWORD_MAX} characters or fewer.`);
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -106,8 +112,11 @@ function ResetPassword() {
   return (
     <Box
       component="main"
+      id="main-content"
+      tabIndex={-1}
       sx={{
         minHeight: "100vh",
+        "@supports (height: 100dvh)": { minHeight: "100dvh" },
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -180,8 +189,27 @@ function ResetPassword() {
             </Box>
 
             {checking ? (
-              <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-                <CircularProgress size={32} sx={{ color: "#6366F1" }} />
+              <Box
+                role="status"
+                aria-live="polite"
+                aria-busy="true"
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 1.5,
+                  py: 4,
+                }}
+              >
+                <CircularProgress
+                  size={32}
+                  aria-hidden="true"
+                  sx={{ color: "#6366F1" }}
+                />
+                <Typography variant="body2" color="#64748B">
+                  Checking your reset link…
+                </Typography>
               </Box>
             ) : validLink ? (
               <form onSubmit={submitReset} noValidate>
@@ -189,6 +217,8 @@ function ResetPassword() {
                   {error && (
                     <Alert
                       severity="error"
+                      role="alert"
+                      aria-live="assertive"
                       sx={{
                         borderRadius: 2,
                         fontSize: "0.875rem",
@@ -218,6 +248,7 @@ function ResetPassword() {
 
                   <TextField
                     label="6-digit code"
+                    name="code"
                     value={code}
                     onChange={(event) => {
                       setCode(event.target.value.replace(/\D/g, "").slice(0, 6));
@@ -245,12 +276,15 @@ function ResetPassword() {
                   />
                   <TextField
                     label="New password"
+                    name="newPassword"
                     type="password"
                     value={newPassword}
                     onChange={(event) => {
                       setNewPassword(event.target.value);
                       setError("");
                     }}
+                    inputProps={{ maxLength: PASSWORD_MAX }}
+                    helperText={`Use ${PASSWORD_MIN} to ${PASSWORD_MAX} characters.`}
                     autoComplete="new-password"
                     required
                     fullWidth
@@ -271,12 +305,14 @@ function ResetPassword() {
                   />
                   <TextField
                     label="Confirm new password"
+                    name="confirmPassword"
                     type="password"
                     value={confirmPassword}
                     onChange={(event) => {
                       setConfirmPassword(event.target.value);
                       setError("");
                     }}
+                    inputProps={{ maxLength: PASSWORD_MAX }}
                     autoComplete="new-password"
                     required
                     fullWidth
@@ -313,7 +349,7 @@ function ResetPassword() {
                       "&.Mui-disabled": { bgcolor: "#C7D2FE", color: "#FFFFFF" },
                     }}
                   >
-                    {loading ? "Changing password..." : "Change password"}
+                    {loading ? "Changing password…" : "Change password"}
                   </Button>
                 </Stack>
               </form>

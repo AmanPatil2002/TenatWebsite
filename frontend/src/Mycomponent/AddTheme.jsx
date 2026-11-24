@@ -4,6 +4,11 @@ import {
   Box,
   Button,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Divider,
   Grid,
   IconButton,
@@ -357,6 +362,7 @@ export default function AddTheme() {
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [themeToDelete, setThemeToDelete] = useState(null);
 
   const [snack, setSnack] = useState({
     open: false,
@@ -430,7 +436,7 @@ export default function AddTheme() {
 
       await axios.post(THEME_URL, values, config);
 
-      showSnack("Theme added successfully!");
+      showSnack("Theme added successfully.");
       await fetchThemes();
 
       return true;
@@ -468,29 +474,29 @@ export default function AddTheme() {
     }
   };
 
-  const handleDelete = async (theme) => {
-    if (!window.confirm(`Delete the theme "${theme.name}"?`)) {
-      return;
-    }
+  const handleDelete = async () => {
+    if (!themeToDelete) return;
 
     const config = authConfig();
 
     if (!config) {
       showSnack("Please log in before deleting a theme.", "error");
+      setThemeToDelete(null);
       return;
     }
 
     try {
-      setDeletingId(theme.themeId);
+      setDeletingId(themeToDelete.themeId);
 
-      await axios.delete(`${THEME_URL}/${theme.themeId}`, config);
+      await axios.delete(`${THEME_URL}/${themeToDelete.themeId}`, config);
 
-      showSnack("Theme deleted successfully!");
+      showSnack("Theme deleted successfully.");
 
-      if (String(editingId) === String(theme.themeId)) {
+      if (String(editingId) === String(themeToDelete.themeId)) {
         setEditingId(null);
       }
 
+      setThemeToDelete(null);
       await fetchThemes();
     } catch (error) {
       showSnack(getErrorMessage(error, "Failed to delete theme."), "error");

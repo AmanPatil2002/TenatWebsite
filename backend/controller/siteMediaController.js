@@ -67,7 +67,10 @@ const upload = multer({
       cb(null, dir);
     },
     filename: (req, file, cb) =>
-      cb(null, crypto.randomBytes(16).toString("hex") + IMAGE_EXT[file.mimetype]),
+      cb(
+        null,
+        crypto.randomBytes(16).toString("hex") + IMAGE_EXT[file.mimetype],
+      ),
   }),
   limits: { fileSize: 5 * 1024 * 1024, files: 1 },
   fileFilter: (req, file, cb) =>
@@ -94,7 +97,10 @@ const getSiteId = (req) => {
   const { siteId } = req.params;
   if (!isId(siteId)) throw new HttpError(400, "Invalid site id");
   if (req.siteAdmin && String(req.siteAdmin.siteId) !== String(siteId)) {
-    throw new HttpError(403, "This login is not assigned to the requested site");
+    throw new HttpError(
+      403,
+      "This login is not assigned to the requested site",
+    );
   }
   return siteId;
 };
@@ -102,24 +108,61 @@ const getSiteId = (req) => {
 const createHandlers = (type) => {
   return {
     list: async (req, res) => {
-        req.params.resource = type;
-        return siteData.list(req, res);
+      req.params.resource = type;
+      return siteData.list(req, res);
     },
     create: async (req, res) => {
-        req.params.resource = type;
-        return siteData.create(req, res);
+      req.params.resource = type;
+      return siteData.create(req, res);
     },
     update: async (req, res) => {
-        req.params.resource = type;
-        req.params.id = req.params.itemId;
-        return siteData.update(req, res);
+      req.params.resource = type;
+      req.params.id = req.params.itemId;
+      return siteData.update(req, res);
     },
     remove: async (req, res) => {
-        req.params.resource = type;
-        req.params.id = req.params.itemId;
-        return siteData.remove(req, res);
-    }
+      req.params.resource = type;
+      req.params.id = req.params.itemId;
+      return siteData.remove(req, res);
+    },
   };
+};
+
+const listPublicPublishedMedia = async (req, res) => {
+  const { siteId } = req.params;
+  if (!isId(siteId))
+    return res.status(400).json({ message: "Invalid site id" });
+  try {
+    const { getPublicSite } = require("./site/access");
+    const site = await getPublicSite(siteId);
+    const [news, galleries, slider] = await Promise.all([
+      db.query(
+        `SELECT id, title, imageUrl, content, createdAt
+           FROM ${tn(siteId, "news", site.dbName)}
+          WHERE status = 'active'
+          ORDER BY createdAt DESC, id DESC`,
+      ),
+      db.query(
+        `SELECT id, title, imageUrl, caption, altText, sortOrder
+           FROM ${tn(siteId, "galleries", site.dbName)}
+          WHERE status = 'active'
+          ORDER BY sortOrder, id`,
+      ),
+      db.query(
+        `SELECT id, title, imageUrl, width, height, sortOrder
+     FROM ${tn(siteId, "slider", site.dbName)}
+    WHERE status = 'active'
+    ORDER BY sortOrder, id`,
+      ),
+    ]);
+    return res.json({
+      news: news[0],
+      galleries: galleries[0],
+      slider: slider[0],
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
 };
 
 const listPublishedMedia = async (req, res) => {
@@ -131,7 +174,10 @@ const listPublishedMedia = async (req, res) => {
   try {
     if (req.siteAdmin) {
       if (String(req.siteAdmin.siteId) !== String(siteId)) {
-        throw new HttpError(403, "This login is not assigned to the requested site");
+        throw new HttpError(
+          403,
+          "This login is not assigned to the requested site",
+        );
       }
     } else {
       const [[site]] = await db.query(
@@ -150,19 +196,19 @@ const listPublishedMedia = async (req, res) => {
         `SELECT id, title, imageUrl, content, createdAt
            FROM ${tn(siteId, "news", site.dbName)}
           WHERE status = 'active'
-          ORDER BY createdAt DESC, id DESC`
+          ORDER BY createdAt DESC, id DESC`,
       ),
       db.query(
         `SELECT id, title, imageUrl, caption, altText, sortOrder
            FROM ${tn(siteId, "galleries", site.dbName)}
           WHERE status = 'active'
-          ORDER BY sortOrder, id`
+          ORDER BY sortOrder, id`,
       ),
       db.query(
-        `SELECT id, title, imageUrl, sortOrder
-           FROM ${tn(siteId, "slider", site.dbName)}
-          WHERE status = 'active'
-          ORDER BY sortOrder, id`
+        `SELECT id, title, imageUrl, width, height, sortOrder
+     FROM ${tn(siteId, "slider", site.dbName)}
+    WHERE status = 'active'
+    ORDER BY sortOrder, id`,
       ),
     ]);
 
@@ -213,6 +259,7 @@ module.exports = {
   galleries: createHandlers("galleries"),
   slider: createHandlers("slider"),
   listPublishedMedia,
+  listPublicPublishedMedia,
   uploadImage,
   UPLOAD_ROOT,
 };

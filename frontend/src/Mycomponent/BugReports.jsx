@@ -45,8 +45,12 @@ const getToken = () =>
   localStorage.getItem("authToken") ||
   localStorage.getItem("accessToken");
 
-const statusLabel = (status) =>
-  status.replace("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+const statusLabel = (status = "") => {
+  const normalized = String(status).trim().replaceAll("_", " ");
+  return normalized
+    ? normalized.replace(/\b\w/g, (letter) => letter.toUpperCase())
+    : "Unknown";
+};
 
 const statusColor = (status) => {
   if (status === "resolved" || status === "closed") return "success";
@@ -62,13 +66,15 @@ const severityColor = (severity) => {
   return "info";
 };
 
-const formatDate = (value) =>
-  value
-    ? new Date(value).toLocaleString(undefined, {
-        dateStyle: "medium",
-        timeStyle: "short",
-      })
-    : "—";
+const formatDate = (value) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+};
 
 const screenshotHref = (value) => {
   try {
@@ -95,6 +101,7 @@ export default function BugReports() {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [reloadKey, setReloadKey] = useState(0);
   const [selectedReport, setSelectedReport] = useState(null);
+  const [confirmClose, setConfirmClose] = useState(false);
   const [edit, setEdit] = useState({
     status: "open",
     severity: "medium",
@@ -158,10 +165,27 @@ export default function BugReports() {
       adminNote: report.adminNote || "",
     });
     setDialogError("");
+    setConfirmClose(false);
   };
+
+  const hasUnsavedChanges =
+    Boolean(selectedReport) &&
+    (edit.status !== selectedReport.status ||
+      edit.severity !== selectedReport.severity ||
+      edit.adminNote !== (selectedReport.adminNote || ""));
 
   const closeReport = () => {
     if (saving) return;
+    if (hasUnsavedChanges) {
+      setConfirmClose(true);
+      return;
+    }
+    setSelectedReport(null);
+    setDialogError("");
+  };
+
+  const discardChanges = () => {
+    setConfirmClose(false);
     setSelectedReport(null);
     setDialogError("");
   };
@@ -181,11 +205,13 @@ export default function BugReports() {
         headers: { Authorization: `Bearer ${token}` },
       });
       setSelectedReport(null);
-      setNotice(`Report #${selectedReport.id} was updated.`);
+      setConfirmClose(false);
+      setNotice(`Report #${selectedReport.id} was updated successfully.`);
       setReloadKey((key) => key + 1);
     } catch (requestError) {
       setDialogError(
-        requestError.response?.data?.message || "Could not update this report.",
+        requestError.response?.data?.message ||
+          "Could not update this report. Check your connection and try again.",
       );
     } finally {
       setSaving(false);
@@ -202,20 +228,23 @@ export default function BugReports() {
       variant="outlined"
       sx={{
         borderRadius: 2,
-        transition: "box-shadow .15s ease, border-color .15s ease",
-        "&:hover": {
-          boxShadow: 2,
-          borderColor: "primary.main",
+        transition: "box-shadow 150ms ease, border-color 150ms ease",
+        "@media (hover: hover)": {
+          "&:hover": {
+            boxShadow: 2,
+            borderColor: "primary.main",
+          },
         },
+        "@media (prefers-reduced-motion: reduce)": { transition: "none" },
       }}
     >
       <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
         <Stack spacing={1.5}>
-        <Stack
-          direction="row"
-          spacing={1.5}
-          sx={{ justifyContent: "space-between", alignItems: "flex-start" }}
-        >
+          <Stack
+            direction="row"
+            spacing={1.5}
+            sx={{ justifyContent: "space-between", alignItems: "flex-start" }}
+          >
             <Box sx={{ minWidth: 0, flex: 1 }}>
               <Typography
                 variant="caption"
@@ -228,7 +257,7 @@ export default function BugReports() {
                 fontWeight={600}
                 sx={{ overflowWrap: "anywhere", lineHeight: 1.35 }}
               >
-                {report.title}
+                {report.title || "Untitled report"}
               </Typography>
             </Box>
             <Chip
@@ -238,9 +267,13 @@ export default function BugReports() {
               sx={{ flexShrink: 0 }}
             />
           </Stack>
-          <Typography variant="body2" color="text.secondary">
-            {report.reporterName} · {report.siteName || "Platform"} ·{" "}
-            {formatDate(report.createdAt)}
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ overflowWrap: "anywhere" }}
+          >
+            {report.reporterName || "Unknown reporter"} ·{" "}
+            {report.siteName || "Platform"} · {formatDate(report.createdAt)}
           </Typography>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
             <Chip
@@ -258,9 +291,13 @@ export default function BugReports() {
             variant="outlined"
             size="small"
             onClick={() => openReport(report)}
-            sx={{ alignSelf: "flex-start", textTransform: "none" }}
+            sx={{
+              alignSelf: { xs: "stretch", sm: "flex-start" },
+              minHeight: 44,
+              textTransform: "none",
+            }}
           >
-            Review report
+            Review Report
           </Button>
         </Stack>
       </CardContent>
@@ -268,10 +305,20 @@ export default function BugReports() {
   );
 
   return (
-    <Box sx={{ maxWidth: 1400, mx: "auto" }}>
+    <Box
+      component="main"
+      id="bug-reports-main"
+      aria-busy={loading || saving}
+      sx={{ maxWidth: 1400, mx: "auto", minWidth: 0, pb: 2 }}
+    >
       {/* Page header */}
       <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" fontWeight={700} sx={{ mb: 0.5 }}>
+        <Typography
+          component="h1"
+          variant="h4"
+          fontWeight={700}
+          sx={{ mb: 0.5, overflowWrap: "anywhere", textWrap: "balance" }}
+        >
           Bug Reports
         </Typography>
         <Typography variant="body2" color="text.secondary">
@@ -280,16 +327,22 @@ export default function BugReports() {
         </Typography>
       </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>
-          {error}
-        </Alert>
-      )}
-      {notice && (
-        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setNotice("")}>
-          {notice}
-        </Alert>
-      )}
+      <Box aria-live="polite" aria-atomic="true">
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>
+            {error} Refresh the list to try again.
+          </Alert>
+        )}
+        {notice && (
+          <Alert
+            severity="success"
+            sx={{ mb: 2 }}
+            onClose={() => setNotice("")}
+          >
+            {notice}
+          </Alert>
+        )}
+      </Box>
 
       {/* Filters + refresh bar */}
       <Paper
@@ -321,6 +374,8 @@ export default function BugReports() {
                   <InputLabel id="bug-status-filter">Status</InputLabel>
                   <Select
                     labelId="bug-status-filter"
+                    id="bug-status-filter-select"
+                    name="statusFilter"
                     value={statusFilter}
                     label="Status"
                     onChange={(event) => {
@@ -345,6 +400,8 @@ export default function BugReports() {
                   <InputLabel id="bug-severity-filter">Severity</InputLabel>
                   <Select
                     labelId="bug-severity-filter"
+                    id="bug-severity-filter-select"
+                    name="severityFilter"
                     value={severityFilter}
                     label="Severity"
                     onChange={(event) => {
@@ -370,38 +427,49 @@ export default function BugReports() {
               setLoading(true);
               setReloadKey((key) => key + 1);
             }}
+            disabled={loading}
             sx={{
               alignSelf: { xs: "stretch", md: "center" },
+              minHeight: 44,
               textTransform: "none",
             }}
           >
-            Refresh
+            {loading ? "Refreshing…" : "Refresh Reports"}
           </Button>
         </Stack>
       </Paper>
 
       {loading ? (
-          <Stack
-            direction="column"
-            sx={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              minHeight: 260,
-            }}
-          >
-            <CircularProgress />
-          </Stack>
+        <Stack
+          role="status"
+          aria-live="polite"
+          direction="column"
+          spacing={2}
+          sx={{
+            justifyContent: "center",
+            alignItems: "center",
+            minHeight: 260,
+          }}
+        >
+          <CircularProgress aria-hidden="true" />
+          <Typography color="text.secondary">Loading bug reports…</Typography>
+        </Stack>
       ) : reports.length === 0 ? (
         <Paper
           variant="outlined"
-          sx={{ p: 6, textAlign: "center", borderRadius: 2 }}
+          sx={{
+            p: { xs: 3, sm: 6 },
+            textAlign: "center",
+            borderRadius: 2,
+          }}
         >
           <Typography variant="h6" fontWeight={600} sx={{ mb: 0.5 }}>
-            No bug reports
+            No Bug Reports
           </Typography>
           <Typography color="text.secondary">
-            No reports match the current filters.
+            {statusFilter || severityFilter
+              ? "No reports match the selected filters. Try changing or clearing a filter."
+              : "No bug reports have been submitted yet."}
           </Typography>
         </Paper>
       ) : (
@@ -472,10 +540,21 @@ export default function BugReports() {
                       </Typography>
                     </TableCell>
                     <TableCell sx={{ py: 1.75 }}>
-                      <Typography variant="body2">
-                        {report.reporterName}
+                      <Typography
+                        variant="body2"
+                        sx={{ maxWidth: 240, overflowWrap: "anywhere" }}
+                      >
+                        {report.reporterName || "Unknown reporter"}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary">
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{
+                        display: "block",
+                        maxWidth: 240,
+                        overflowWrap: "anywhere",
+                      }}
+                      >
                         {report.siteName || "Platform"}
                       </Typography>
                     </TableCell>
@@ -507,9 +586,9 @@ export default function BugReports() {
                         size="small"
                         variant="outlined"
                         onClick={() => openReport(report)}
-                        sx={{ textTransform: "none" }}
+                        sx={{ minHeight: 44, textTransform: "none" }}
                       >
-                        Review
+                        Review Report
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -537,7 +616,12 @@ export default function BugReports() {
               mt: 1,
               borderTop: "1px solid",
               borderColor: "divider",
-              ".MuiTablePagination-toolbar": { px: { xs: 0, sm: 2 } },
+              ".MuiTablePagination-toolbar": {
+                px: { xs: 0, sm: 2 },
+                minHeight: 52,
+                flexWrap: { xs: "wrap", sm: "nowrap" },
+              },
+              ".MuiIconButton-root": { minWidth: 44, minHeight: 44 },
             }}
           />
         </>
@@ -550,6 +634,13 @@ export default function BugReports() {
         fullWidth
         maxWidth="md"
         fullScreen={fullScreenDialog}
+        PaperProps={{
+          sx: {
+            m: { xs: 0, sm: 2 },
+            maxHeight: { sm: "calc(100% - 32px)" },
+            overscrollBehavior: "contain",
+          },
+        }}
       >
         <DialogTitle sx={{ fontWeight: 700, pr: 6 }}>
           <Stack spacing={1.5}>
@@ -562,7 +653,7 @@ export default function BugReports() {
                 textAlign: "center",
               }}
             >
-              Review Report # {selectedReport?.id}
+              Review Report #{selectedReport?.id}
             </Typography>
           </Stack>
         </DialogTitle>
@@ -576,17 +667,29 @@ export default function BugReports() {
                     fontWeight={600}
                     sx={{ overflowWrap: "anywhere", lineHeight: 1.35 }}
                   >
-                    Title : {selectedReport.title}
+                    {selectedReport.title || "Untitled report"}
                   </Typography>
-                  <Typography
-                    sx={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}
-                  >
-                    Description : {selectedReport.description}
-                  </Typography>
+                  <Box>
+                    <Typography
+                      variant="subtitle2"
+                      color="text.secondary"
+                      sx={{ mb: 0.5 }}
+                    >
+                      Description
+                    </Typography>
+                    <Typography
+                      sx={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}
+                    >
+                      {selectedReport.description || "No description provided."}
+                    </Typography>
+                  </Box>
                   <Divider />
                   <Typography variant="body2" color="text.secondary">
-                    <strong>From:</strong> {selectedReport.reporterName} (
-                    {selectedReport.reporterEmail})
+                    <strong>From:</strong>{" "}
+                    {selectedReport.reporterName || "Unknown reporter"}
+                    {selectedReport.reporterEmail
+                      ? ` (${selectedReport.reporterEmail})`
+                      : ""}
                   </Typography>
                   <Stack direction="row" spacing={5} flexWrap="wrap" useFlexGap>
                     <Typography variant="body2" color="text.secondary">
@@ -612,9 +715,13 @@ export default function BugReports() {
                         component="img"
                         src={selectedScreenshotHref}
                         alt="Report screenshot"
+                        loading="lazy"
+                        width="1200"
+                        height="800"
                         sx={{
                           display: "block",
                           width: "100%",
+                          height: "auto",
                           maxHeight: 400,
                           objectFit: "contain",
                           borderRadius: 2,
@@ -630,9 +737,9 @@ export default function BugReports() {
                         target="_blank"
                         rel="noreferrer"
                         size="small"
-                        sx={{ mt: 1, textTransform: "none" }}
+                        sx={{ mt: 1, minHeight: 44, textTransform: "none" }}
                       >
-                        Open full-size image
+                        Open Full-Size Image
                       </Button>
                     </Box>
                   )}
@@ -671,6 +778,8 @@ export default function BugReports() {
                       <InputLabel id="edit-report-status">Status</InputLabel>
                       <Select
                         labelId="edit-report-status"
+                        id="edit-report-status-select"
+                        name="status"
                         label="Status"
                         value={edit.status}
                         onChange={(event) =>
@@ -690,6 +799,8 @@ export default function BugReports() {
                       </InputLabel>
                       <Select
                         labelId="edit-report-severity"
+                        id="edit-report-severity-select"
+                        name="severity"
                         label="Severity"
                         value={edit.severity}
                         onChange={(event) =>
@@ -704,7 +815,9 @@ export default function BugReports() {
                       </Select>
                     </FormControl>
                     <TextField
-                      label="Admin note"
+                      id="bug-report-admin-note"
+                      name="adminNote"
+                      label="Admin Note"
                       value={edit.adminNote}
                       onChange={(event) =>
                         setEdit({ ...edit, adminNote: event.target.value })
@@ -713,6 +826,8 @@ export default function BugReports() {
                       minRows={7}
                       maxRows={12}
                       inputProps={{ maxLength: 65535 }}
+                      autoComplete="off"
+                      helperText={`${new Intl.NumberFormat().format(edit.adminNote.length)} characters`}
                       fullWidth
                       size="medium"
                     />
@@ -721,19 +836,29 @@ export default function BugReports() {
               </Grid>
             </Grid>
           )}
-          {dialogError && (
-            <Alert severity="error" sx={{ mt: 2 }}>
-              {dialogError}
-            </Alert>
-          )}
+          <Box aria-live="polite" aria-atomic="true">
+            {dialogError && (
+              <Alert severity="error" sx={{ mt: 2 }}>
+                {dialogError}
+              </Alert>
+            )}
+          </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
+        <DialogActions
+          sx={{
+            p: 2,
+            gap: 1,
+            flexDirection: { xs: "column-reverse", sm: "row" },
+            "& > :not(style)": { m: 0, minHeight: 44 },
+            "& .MuiButton-root": { width: { xs: "100%", sm: "auto" } },
+          }}
+        >
           <Button
             onClick={closeReport}
             disabled={saving}
             sx={{ textTransform: "none" }}
           >
-            Cancel
+            {hasUnsavedChanges ? "Discard Changes" : "Cancel"}
           </Button>
           <Button
             variant="contained"
@@ -741,7 +866,37 @@ export default function BugReports() {
             disabled={saving}
             sx={{ textTransform: "none" }}
           >
-            {saving ? "Saving…" : "Save changes"}
+            {saving ? "Saving…" : "Save Changes"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={confirmClose}
+        onClose={() => setConfirmClose(false)}
+        aria-labelledby="discard-report-changes-title"
+        PaperProps={{ sx: { m: 2, overscrollBehavior: "contain" } }}
+      >
+        <DialogTitle id="discard-report-changes-title">
+          Discard Unsaved Changes?
+        </DialogTitle>
+        <DialogContent>
+          <Typography color="text.secondary">
+            Your updates to this report have not been saved.
+          </Typography>
+        </DialogContent>
+        <DialogActions
+          sx={{
+            p: 2,
+            gap: 1,
+            flexDirection: { xs: "column-reverse", sm: "row" },
+            "& > :not(style)": { m: 0, minHeight: 44 },
+            "& .MuiButton-root": { width: { xs: "100%", sm: "auto" } },
+          }}
+        >
+          <Button onClick={() => setConfirmClose(false)}>Keep Editing</Button>
+          <Button color="error" variant="contained" onClick={discardChanges}>
+            Discard Changes
           </Button>
         </DialogActions>
       </Dialog>

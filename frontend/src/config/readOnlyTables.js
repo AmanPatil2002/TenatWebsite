@@ -2,6 +2,86 @@
  * Read-only and Status-only table configurations for admin panel access.
  */
 
+export const TABLE_PERMISSIONS = {
+  sitetables: 'hidden',
+  sitethemes: 'hidden',
+};
+
+export const STATUS_FIELD_MAP = {
+  appointments: 'status',
+  reservations: 'status',
+  orders: 'status',
+  bookings: 'bookingStatus',
+  salonbookings: 'status',
+  tablebookings: 'status',
+  petappointments: 'status',
+  dentalappointments: 'status',
+  classbookings: 'status',
+  registrations: 'registrationStatus',
+  propertyinquiries: 'status',
+  propertyviewings: 'status',
+  caseinquiries: 'status',
+  leads: 'status',
+  designinquiries: 'status',
+  jewelryinquiries: 'status',
+  farminquiries: 'status',
+  consultationrequests: 'status',
+  admissionenquiries: 'status',
+  financeapplications: 'status',
+  customorders: 'status',
+  jewelryorders: 'orderStatus',
+  furnitureorders: 'orderStatus',
+  groceryorders: 'status',
+  cafeorders: 'status',
+  donations: 'paymentStatus',
+  volunteers: 'status',
+  subscribers: 'status',
+  subscriptions: 'status',
+  reviews: 'status',
+  hotelreviews: 'status',
+  productreviews: 'status',
+  appreviews: 'status',
+  comments: 'status',
+  payments: 'paymentStatus',
+};
+
+const STATUS_ONLY_TABLES_BY_NAME = new Set([
+  'appointments','reservations','orders','bookings','salonbookings',
+  'tablebookings','petappointments','dentalappointments','classbookings',
+  'registrations','propertyinquiries','propertyviewings','caseinquiries',
+  'leads','designinquiries','jewelryinquiries','farminquiries',
+  'consultationrequests','admissionenquiries','financeapplications',
+  'customorders','jewelryorders','furnitureorders','groceryorders',
+  'cafeorders','donations','volunteers','subscribers','subscriptions',
+  'reviews','hotelreviews','productreviews','appreviews','comments',
+]);
+
+const VIEW_ONLY_TABLES_BY_NAME = new Set([
+  'customers','addresses','carts','cartitems','wishlists','orderitems',
+  'jewelryorderitems','furnitureorderitems','groceryorderitems',
+  'cafeorderitems','farmorderitems','payments','petpayments',
+  'dentalpayments','daycarepayments','memberpayments','propertyfavorites',
+  'watchlist','watchhistory','downloads','tickets','donationreceipts',
+  'kycdocuments','casedocuments',
+]);
+
+const normalizeTableName = (table) =>
+  String(table || '').trim().replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+
+export const getTablePermission = (vertical, table) => {
+  const explicit = TABLE_PERMISSIONS[String(table || '').toLowerCase()];
+  if (explicit) return explicit;
+  const normalized = normalizeTableName(table);
+  if ([...STATUS_ONLY_TABLES_BY_NAME].some((name) => normalizeTableName(name) === normalized)) return 'status';
+  if ([...VIEW_ONLY_TABLES_BY_NAME].some((name) => normalizeTableName(name) === normalized)) return 'view';
+  return 'full';
+};
+
+export const getStatusField = (vertical, table) =>
+  getTablePermission(vertical, table) === 'status'
+    ? STATUS_FIELD_MAP[String(table || '').toLowerCase()] || null
+    : null;
+
 // Derived/computed fields that should not be directly modifiable by admins
 // These are typically calculated from other fields or updated by the system
 export const DERIVED_FIELDS = {
@@ -117,11 +197,11 @@ export const DERIVED_FIELDS = {
 };
 
 export const READ_ONLY_TABLES = {
-  school: ['attendance', 'examresults', 'feepayments'],
+  // school: ['attendance', 'examresults', 'feepayments'],
   medical: ['appointments', 'patients', 'prescriptions', 'doctoravailability'],
   ecommerce: [
     'customers', 'addresses', 'carts', 'cartitems', 'orders',
-    'orderitems', 'payments', 'shipments', 'productreviews', 'wishlists'
+    'orderitems', 'payments', 'productreviews', 'wishlists'
   ],
   restaurant: ['reservations', 'orders', 'orderitems', 'reviews'],
   hotel: ['bookings', 'invoices', 'roominventory', 'hotelreviews'],
@@ -259,48 +339,66 @@ export const isDerivedField = (vertical, table, field) =>
  * @param {string} vertical
  * @param {string} table
  * @param {'create'|'update'|'delete'} action
- * @param {Object} payload
+ * @param {Object} [payload={}]
+ * @param {Object} [options={}]
+ * @param {boolean} [options.isFormSubmission=false] - If true, allows operations on read-only tables (e.g., from CKEditor forms)
  */
-export const assertWritable = (vertical, table, action, payload = {}) => {
+export const assertWritable = (vertical, table, action, payload = {}, options = {}) => {
+  void options;
+  const mode = getTablePermission(vertical, table);
+  if (mode === 'hidden') throw new Error(`Table '${table}' is hidden`);
+  if (mode === 'view' && ['create','update','delete'].includes(action)) {
+    throw new Error(`Table '${table}' is read-only`);
+  }
+  if (mode === 'status' && ['create','delete'].includes(action)) {
+    throw new Error(`Table '${table}' is status-only in admin`);
+  }
   const readOnly = isReadOnly(vertical, table);
   const statusOnly = isStatusOnly(vertical, table);
 
-  if (readOnly && !statusOnly) {
+  // Priority 1: Read-only tables (not status-only) - block operations from admin panel (if not form submission)
+  if (readOnly && !statusOnly && !isFormSubmission) {
     if (action === 'create' || action === 'update' || action === 'delete') {
       throw new Error(`Table '${table}' is populated by site users and is read-only in admin`);
     }
   }
 
-  if (statusOnly) {
+  // Priority 2: Status-only tables - block create/delete operations
+  // Allow form submissions to create on status-only tables (e.g., CKEditor forms creating orders/payments)
+  if (statusOnly && !isFormSubmission) {
     if (action === 'create' || action === 'delete') {
       throw new Error(`Table '${table}' is status-only in admin`);
     }
-
-    if (action === 'update') {
-      const keys = Object.keys(payload).filter((k) => k !== 'updatedAt');
-      const invalidKeys = keys.filter((k) => k !== 'status');
-      if (invalidKeys.length > 0) {
-        throw new Error(`Table '${table}' allows only status updates. Invalid fields: ${invalidKeys.join(', ')}`);
-      }
-
-      const allowedStatuses = STATUS_ONLY_TABLES[vertical][table];
-      if (Array.isArray(allowedStatuses) && !allowedStatuses.includes(payload.status)) {
-        throw new Error(`Invalid status '${payload.status}' for table '${table}'`);
-      }
-    }
   }
 
-  // Check for derived fields that cannot be directly modified
+  // Priority 3: Derived fields protection - check on create/update
+  // Tables that are BOTH read-only and status-only (like orders) should be checked here
+  // If they are only status-only, they are still protected from derived fields modification
   if (action === 'create' || action === 'update') {
     const derivedFields = getDerivedFields(vertical, table);
     if (derivedFields.length > 0) {
-      const invalidKeys = Object.keys(payload).filter((k) => derivedFields.includes(k));
+      const invalidKeys = Object.keys(payload).filter((k) => derivedFields.includes(k) && k !== 'updatedAt');
       if (invalidKeys.length > 0) {
         throw new Error(
           `Table '${table}' has derived fields that cannot be directly modified: ${invalidKeys.join(', ')}. ` +
           `These fields are calculated automatically.`
         );
       }
+    }
+  }
+
+  // Priority 4: Status-only tables - validate update operations (only status field allowed)
+  if (statusOnly && action === 'update') {
+    const keys = Object.keys(payload).filter((k) => k !== 'updatedAt' && k !== 'id');
+    // Check if there are any fields other than 'status'
+    const invalidKeys = keys.filter((k) => k !== 'status');
+    if (invalidKeys.length > 0) {
+      throw new Error(`Table '${table}' allows only status updates. Invalid fields: ${invalidKeys.join(', ')}`);
+    }
+
+    const allowedStatuses = STATUS_ONLY_TABLES[vertical]?.[table];
+    if (Array.isArray(allowedStatuses) && payload.status !== undefined && !allowedStatuses.includes(payload.status)) {
+      throw new Error(`Invalid status '${payload.status}' for table '${table}'`);
     }
   }
 };

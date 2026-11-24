@@ -6,6 +6,11 @@ import {
   Chip,
   CircularProgress,
   Divider,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Grid,
   IconButton,
   ListSubheader,
@@ -48,51 +53,53 @@ const BRAND = {
 
 const PACK_CATALOG = [
   // --- Education -------------------------------------------------
-  { key: "school",         label: "School / Education",     group: "Education" },
-  { key: "daycare",        label: "Daycare / Preschool",    group: "Education" },
+  { key: "school",          label: "School / Education",     group: "Education" },
+  { key: "daycare",         label: "Daycare / Preschool",    group: "Education" },
 
   // --- Health & Medical ------------------------------------------
-  { key: "medical",        label: "Medical / Clinic",       group: "Health & Medical" },
-  { key: "dental",         label: "Dental Clinic",          group: "Health & Medical" },
-  { key: "petcare",        label: "Pet Care / Veterinary",  group: "Health & Medical" },
+  { key: "medical",         label: "Medical / Clinic",       group: "Health & Medical" },
+  { key: "dental",          label: "Dental Clinic",          group: "Health & Medical" },
+  { key: "petcare",         label: "Pet Care / Veterinary",  group: "Health & Medical" },
+
+  // --- Wellness & Beauty -----------------------------------------
+  { key: "spa",             label: "Spa & Massage",          group: "Wellness & Beauty" },
+  { key: "salon",           label: "Beauty & Salon",         group: "Wellness & Beauty" },
+  { key: "gym",             label: "Fitness & Gym",          group: "Wellness & Beauty" },
 
   // --- Commerce & Retail -----------------------------------------
-  { key: "ecommerce",      label: "E-commerce / Shopping",  group: "Commerce & Retail" },
-  { key: "grocery",        label: "Grocery & Supermarket",  group: "Commerce & Retail" },
-  { key: "jewelry",        label: "Jewelry & Accessories",  group: "Commerce & Retail" },
-  { key: "furniture",      label: "Furniture & Home Decor", group: "Commerce & Retail" },
-  { key: "agriculture",    label: "Agriculture & Farming",  group: "Commerce & Retail" },
+  { key: "ecommerce",       label: "E-commerce / Shopping",  group: "Commerce & Retail" },
+  { key: "grocery",         label: "Grocery & Supermarket",  group: "Commerce & Retail" },
+  { key: "jewelry",         label: "Jewelry & Accessories",  group: "Commerce & Retail" },
+  { key: "furniture",       label: "Furniture & Home Decor", group: "Commerce & Retail" },
+  { key: "agriculture",     label: "Agriculture & Farming",  group: "Commerce & Retail" },
 
   // --- Food & Hospitality ----------------------------------------
-  { key: "restaurant",     label: "Restaurant & Food",      group: "Food & Hospitality" },
-  { key: "cafe",           label: "Café & Coffee Shop",     group: "Food & Hospitality" },
-  { key: "hotel",          label: "Hotel & Resort",         group: "Food & Hospitality" },
-  { key: "spa",            label: "Spa & Massage",          group: "Food & Hospitality" },
-  { key: "salon",          label: "Beauty & Salon",         group: "Food & Hospitality" },
-  { key: "gym",            label: "Fitness & Gym",          group: "Food & Hospitality" },
+  { key: "restaurant",      label: "Restaurant & Food",      group: "Food & Hospitality" },
+  { key: "cafe",            label: "Café & Coffee Shop",     group: "Food & Hospitality" },
+  { key: "hotel",           label: "Hotel & Resort",         group: "Food & Hospitality" },
 
   // --- Professional Services -------------------------------------
-  { key: "lawfirm",        label: "Legal / Law Firm",       group: "Professional Services" },
-  { key: "consulting",     label: "Consulting & Business",  group: "Professional Services" },
-  { key: "finance",        label: "Finance & Banking",      group: "Professional Services" },
-  { key: "marketing",      label: "Digital Marketing",      group: "Professional Services" },
-  { key: "realestate",     label: "Real Estate & Property", group: "Professional Services" },
-  { key: "interiordesign", label: "Interior Design",        group: "Professional Services" },
+  { key: "lawfirm",         label: "Legal / Law Firm",       group: "Professional Services" },
+  { key: "consulting",      label: "Consulting & Business",  group: "Professional Services" },
+  { key: "finance",         label: "Finance & Banking",      group: "Professional Services" },
+  { key: "marketing",       label: "Digital Marketing",      group: "Professional Services" },
+  { key: "realestate",      label: "Real Estate & Property", group: "Professional Services" },
+  { key: "interiordesign",  label: "Interior Design",        group: "Professional Services" },
 
   // --- Events & Media --------------------------------------------
-  { key: "eventmanagement",label: "Wedding & Events",       group: "Events & Media" },
-  { key: "news",           label: "News & Magazine",        group: "Events & Media" },
-  { key: "blog",           label: "Blog & Personal",        group: "Events & Media" },
-  { key: "portfolio",      label: "Portfolio & Creative",   group: "Events & Media" },
-  { key: "music",          label: "Music & Entertainment",  group: "Events & Media" },
-  { key: "streaming",      label: "Movies & Streaming",     group: "Events & Media" },
-  { key: "gaming",         label: "Gaming & Esports",       group: "Events & Media" },
+  { key: "eventmanagement", label: "Wedding & Events",       group: "Events & Media" },
+  { key: "news",            label: "News & Magazine",        group: "Events & Media" },
+  { key: "blog",            label: "Blog & Personal",        group: "Events & Media" },
+  { key: "portfolio",       label: "Portfolio & Creative",   group: "Events & Media" },
+  { key: "music",           label: "Music & Entertainment",  group: "Events & Media" },
+  { key: "streaming",       label: "Movies & Streaming",     group: "Events & Media" },
+  { key: "gaming",          label: "Gaming & Esports",       group: "Events & Media" },
 
   // --- Apps & Technology -----------------------------------------
-  { key: "mobileapps",     label: "Mobile Applications",    group: "Apps & Technology" },
+  { key: "mobileapps",      label: "Mobile Applications",    group: "Apps & Technology" },
 
   // --- Community -------------------------------------------------
-  { key: "ngo",            label: "Non-profit & Charity",   group: "Community" },
+  { key: "ngo",             label: "Non-profit & Charity",   group: "Community" },
 ];
 
 /* Fast lookups derived once from the catalog. */
@@ -273,7 +280,7 @@ function CategoryForm({
           helperText={errors.name || " "}
           slotProps={{ htmlInput: { maxLength: NAME_MAX } }}
           required
-          autoFocus
+          autoComplete="off"
           sx={fieldSx}
         />
 
@@ -293,6 +300,7 @@ function CategoryForm({
           slotProps={{
             select: {
               displayEmpty: true,
+              inputProps: { "aria-label": "Template pack key" },
               renderValue: (v) =>
                 v ? packLabel(v) : <em style={{ color: BRAND.muted }}>None</em>,
               MenuProps: { PaperProps: { sx: { maxHeight: 320 } } },
@@ -346,6 +354,7 @@ function CategoryForm({
           onChange={handleChange}
           error={!!errors.tag}
           helperText={errors.tag || "Comma-separated, e.g. education, courses"}
+          autoComplete="off"
           slotProps={{ htmlInput: { maxLength: TAG_MAX } }}
           sx={fieldSx}
         />
@@ -415,6 +424,7 @@ export default function AddCategory() {
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [createKey, setCreateKey] = useState(0);
   const [snack, setSnack] = useState({
     open: false,
@@ -490,19 +500,24 @@ export default function AddCategory() {
     }
   };
 
-  const handleDelete = async (category) => {
-    if (!window.confirm(`Delete category "${category.name}"?`)) return;
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
 
     const token = getToken();
-    if (!token) return showSnack("Please log in first.", "error");
+    if (!token) {
+      showSnack("Please log in first.", "error");
+      setDeleteTarget(null);
+      return;
+    }
 
     try {
-      setDeletingId(category.categoryId);
-      await axios.delete(`${API_URL}/categories/${category.categoryId}`, {
+      setDeletingId(deleteTarget.categoryId);
+      await axios.delete(`${API_URL}/categories/${deleteTarget.categoryId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      showSnack("Category deleted.");
-      if (editingId === category.categoryId) setEditingId(null);
+      showSnack("Category deleted successfully.");
+      if (editingId === deleteTarget.categoryId) setEditingId(null);
+      setDeleteTarget(null);
       fetchCategories();
     } catch (error) {
       showSnack(
@@ -764,7 +779,11 @@ export default function AddCategory() {
                           >
                             <Typography
                               variant="body2"
-                              sx={{ fontWeight: 600, color: BRAND.ink }}
+                              sx={{
+                                fontWeight: 600,
+                                color: BRAND.ink,
+                                overflowWrap: "anywhere",
+                              }}
                             >
                               {c.name}
                             </Typography>
@@ -790,6 +809,8 @@ export default function AddCategory() {
                                   }
                                   sx={{
                                     color: BRAND.indigo,
+                                    width: 44,
+                                    height: 44,
                                     "&:hover": {
                                       bgcolor: alpha(BRAND.indigo, 0.08),
                                     },
@@ -806,11 +827,13 @@ export default function AddCategory() {
                                   size="small"
                                   color="error"
                                   aria-label={`Delete ${c.name}`}
-                                  onClick={() => handleDelete(c)}
+                                  onClick={() => setDeleteTarget(c)}
                                   disabled={
                                     submitting || deletingId === c.categoryId
                                   }
                                   sx={{
+                                    width: 44,
+                                    height: 44,
                                     "&:hover": {
                                       bgcolor: alpha("#dc2626", 0.08),
                                     },
@@ -849,11 +872,54 @@ export default function AddCategory() {
           onClose={() => setSnack((s) => ({ ...s, open: false }))}
           severity={snack.severity}
           variant="filled"
+          role="status"
+          aria-live="polite"
           sx={{ width: "100%", borderRadius: 2 }}
         >
           {snack.message}
         </Alert>
       </Snackbar>
+
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onClose={() => !deletingId && setDeleteTarget(null)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3, mx: 2 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>Delete Category?</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ overflowWrap: "anywhere" }}>
+            Delete <strong>{deleteTarget?.name}</strong>? Templates linked to
+            this category may be affected. This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button
+            onClick={() => setDeleteTarget(null)}
+            disabled={Boolean(deletingId)}
+            sx={{ minHeight: 44, textTransform: "none", fontWeight: 600 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={handleDelete}
+            disabled={Boolean(deletingId)}
+            startIcon={
+              deletingId ? (
+                <CircularProgress size={16} color="inherit" />
+              ) : (
+                <DeleteIcon />
+              )
+            }
+            sx={{ minHeight: 44, textTransform: "none", fontWeight: 700 }}
+          >
+            {deletingId ? "Deleting…" : "Delete Category"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

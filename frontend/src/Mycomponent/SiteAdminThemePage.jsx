@@ -13,6 +13,7 @@ import {
   InputLabel,
   MenuItem,
   Paper,
+  Grid,
   Select,
   Stack,
   TextField,
@@ -20,6 +21,7 @@ import {
   Typography,
 } from "@mui/material";
 import { Clear, Delete, Refresh, Save } from "@mui/icons-material";
+
 
 const API_URL = (
   import.meta.env.VITE_API_URL || "http://localhost:5000"
@@ -38,18 +40,46 @@ const getAuthToken = () =>
   localStorage.getItem("authToken") ||
   localStorage.getItem("accessToken");
 
-// <input type="color"> only accepts 6-digit hex values
-const toPickerValue = (value, fallback = "#000000") => {
-  const candidate = HEX_REGEX.test(value || "") ? value : fallback;
-  if (!HEX_REGEX.test(candidate || "")) return "#000000";
-  if (candidate.length === 4) {
-    const [, r, g, b] = candidate;
-    return `#${r}${r}${g}${g}${b}${b}`;
-  }
-  return candidate;
-};
+/* ------------------------------------------------------------------ */
+/*  CVD-Safe Palette Preview Component                                */
+/* ------------------------------------------------------------------ */
 
-const isValidColor = (value) => !value || HEX_REGEX.test(value);
+const PaletteSwatch = ({ color, label, size = 36 }) => (
+  <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", minWidth: 0 }}>
+    <Box
+      sx={{
+        width: size,
+        height: size,
+        flexShrink: 0,
+        borderRadius: 1.5,
+        bgcolor: color,
+        border: "1px solid",
+        borderColor: "divider",
+        boxShadow: "0 2px 4px rgba(0,0,0,0.08)",
+      }}
+      aria-label={`${label}: ${color}`}
+    />
+    <Box sx={{ minWidth: 0, overflow: "hidden" }}>
+      <Typography
+        variant="body2"
+        fontWeight={600}
+        noWrap
+        sx={{ overflow: "hidden", textOverflow: "ellipsis" }}
+      >
+        {label}
+      </Typography>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        fontFamily="monospace"
+        sx={{ fontSize: 11 }}
+      >
+        {color.toUpperCase()}
+      </Typography>
+    </Box>
+  </Stack>
+);
+
 
 /* ------------------------------------------------------------------ */
 /* Small presentational pieces                                         */
@@ -101,7 +131,7 @@ const ColorField = ({ field, value, defaultValue, disabled, onChange }) => {
         fullWidth
         disabled={disabled}
         error={invalid}
-        helperText={invalid ? "Use a hex value like #1976d2" : " "}
+        helperText={invalid ? "Use a hex value like #2a78d6" : " "}
         placeholder={`Default: ${defaultValue || "inherit"}`}
         slotProps={{
           input: {
@@ -126,6 +156,19 @@ const ColorField = ({ field, value, defaultValue, disabled, onChange }) => {
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
+
+// <input type="color"> only accepts 6-digit hex values
+const toPickerValue = (value, fallback = "#000000") => {
+  const candidate = HEX_REGEX.test(value || "") ? value : fallback;
+  if (!HEX_REGEX.test(candidate || "")) return "#000000";
+  if (candidate.length === 4) {
+    const [, r, g, b] = candidate;
+    return `#${r}${r}${g}${g}${b}${b}`;
+  }
+  return candidate;
+};
+
+const isValidColor = (value) => !value || HEX_REGEX.test(value);
 
 export default function SiteAdminThemePage() {
   const { siteId, reloadSite } = useOutletContext();
@@ -299,13 +342,14 @@ export default function SiteAdminThemePage() {
     }
   };
 
+
   /* ---------------------------- render ---------------------------- */
 
   if (loading) {
     return (
-      <Stack sx={{ alignItems: "center", justifyContent: "center", p: 6 }}>
+      <Box sx={{ display: "flex", justifyContent: "center", p: 6 }}>
         <CircularProgress />
-      </Stack>
+      </Box>
     );
   }
 
@@ -314,14 +358,34 @@ export default function SiteAdminThemePage() {
   );
 
   return (
-    <Box sx={{ maxWidth: 800, width: "100%" }}>
-      <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, borderRadius: 2 }}>
+    <Box
+      sx={{
+        width: "100%",
+        maxWidth: "100%",
+        mx: "auto",
+        px: { xs: 1, sm: 2 },
+        py: { xs: 1, sm: 2 },
+      }}
+    >
+      <Paper
+        variant="outlined"
+        sx={{
+          width: "100%",
+          p: { xs: 2, sm: 3, md: 4 },
+          borderRadius: 2,
+        }}
+      >
         {/* Header */}
         <Stack
-          direction="row"
-          sx={{ justifyContent: "space-between", alignItems: "center", mb: 3 }}
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1}
+          sx={{
+            justifyContent: "space-between",
+            alignItems: { xs: "flex-start", sm: "center" },
+            mb: 3,
+          }}
         >
-          <Box>
+          <Box sx={{ minWidth: 0 }}>
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
               Theme Customizer
             </Typography>
@@ -353,7 +417,10 @@ export default function SiteAdminThemePage() {
         )}
 
         {/* Active theme */}
-        <FormControl fullWidth sx={{ mb: 3 }} disabled={saving}>
+        <FormControl
+          fullWidth
+          disabled={saving}
+        >
           <InputLabel id="active-theme-label">Active Theme</InputLabel>
           <Select
             labelId="active-theme-label"
@@ -371,119 +438,183 @@ export default function SiteAdminThemePage() {
             <strong>{activeTheme === "custom" ? "Custom" : "Default"}</strong>
           </FormHelperText>
         </FormControl>
+        <br/>
 
         <Divider sx={{ mb: 3 }} />
 
-        {/* Custom theme editor */}
-        <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
-          Custom Theme Configuration
-        </Typography>
-
-        <Box
-          sx={{
-            display: "grid",
-            gap: 2,
-            gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-          }}
-        >
-          {EDITABLE_FIELDS.map((field) => (
-            <ColorField
-              key={field.key}
-              field={field}
-              value={editConfig[field.key]}
-              defaultValue={defaultTheme[field.key]}
-              disabled={saving}
-              onChange={handleConfigChange}
-            />
-          ))}
-        </Box>
-
-        <Stack
-          direction="row"
+        <Grid
+          container
           spacing={2}
-          sx={{ justifyContent: "flex-end", mt: 2 }}
+          sx={{ alignItems: "flex-start" }}
         >
-          {customTheme && (
-            <Button
-              variant="outlined"
-              color="error"
-              onClick={handleReset}
-              disabled={saving}
-              startIcon={<Delete />}
+          {/* ───────────────── Left: Custom theme editor ───────────────── */}
+          <Grid size={{ xs: 12, lg: 6 }}>
+            <Typography
+              variant="h6"
+              sx={{ fontWeight: 600, mb: 2, textAlign: { xs: "center", lg: "left" } }}
             >
-              Reset
-            </Button>
-          )}
-          <Button
-            variant="contained"
-            onClick={handleSave}
-            disabled={saving || !isDirty || hasInvalidValue}
-            startIcon={
-              saving ? <CircularProgress size={18} color="inherit" /> : <Save />
-            }
-            sx={{ minWidth: 160 }}
-          >
-            {saving ? "Saving..." : "Save Custom"}
-          </Button>
-        </Stack>
+              Custom Theme Configuration
+            </Typography>
+            <Stack
+              direction="column"
+              spacing={1.5}
+              sx={{
+                p: 1.5,
+                minWidth: 0,
+                overflow: "hidden",
+              }}
+            >
+              {EDITABLE_FIELDS.map((field) => (
+                <ColorField
+                  key={field.key}
+                  field={field}
+                  value={editConfig[field.key]}
+                  defaultValue={defaultTheme[field.key]}
+                  disabled={saving}
+                  onChange={handleConfigChange}
+                />
+              ))}
+            </Stack>
 
-        <Divider sx={{ my: 3 }} />
+            {/* Action row */}
+            <Stack
+              direction={{ xs: "column-reverse", sm: "row" }}
+              spacing={2}
+              sx={{
+                mt: 3,
+                justifyContent: "flex-end",
+                alignItems: { xs: "stretch", sm: "center" },
+              }}
+            >
+              <Button
+                variant="contained"
+                onClick={handleSave}
+                disabled={saving || !isDirty || hasInvalidValue}
+                startIcon={
+                  saving ? (
+                    <CircularProgress size={18} color="inherit" />
+                  ) : (
+                    <Save />
+                  )
+                }
+                sx={{
+                  minWidth: { sm: 160 },
+                  width: { xs: "100%", sm: "auto", md: "auto" },
+                }}
+              >
+                {saving ? "Saving..." : "Save Custom"}
+              </Button>
 
-        {/* Purchased default colors (read-only) */}
-        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-          Purchased Theme Colors
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          These come with your purchased theme and cannot be edited.
-        </Typography>
-
-        {defaultEntries.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">
-            No default colors available.
-          </Typography>
-        ) : (
-          <Box
-            sx={{
-              display: "grid",
-              gap: 2,
-              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-            }}
-          >
-            {defaultEntries.map(([key, value]) => {
-              const label =
-                EDITABLE_FIELDS.find((f) => f.key === key)?.label || key;
-              return (
-                <Stack
-                  key={key}
-                  direction="row"
-                  spacing={1.5}
-                  sx={{
-                    alignItems: "center",
-                    p: 1.5,
-                    border: "1px solid",
-                    borderColor: "divider",
-                    borderRadius: 1,
-                    bgcolor: "action.hover",
-                  }}
+              {customTheme && (
+                <Button
+                  variant="outlined"
+                  color="error"
+                  onClick={handleReset}
+                  disabled={saving}
+                  startIcon={<Delete />}
+                  sx={{ width: { xs: "100%", sm: "auto" } }}
                 >
-                  <Swatch color={value} />
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {label}
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ fontFamily: "monospace" }}
+                  Reset
+                </Button>
+              )}
+            </Stack>
+          </Grid>
+
+          {/* ───────────────── Right: Purchased theme colors ───────────────── */}
+          <Grid size={{ xs: 12, lg: 6 }}>
+            <Typography
+              variant="h6"
+              sx={{ fontWeight: 600, paddingBottom: 2, textAlign: { xs: "center", lg: "left" } }}
+            >
+              Purchased Theme Colors
+            </Typography>
+
+            {defaultEntries.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                No default colors available.
+              </Typography>
+            ) : (
+              <Box
+                sx={{
+                  display: "grid",
+                  gap: 2,
+                  gridTemplateColumns: {
+                    xs: "1fr",
+                    sm: "repeat(2, minmax(0, 1fr))",
+                    md: "repeat(3, minmax(0, 1fr))",
+                  },
+                }}
+              >
+                {defaultEntries.map(([key, value]) => {
+                  const label =
+                    EDITABLE_FIELDS.find((f) => f.key === key)?.label || key;
+
+                  return (
+                    <Stack
+                      key={key}
+                      direction="row"
+                      spacing={1.5}
+                      sx={{
+                        alignItems: "center",
+                        p: 1.5,
+                        minWidth: 0,
+                        width: "100%",
+                        overflow: "hidden",
+                        borderRadius: 1.5,
+                        border: "1px solid",
+                        borderColor: "divider",
+                        "&:hover": {
+                          borderColor: "primary.main",
+                          bgcolor: "action.hover",
+                        },
+                      }}
                     >
-                      {value}
-                    </Typography>
-                  </Box>
-                </Stack>
-              );
-            })}
-          </Box>
-        )}
+                      <Box sx={{ flexShrink: 0 }}>
+                        <Swatch color={value} size={44} />
+                      </Box>
+
+                      <Box
+                        sx={{
+                          flex: 1,
+                          minWidth: 0,
+                          overflow: "hidden",
+                        }}
+                      >
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontWeight: 600,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                          title={label}
+                        >
+                          {label}
+                        </Typography>
+
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{
+                            fontFamily: "monospace",
+                            fontSize: 12,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                          title={String(value)}
+                        >
+                          {value}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  );
+                })}
+              </Box>
+            )}
+          </Grid>
+        </Grid>
       </Paper>
     </Box>
   );

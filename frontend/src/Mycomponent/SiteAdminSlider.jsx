@@ -160,19 +160,19 @@ export default function SiteAdminSlider() {
     setNotice("");
   };
 
-  const editSlide = (item) => {
-    setEditingId(item.id);
-    setForm({
-      title: item.title || "",
-      imageUrl: item.imageUrl || "",
-      width:item.width || "",
-      height:item.height || "",
-      sortOrder: String(item.sortOrder ?? 0),
-      status: item.status || "active",
-    });
-    setError("");
-    setNotice("");
-  };
+const editSlide = (item) => {
+  setEditingId(item.id);
+  setForm({
+    title: item.title || "",
+    imageUrl: item.imageUrl || "",
+    width: String(item.width || EMPTY_FORM.width),
+    height: String(item.height || EMPTY_FORM.height),
+    sortOrder: String(item.sortOrder ?? 0),
+    status: item.status || "active",
+  });
+  setError("");
+  setNotice("");
+};
 
   const handleFileChange = async (event) => {
     const file = event.target.files?.[0];
@@ -214,38 +214,52 @@ export default function SiteAdminSlider() {
     }
   };
 
-  const saveSlide = async (event) => {
-    event.preventDefault();
-    setError("");
-    setNotice("");
-    if (!form.imageUrl) {
-      setError("Upload an image before saving.");
-      return;
-    }
-    setSaving(true);
+const saveSlide = async (event) => {
+  event.preventDefault();
+  setError("");
+  setNotice("");
+  if (!form.imageUrl) {
+    setError("Upload an image before saving.");
+    return;
+  }
 
-    const payload = {
-      ...form,
-      sortOrder: Number(form.sortOrder || 0),
-    };
+  const width = Number(form.width);
+  const height = Number(form.height);
+  if (!Number.isInteger(width) || width < 100 || width > 5000) {
+    setError("Width must be a whole number between 100 and 5000.");
+    return;
+  }
+  if (!Number.isInteger(height) || height < 50 || height > 3000) {
+    setError("Height must be a whole number between 50 and 3000.");
+    return;
+  }
 
-    try {
-      if (editingId) {
-        await axios.put(`${sliderUrl}/${editingId}`, payload, authConfig);
-      } else {
-        await axios.post(sliderUrl, payload, authConfig);
-      }
-      await loadSlides();
-      startNew();
-      setNotice(editingId ? "Slide updated." : "Slide added.");
-    } catch (requestError) {
-      setError(
-        requestError.response?.data?.message || "Could not save this slide.",
-      );
-    } finally {
-      setSaving(false);
-    }
+  setSaving(true);
+
+  const payload = {
+    ...form,
+    width,
+    height,
+    sortOrder: Number(form.sortOrder || 0),
   };
+
+  try {
+    if (editingId) {
+      await axios.put(`${sliderUrl}/${editingId}`, payload, authConfig);
+    } else {
+      await axios.post(sliderUrl, payload, authConfig);
+    }
+    await loadSlides();
+    startNew();
+    setNotice(editingId ? "Slide updated." : "Slide added.");
+  } catch (requestError) {
+    setError(
+      requestError.response?.data?.message || "Could not save this slide.",
+    );
+  } finally {
+    setSaving(false);
+  }
+};
 
   const deleteSlide = async (item) => {
     const name = item.title || "slide";

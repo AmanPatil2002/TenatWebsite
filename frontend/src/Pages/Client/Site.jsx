@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState,useCallback  } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import { useTheme, alpha } from "@mui/material/styles";
 import {
   Alert,
   Box,
+  Button,
   CircularProgress,
   Dialog,
   DialogContent,
@@ -16,7 +17,8 @@ import {
 } from "@mui/material";
 import { createSiteSlug } from "../../utils/siteSlug";
 import { buildSiteTheme } from "../../utils/siteTheme";
-
+import { installSiteFormHandler, SITE_FORM_SCRIPT } from "../../utils/siteForms";
+import { renderSlider } from "../../utils/siteSlider";
 /* ------------------------------------------------------------------ */
 /* Inline SVG icons (no @mui/icons-material dependency)                */
 /* ------------------------------------------------------------------ */
@@ -130,6 +132,34 @@ const getToken = () =>
 
 const pageKey = (page) => String(page.sitePageId ?? page.pagesId);
 
+const PAGE_HASH_PREFIX = "#tenant-page-";
+const pageAnchorId = (id) =>
+  `${PAGE_HASH_PREFIX.slice(1)}${encodeURIComponent(String(id))}`;
+const pageHref = (id) => `#${pageAnchorId(id)}`;
+const pageIdFromHash = () => {
+  if (!window.location.hash.startsWith(PAGE_HASH_PREFIX)) return "";
+  try {
+    return decodeURIComponent(window.location.hash.slice(PAGE_HASH_PREFIX.length));
+  } catch {
+    return "";
+  }
+};
+
+const handlePageAnchorClick = (event, id, onNavigate, options) => {
+  if (
+    event.button !== 0 ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.shiftKey ||
+    event.altKey
+  ) {
+    return;
+  }
+
+  event.preventDefault();
+  onNavigate(id, options);
+};
+
 const escapeHtml = (value) =>
   String(value ?? "").replace(
     /[&<>"']/g,
@@ -171,47 +201,189 @@ const renderGallery = (items) => {
       const caption = description
         ? `<figcaption>${escapeHtml(description)}</figcaption>`
         : "";
-      return `<figure><img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.altText || title)}" loading="lazy" />${caption}</figure>`;
+      return `<figure><img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.altText || title)}" width="640" height="480" loading="lazy" decoding="async" />${caption}</figure>`;
     })
     .filter(Boolean)
     .join("");
 
   if (!cards) return "";
-  return `<section class="site-gallery"><div class="site-gallery-grid">${cards}</div></section>`;
+  return `<section class="site-gallery" aria-labelledby="site-gallery-title"><h2 id="site-gallery-title" class="site-visually-hidden">Gallery</h2><div class="site-gallery-grid">${cards}</div></section>`;
 };
 
-const renderSlider = (items) => {
-  if (!Array.isArray(items)) return "";
-  const slides = items
-    .filter((item) => resolveMediaImage(item.imageUrl))
-    .map((item) => {
-      const title = item.title || "Site slide";
-      return `<div class="site-slide"><img src="${escapeHtml(resolveMediaImage(item.imageUrl))}" alt="${escapeHtml(title)}" /><span>${escapeHtml(title)}</span></div>`;
-    });
+// const renderSlider = (items) => {
+//   if (!Array.isArray(items)) return "";
+//   const slides = items
+//     .filter((item) => resolveMediaImage(item.imageUrl))
+//     .map((item, index) => {
+//       const title = item.title || `Slide ${index + 1}`;
+//       const loading = index === 0 ? "eager" : "lazy";
+//       const fetchPriority = index === 0 ? ' fetchpriority="high"' : "";
+//       return `<figure class="site-slide"><img src="${escapeHtml(resolveMediaImage(item.imageUrl))}" alt="${escapeHtml(title)}" width="1600" height="900" loading="${loading}" decoding="async"${fetchPriority} /><figcaption>${escapeHtml(title)}</figcaption></figure>`;
+//     });
 
-  if (!slides.length) return "";
-  const animation =
-    slides.length > 1
-      ? `animation: siteSlider ${slides.length * 5}s linear infinite;`
-      : "";
-  const keyframes =
-    slides.length > 1
-      ? `@keyframes siteSlider { ${slides
-          .map((_, index) => {
-            const start = (index / slides.length) * 100;
-            const holdEnd =
-              index === slides.length - 1
-                ? 100
-                : ((index + 1) / slides.length) * 100 - 1;
-            return `${start}% , ${holdEnd}% { transform: translateX(-${index * 100}%); }`;
-          })
-          .join(" ")} }`
-      : "";
+//   if (!slides.length) return "";
+//   const hasMotion = slides.length > 1;
+//   const animation = hasMotion
+//     ? `animation: siteSlider ${slides.length * 5}s ease-in-out infinite;`
+//     : "";
+//   const keyframes = hasMotion
+//     ? `@keyframes siteSlider { ${slides
+//         .map((_, index) => {
+//           const start = (index / slides.length) * 100;
+//           const holdEnd =
+//             index === slides.length - 1
+//               ? 100
+//               : ((index + 1) / slides.length) * 100 - 1;
+//           return `${start}% , ${holdEnd}% { transform: translateX(-${index * 100}%); }`;
+//         })
+//         .join(" ")} }`
+//     : "";
 
-  return `<section class="site-home-slider" aria-label="Image slider"><div class="site-slider-track" style="${animation}">${slides.join("")}</div></section><style>${keyframes}</style>`;
-};
+//   return `<section class="site-home-slider" aria-label="Featured images"><button class="site-slider-pause" type="button" aria-pressed="false"${hasMotion ? "" : " hidden"}>Pause slideshow</button><div class="site-slider-track"${animation ? ` style="${animation}"` : ""}>${slides.join("")}</div></section><style>${keyframes}</style>`;
+// };
+
 
 const SLIDER_MARKER = /<!--\s*SITE_SLIDER\s*-->/i;
+
+const SITE_IFRAME_UX_SCRIPT = `
+<script>
+(() => {
+  const postFrameMessage = (type, details = {}) => {
+    parent.postMessage({ type, ...details }, '*');
+  };
+
+  let resizeFrame = 0;
+  const reportHeight = () => {
+  resizeFrame = 0;
+  const height = Math.ceil(
+    document.documentElement.getBoundingClientRect().height,
+  );
+  postFrameMessage('tenant-site-frame-resize', { height });
+};
+  const scheduleHeight = () => {
+    if (resizeFrame) cancelAnimationFrame(resizeFrame);
+    resizeFrame = requestAnimationFrame(reportHeight);
+  };
+
+  const getFormStatus = (form, index) => {
+    let status = form.querySelector('[data-form-status]');
+    if (!status) {
+      status = document.createElement('p');
+      status.setAttribute('data-form-status', '');
+      form.appendChild(status);
+    }
+    if (!status.id) status.id = 'tenant-form-status-' + index;
+    status.setAttribute('role', 'status');
+    status.setAttribute('aria-live', 'polite');
+    status.setAttribute('aria-atomic', 'true');
+    const describedBy = new Set(
+      (form.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean),
+    );
+    describedBy.add(status.id);
+    form.setAttribute('aria-describedby', Array.from(describedBy).join(' '));
+    return status;
+  };
+
+  document.querySelectorAll('form[data-form]').forEach((form, index) => {
+    const status = getFormStatus(form, index);
+    form.querySelectorAll('input, select, textarea').forEach((control) => {
+      if (control.type === 'hidden') return;
+      const hasLabel = control.id && document.querySelector('label[for="' + CSS.escape(control.id) + '"]');
+      if (!hasLabel && !control.getAttribute('aria-label') && !control.getAttribute('aria-labelledby')) {
+        const fallbackLabel = control.getAttribute('placeholder') || control.getAttribute('name');
+        if (fallbackLabel) control.setAttribute('aria-label', fallbackLabel.replace(/[-_]+/g, ' '));
+      }
+    });
+    form.addEventListener('submit', () => {
+      form.setAttribute('aria-busy', 'true');
+      status.setAttribute('role', 'status');
+      status.setAttribute('aria-live', 'polite');
+      status.setAttribute('data-state', 'pending');
+      window.setTimeout(() => {
+        status.textContent = 'Submitting…';
+        scheduleHeight();
+      }, 0);
+    });
+  });
+
+  window.addEventListener('message', (message) => {
+    if (message.data?.type !== 'tenant-site-form-result') return;
+    window.setTimeout(() => {
+      document.querySelectorAll('form[aria-busy="true"]').forEach((form, index) => {
+        const status = getFormStatus(form, index);
+        const success = message.data.success === true;
+        form.removeAttribute('aria-busy');
+        status.setAttribute('role', success ? 'status' : 'alert');
+        status.setAttribute('aria-live', success ? 'polite' : 'assertive');
+        status.setAttribute('data-state', success ? 'success' : 'error');
+        status.textContent = String(
+          message.data.message ||
+            (success ? 'Submission received successfully.' : 'Could not submit the form. Please try again.'),
+        );
+      });
+      scheduleHeight();
+    }, 0);
+  });
+
+  const slider = document.querySelector('.site-home-slider');
+  const sliderTrack = slider?.querySelector('.site-slider-track');
+  const pauseButton = slider?.querySelector('.site-slider-pause');
+  if (sliderTrack && pauseButton) {
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reducedMotion) {
+      sliderTrack.style.animation = 'none';
+      pauseButton.hidden = true;
+    } else {
+      pauseButton.addEventListener('click', () => {
+        const paused = sliderTrack.style.animationPlayState === 'paused';
+        sliderTrack.style.animationPlayState = paused ? 'running' : 'paused';
+        pauseButton.setAttribute('aria-pressed', String(!paused));
+        pauseButton.textContent = paused ? 'Pause slideshow' : 'Play slideshow';
+      });
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) sliderTrack.style.animationPlayState = 'paused';
+      });
+    }
+  }
+
+  document.querySelectorAll('a[target="_blank"]').forEach((link) => {
+    link.setAttribute('rel', 'noopener noreferrer');
+  });
+  document.querySelectorAll('img').forEach((image, index) => {
+    if (!image.hasAttribute('alt')) image.setAttribute('alt', '');
+    image.decoding = 'async';
+    if (!image.hasAttribute('loading') && index > 0) image.loading = 'lazy';
+    const setDimensions = () => {
+      if (!image.hasAttribute('width') && image.naturalWidth) image.width = image.naturalWidth;
+      if (!image.hasAttribute('height') && image.naturalHeight) image.height = image.naturalHeight;
+      scheduleHeight();
+    };
+    if (image.complete) setDimensions();
+    else image.addEventListener('load', setDimensions, { once: true });
+  });
+
+  if ('ResizeObserver' in window) {
+    const resizeObserver = new ResizeObserver(scheduleHeight);
+    resizeObserver.observe(document.documentElement);
+    if (document.body) resizeObserver.observe(document.body);
+  }
+  window.addEventListener('load', scheduleHeight, { once: true });
+  window.addEventListener('error', (event) => {
+    if (!event.error) return;
+    postFrameMessage('tenant-site-frame-error', {
+      message: 'Some page content could not load. Refresh the page or choose another page.',
+    });
+  });
+  window.addEventListener('unhandledrejection', () => {
+    postFrameMessage('tenant-site-frame-error', {
+      message: 'Some page content could not load. Refresh the page or choose another page.',
+    });
+  });
+
+  postFrameMessage('tenant-site-frame-ready');
+  scheduleHeight();
+})();
+</script>`;
 
 /* ------------------------------------------------------------------ */
 /* Hydration: relationships                                            */
@@ -354,6 +526,7 @@ const HIDDEN_STATUSES = new Set([
   "archived",
   "unsubscribed",
   "spam",
+  "pending",
   "rejected",
   "cancelled",
   "expired",
@@ -527,6 +700,9 @@ const renderField = (element, item) => {
     );
 
     element.textContent = isEmpty(shown) ? (fallback ?? "—") : String(shown);
+    if (element.hasAttribute("data-format")) {
+      element.style.fontVariantNumeric = "tabular-nums";
+    }
 
     return;
   }
@@ -591,6 +767,12 @@ const renderField = (element, item) => {
   if (attr === "target" && output === "_blank") {
     element.setAttribute("rel", "noopener noreferrer");
   }
+
+  if (attr === "src" && element.tagName === "IMG") {
+    if (!element.hasAttribute("alt")) element.setAttribute("alt", "");
+    if (!element.hasAttribute("loading")) element.setAttribute("loading", "lazy");
+    element.setAttribute("decoding", "async");
+  }
 };
 
 /* --------------------------------
@@ -614,7 +796,12 @@ const hydrateContainer = (container, siteData, maps) => {
 
   // Hide only unwanted statuses; available / upcoming / published etc. are shown.
   const rows = source.filter(
-    (record) => !HIDDEN_STATUSES.has(String(record.status ?? "").toLowerCase()),
+    (record) =>
+      record.isApproved !== false &&
+      record.isApproved !== 0 &&
+      record.approved !== false &&
+      record.approved !== 0 &&
+      !HIDDEN_STATUSES.has(String(record.status ?? "").toLowerCase()),
   );
 
   holder.replaceChildren();
@@ -623,11 +810,10 @@ const hydrateContainer = (container, siteData, maps) => {
     const empty = container.ownerDocument.createElement("p");
 
     empty.className = "hydration-empty-state";
+    empty.setAttribute("role", "status");
 
     empty.textContent =
-      container.getAttribute("data-empty-text") || "No records added yet.";
-
-    empty.style.cssText = "text-align:center;opacity:.7;padding:16px;";
+      container.getAttribute("data-empty-text") || "No published items yet.";
 
     holder.appendChild(empty);
 
@@ -704,8 +890,7 @@ const buildSrcDoc = ({
   const isHome = /home/i.test(pageTitle);
   const isGallery = /gall[ae]ry/i.test(pageTitle);
 
-  const sliderHtml = isHome ? renderSlider(slides) : "";
-
+  const sliderHtml = isHome ? renderSlider(slides, resolveMediaImage, escapeHtml) : "";
   // Hydrate the page's [data-entity] tables BEFORE injecting into iframe
   const pageHtml =
     hydrateSiteData(html, siteData) || "<p>This page has no content yet.</p>";
@@ -740,44 +925,74 @@ const buildSrcDoc = ({
         background: var(--site-bg);
         color: var(--site-text);
         font-family: ${themeConfig.fontFamily || "Arial, sans-serif"};
+        line-height: 1.5;
+        overflow-wrap: anywhere;
       }
-      .site-page { padding: 16px; }
-      img { max-width: 100%; height: auto; }
-      table { max-width: 100%; }
+      .site-page { width: min(100%, 1200px); margin-inline: auto; padding: clamp(12px, 3vw, 32px); }
+      .site-page > :first-child { margin-top: 0; }
+      h1, h2, h3, h4, h5, h6 { scroll-margin-top: 24px; text-wrap: balance; overflow-wrap: anywhere; }
+      p, li, figcaption { text-wrap: pretty; overflow-wrap: anywhere; }
+      img, video, svg, canvas { max-width: 100%; height: auto; }
+      iframe { max-width: 100%; }
+      table { width: 100%; max-width: 100%; border-collapse: collapse; }
+      th, td { overflow-wrap: anywhere; }
+      .site-visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
+      .hydration-empty-state { margin: 16px 0; padding: 24px 16px; border: 1px dashed color-mix(in srgb, var(--site-text) 30%, transparent); border-radius: ${themeConfig.borderRadius || "8px"}; text-align: center; opacity: .8; }
 
-      /* Buttons */
+      button, .btn, input, select, textarea { font: inherit; }
       button, .btn {
+        min-height: 44px;
         background: var(--site-button-bg);
         color: var(--site-button-text);
         border-radius: ${themeConfig.borderRadius || "4px"};
-        padding: 8px 16px;
+        padding: 10px 16px;
         border: none;
         cursor: pointer;
+        touch-action: manipulation;
       }
+      button:hover, .btn:hover { filter: brightness(.94); }
+      button:disabled, .btn:disabled { cursor: wait; opacity: .7; }
+      a, button, .btn, input, select, textarea { scroll-margin-block: 24px; }
+      :where(a, button, .btn, input, select, textarea):focus-visible { outline: 3px solid var(--site-primary); outline-offset: 3px; }
+      input, select, textarea { max-width: 100%; }
+      [data-form-status] { min-height: 1.5em; margin-block: 12px 0; font-weight: 600; }
+      [data-form-status][data-state="error"] { color: #b91c1c; }
+      [data-form-status][data-state="success"] { color: #166534; }
 
-      .site-home-slider { width: 100%; margin: 22px auto 28px; overflow: hidden; border-radius: ${themeConfig.borderRadius || "12px"}; background: #f0f0f0; }
-      .site-slider-track { display: flex; width: 100%; }
-      .site-slide { position: relative; flex: 0 0 100%; height: clamp(220px, 42vw, 520px); }
-      .site-slide img { width: 100%; height: 100%; object-fit: cover; }
-      .site-slide span { position: absolute; inset: auto 0 0; padding: 18px 22px; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,.7)); font-size: 1.15rem; text-align: left; }
+      .site-home-slider { position: relative; width: 100%; margin: 22px auto 28px; overflow: hidden; border-radius: ${themeConfig.borderRadius || "12px"}; background: #f0f0f0; }
+      .site-slider-track { display: flex; width: 100%; will-change: transform; }
+      .site-slider-pause { position: absolute; z-index: 2; top: 12px; right: 12px; min-height: 40px; padding: 8px 12px; background: rgba(0, 0, 0, .78); color: #fff; }
+      .site-slide { position: relative; flex: 0 0 100%; margin: 0; aspect-ratio: var(--slide-ratio, 16 / 9); min-height: 160px; }
+      .site-slide img { display: block; width: 100%; height: 100%; object-fit: cover; }
+      .site-slide figcaption { position: absolute; inset: auto 0 0; padding: 38px 22px 18px; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,.78)); font-size: 1.15rem; text-align: left; }
       .site-gallery { margin-top: 32px; }
       .site-gallery-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 16px; }
-      .site-gallery figure { margin: 0; overflow: hidden; border-radius: ${themeConfig.borderRadius || "10px"}; background: var(--site-header-bg); }
-      .site-gallery img { display: block; width: 100%; height: 240px; object-fit: cover; transition: transform 0.4s ease; }
-      .site-gallery figure:hover img { transform: scale(1.06); }
+      .site-gallery figure { min-width: 0; margin: 0; overflow: hidden; border-radius: ${themeConfig.borderRadius || "10px"}; background: var(--site-header-bg); }
+      .site-gallery img { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; transition: transform 0.4s ease; }
+      .site-gallery figure:hover img { transform: scale(1.04); }
       .site-gallery figcaption { padding: 10px 12px; }
-      /* Ensure CSS variables are applied globally to all elements within the iframe */
-      main, div, section, p, h1, h2, h3, h4, h5, h6, span, a, li, ul, ol {
-        color: inherit;
-      }
-      body {
-        color: var(--site-text);
-        background-color: var(--site-bg);
-      }
+      main, div, section, p, h1, h2, h3, h4, h5, h6, span, a, li, ul, ol { color: inherit; }
 
+      @media (max-width: 640px) {
+        .site-page { padding: 12px; }
+        
+        .site-slide figcaption { padding: 32px 14px 14px; font-size: 1rem; }
+        .site-slider-pause { top: 8px; right: 8px; }
+        table { display: block; overflow-x: auto; overscroll-behavior-inline: contain; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+        *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+        .site-slider-track { animation: none !important; transform: none !important; }
+        .site-slider-pause { display: none; }
+        .site-gallery figure:hover img { transform: none; }
+      }
+      @media (forced-colors: active) {
+        :where(a, button, .btn, input, select, textarea):focus-visible { outline-color: Highlight; }
+      }
     </style>
   </head>
-  <body><main class="site-page">${bodyHtml}${isGallery ? renderGallery(galleries) : ""}</main></body>
+  <body><main class="site-page">${bodyHtml}${isGallery ? renderGallery(galleries) : ""}</main>${SITE_FORM_SCRIPT}${SITE_IFRAME_UX_SCRIPT}</body>
 </html>`;
 };
 
@@ -816,15 +1031,26 @@ function SiteHeader({ header, siteName, pages, activeId, onNavigate, theme }) {
         {(logo || title) && (
           <Box
             component="a"
-            href="#"
+            href={pages[0] ? pageHref(pageKey(pages[0])) : "#main-content"}
             onClick={(event) => {
-              event.preventDefault();
-              if (pages[0]) onNavigate(pageKey(pages[0]));
+              if (pages[0]) {
+                handlePageAnchorClick(
+                  event,
+                  pageKey(pages[0]),
+                  onNavigate,
+                  { focus: true },
+                );
+              }
             }}
             sx={{
               display: "flex",
               alignItems: "center",
               gap: 1.25,
+              borderRadius: 1,
+              "&:focus-visible": {
+                outline: `3px solid ${theme.primaryColor || theme.color}`,
+                outlineOffset: 3,
+              },
               py: 1,
               minHeight: { xs: 56, md: 64 },
               color: "inherit",
@@ -836,29 +1062,21 @@ function SiteHeader({ header, siteName, pages, activeId, onNavigate, theme }) {
           >
             {logo && (
               <Box
+                component="img"
+                src={logo}
+                alt={title ? `${title} logo` : "Site logo"}
+                width={44}
+                height={44}
+                fetchPriority="high"
                 sx={{
+                  display: "block",
                   width: { xs: 36, md: 44 },
                   height: { xs: 36, md: 44 },
                   borderRadius: "50%",
-                  overflow: "hidden",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
+                  objectFit: "cover",
                   flexShrink: 0,
                 }}
-              >
-                <Box
-                  component="img"
-                  src={logo}
-                  alt={title || "Site logo"}
-                  sx={{
-                    display: "block",
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                  }}
-                />
-              </Box>
+              />
             )}
             {title && (
               <Typography
@@ -926,6 +1144,11 @@ function SiteHeader({ header, siteName, pages, activeId, onNavigate, theme }) {
                 textOverflow: "ellipsis",
                 transition: "opacity .2s, background-color .2s",
                 "&:hover": { opacity: 1, bgcolor: theme.hover },
+                "&:focus-visible": {
+                  opacity: 1,
+                  outline: `3px solid ${theme.primaryColor || theme.color}`,
+                  outlineOffset: -3,
+                },
               },
               "& .MuiTab-root.Mui-selected": {
                 color: theme.textColor || theme.color,
@@ -933,14 +1156,24 @@ function SiteHeader({ header, siteName, pages, activeId, onNavigate, theme }) {
               },
             }}
           >
-            {pages.map((p) => (
-              <Tab
-                key={pageKey(p)}
-                value={pageKey(p)}
-                label={p.title}
-                title={p.title}
-              />
-            ))}
+            {pages.map((p) => {
+              const id = pageKey(p);
+              const label = p.title || "Untitled page";
+              return (
+                <Tab
+                  key={id}
+                  component="a"
+                  href={pageHref(id)}
+                  value={id}
+                  label={label}
+                  title={label}
+                  aria-current={id === activeId ? "page" : undefined}
+                  onClick={(event) =>
+                    handlePageAnchorClick(event, id, onNavigate, { focus: true })
+                  }
+                />
+              );
+            })}
           </Tabs>
         </Box>
       </Box>
@@ -1011,7 +1244,13 @@ function SiteFooter({ header, siteName, pages, activeId, onNavigate, theme }) {
     color: "inherit",
     textDecoration: "none",
     opacity: 0.85,
+    borderRadius: 0.5,
     "&:hover": { opacity: 1, textDecoration: "underline" },
+    "&:focus-visible": {
+      opacity: 1,
+      outline: `3px solid ${theme.primaryColor || theme.color}`,
+      outlineOffset: 3,
+    },
   };
 
   if (
@@ -1099,11 +1338,18 @@ function SiteFooter({ header, siteName, pages, activeId, onNavigate, theme }) {
                   return (
                     <Link
                       key={pageKey(p)}
-                      component="button"
-                      type="button"
-                      onClick={() => onNavigate(pageKey(p))}
+                      component="a"
+                      href={pageHref(pageKey(p))}
+                      onClick={(event) =>
+                        handlePageAnchorClick(
+                          event,
+                          pageKey(p),
+                          onNavigate,
+                          { focus: true },
+                        )
+                      }
                       aria-current={isActive ? "page" : undefined}
-                      title={p.title}
+                      title={p.title || "Untitled page"}
                       sx={{
                         ...linkSx,
                         display: "block",
@@ -1117,7 +1363,7 @@ function SiteFooter({ header, siteName, pages, activeId, onNavigate, theme }) {
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {p.title}
+                      {p.title || "Untitled page"}
                     </Link>
                   );
                 })}
@@ -1184,6 +1430,10 @@ function SiteFooter({ header, siteName, pages, activeId, onNavigate, theme }) {
                       width: 40,
                       height: 40,
                       "&:hover": { bgcolor: theme.hover },
+                      "&:focus-visible": {
+                        outline: `3px solid ${theme.primaryColor || theme.color}`,
+                        outlineOffset: 2,
+                      },
                     }}
                   >
                     <Icon />
@@ -1223,6 +1473,7 @@ export default function Site() {
   const { siteId: adminSiteId, siteSlug } = useParams();
   const navigate = useNavigate();
   const siteAdminMode = window.location.pathname.startsWith("/site-admin/");
+  const publicMode = window.location.pathname.startsWith("/site/");
   const routeSiteKey = siteAdminMode ? adminSiteId : siteSlug;
 
   const [site, setSite] = useState({
@@ -1238,26 +1489,38 @@ export default function Site() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [themeConfig, setThemeConfig] = useState(null);
-  const observerRef = useRef(null);
+  const [frameLoading, setFrameLoading] = useState(true);
+  const [frameError, setFrameError] = useState("");
+  const iframeRef = useRef(null);
+  const mainRef = useRef(null);
+  const [targetSiteId, setTargetSiteId] = useState("");
+  const [submissionVersion, setSubmissionVersion] = useState(0);
 
   useEffect(() => {
     const token = siteAdminMode
       ? localStorage.getItem("siteAdminToken")
       : getToken();
-    if (!token) {
+    if (!token && !publicMode) {
       navigate("/login", { replace: true });
       return;
     }
 
     let cancelled = false;
-    const headers = { Authorization: `Bearer ${token}` };
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
     const load = async () => {
       setLoading(true);
       setError("");
       try {
         let targetSiteId = routeSiteKey;
         let meta = null;
-        if (!siteAdminMode) {
+        if (publicMode) {
+          const resolved = await axios.get(
+            `${API_URL}/sites/public/resolve/${encodeURIComponent(routeSiteKey)}`,
+          );
+          if (cancelled) return;
+          meta = resolved.data;
+          targetSiteId = meta.id;
+        } else if (!siteAdminMode) {
           const sitesRes = await axios.get(`${API_URL}/sites/my`, { headers });
           if (cancelled) return;
           const sites = Array.isArray(sitesRes.data) ? sitesRes.data : [];
@@ -1281,16 +1544,23 @@ export default function Site() {
           }
           targetSiteId = meta.id;
         }
+        setTargetSiteId(targetSiteId);
 
         const pagesUrl = siteAdminMode
           ? `${API_URL}/sites/client-admin/${targetSiteId}/pages`
-          : `${API_URL}/sites/${targetSiteId}/pages`;
+          : publicMode
+            ? `${API_URL}/sites/${targetSiteId}/public/pages`
+            : `${API_URL}/sites/${targetSiteId}/pages`;
         const themeUrl = siteAdminMode
           ? `${API_URL}/sites/client-admin/${targetSiteId}/theme`
-          : `${API_URL}/sites/${targetSiteId}/theme`;
+          : publicMode
+            ? `${API_URL}/sites/${targetSiteId}/public/theme`
+            : `${API_URL}/sites/${targetSiteId}/theme`;
         const mediaUrl = siteAdminMode
           ? `${API_URL}/sites/client-admin/${targetSiteId}/media`
-          : `${API_URL}/sites/${targetSiteId}/media`;
+          : publicMode
+            ? `${API_URL}/sites/${targetSiteId}/public/media`
+            : `${API_URL}/sites/${targetSiteId}/media`;
 
         const [pagesRes, themeRes, mediaRes] = await Promise.all([
           axios.get(pagesUrl, { headers }),
@@ -1325,7 +1595,9 @@ export default function Site() {
         try {
           const base = siteAdminMode
             ? `${API_URL}/sites/client-admin/${targetSiteId}/data`
-            : `${API_URL}/sites/${targetSiteId}/data`;
+            : publicMode
+              ? `${API_URL}/sites/${targetSiteId}/public/data`
+              : `${API_URL}/sites/${targetSiteId}/data`;
           const dataRes = await axios.get(base, { headers });
           if (cancelled) return;
 
@@ -1360,7 +1632,10 @@ export default function Site() {
           console.warn("Could not load site data resources", e);
         }
 
-        setActiveId(list[0] ? pageKey(list[0]) : "");
+        const requestedPageId = pageIdFromHash();
+        const initialPage =
+          list.find((page) => pageKey(page) === requestedPageId) || list[0];
+        setActiveId(initialPage ? pageKey(initialPage) : "");
         setSite({
           color: meta?.color || pagesRes.data?.color || "#222222",
           background:
@@ -1385,10 +1660,26 @@ export default function Site() {
     return () => {
       cancelled = true;
     };
-  }, [routeSiteKey, siteSlug, navigate, siteAdminMode]);
+  }, [routeSiteKey, siteSlug, navigate, siteAdminMode, publicMode, submissionVersion]);
+
+  useEffect(
+    () =>
+      installSiteFormHandler({
+        siteId: targetSiteId,
+        iframeRef,
+        onSubmitted: () => {
+          setSubmissionVersion((version) => version + 1);
+        },
+      }),
+    [targetSiteId],
+  );
 
   useEffect(() => {
     if (!media.news.length) return undefined;
+    const reducedMotion = window.matchMedia?.(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    if (reducedMotion) return undefined;
 
     let nextIndex = 0;
     const timer = window.setInterval(
@@ -1403,7 +1694,35 @@ export default function Site() {
     return () => window.clearInterval(timer);
   }, [media.news]);
 
-  useEffect(() => () => observerRef.current?.disconnect(), []);
+  useEffect(() => {
+    const onFrameMessage = (event) => {
+      if (event.source !== iframeRef.current?.contentWindow) return;
+
+      if (event.data?.type === "tenant-site-frame-ready") {
+        setFrameLoading(false);
+        return;
+      }
+
+      if (event.data?.type === "tenant-site-frame-resize") {
+        const height = Number(event.data.height);
+        if (Number.isFinite(height) && height > 0 && iframeRef.current) {
+          iframeRef.current.style.height = `${Math.ceil(height)}px`;
+        }
+        return;
+      }
+
+      if (event.data?.type === "tenant-site-frame-error") {
+        setFrameLoading(false);
+        setFrameError(
+          event.data.message ||
+            "Some page content could not load. Refresh the page or choose another page.",
+        );
+      }
+    };
+
+    window.addEventListener("message", onFrameMessage);
+    return () => window.removeEventListener("message", onFrameMessage);
+  }, []);
 
   const muiTheme = useTheme();
   const muiPrimary = muiTheme.palette.primary.main;
@@ -1451,31 +1770,27 @@ export default function Site() {
     [activePage, theme, media.galleries, media.slider, siteData, site.header],
   );
 
-  const handleNavigate = (id) => {
-    setActiveId(String(id));
-    window.scrollTo({ top: 0 });
+  const handleNavigate = (id, { focus = false } = {}) => {
+    const nextId = String(id);
+    if (!pages.some((page) => pageKey(page) === nextId)) return;
+
+    setFrameLoading(true);
+    setFrameError("");
+    setActiveId(nextId);
+    window.history.replaceState(null, "", pageHref(nextId));
+    window.scrollTo({ top: 0, behavior: "auto" });
+    if (focus) window.requestAnimationFrame(() => mainRef.current?.focus());
   };
 
-  const handleFrameLoad = (event) => {
-    const frame = event.currentTarget;
-    const doc = frame.contentDocument;
-    if (!doc?.body) return;
+  const handleFrameLoad = () => {
+    // A sandboxed srcdoc has an opaque origin, so frame sizing is reported via postMessage.
+    window.setTimeout(() => setFrameLoading(false), 1500);
+  };
 
-    observerRef.current?.disconnect();
-    const resize = () => {
-      const height = Math.max(
-        doc.documentElement.scrollHeight,
-        doc.body.scrollHeight,
-      );
-      frame.style.height = `${height}px`;
-    };
-    resize();
-
-    if (typeof ResizeObserver !== "undefined") {
-      observerRef.current = new ResizeObserver(resize);
-      observerRef.current.observe(doc.documentElement);
-      observerRef.current.observe(doc.body);
-    }
+  const retryFrame = () => {
+    setFrameError("");
+    setFrameLoading(true);
+    setSubmissionVersion((version) => version + 1);
   };
 
   return (
@@ -1538,13 +1853,13 @@ export default function Site() {
               component="iframe"
               key={`${activeId}-${dataVersion}`}
               title={activePage?.title || "Page preview"}
-              sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+              sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
               srcDoc={srcDoc}
               onLoad={handleFrameLoad}
               sx={{
                 display: "block",
                 width: "100%",
-                minHeight: 300,
+                minHeight: "calc(100vh - 160px)",
                 border: 0,
                 bgcolor: theme.background,
               }}
@@ -1592,6 +1907,10 @@ export default function Site() {
               component="img"
               src={resolveMediaImage(media.news[newsIndex].imageUrl)}
               alt={media.news[newsIndex].title || "News"}
+              width={640}
+              height={360}
+              loading="lazy"
+              decoding="async"
               sx={{
                 display: "block",
                 width: "100%",
@@ -1639,6 +1958,8 @@ export default function Site() {
                 color: muiTextSecondary,
                 lineHeight: 1.7,
                 textAlign: "center",
+                overflowWrap: "anywhere",
+                textWrap: "pretty",
               }}
             >
               {media.news[newsIndex].content}
