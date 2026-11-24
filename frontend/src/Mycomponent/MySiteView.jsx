@@ -2057,9 +2057,10 @@ export default function MySiteView() {
               >
                 <Box
                   component="iframe"
+                  ref={iframeRef}
                   key={`${activeId}-${devices}-${dataVersion}`}
                   title={activePage?.title || "Page preview"}
-                  sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
+                  sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms"
                   srcDoc={srcDoc}
                   onLoad={handleFrameLoad}
                   sx={{

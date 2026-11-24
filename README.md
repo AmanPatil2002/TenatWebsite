@@ -1,8 +1,8 @@
 # 🏠 Tenant Website Management System
 
-A full-stack web application designed to simplify tenant, property, and website administration. The system provides an interface for managing site content, administrator profiles, media assets, and secure content previews.
+A full-stack, multi-tenant web application designed to simplify tenant, property, and website administration. The system provides an interface for managing site content, administrator profiles, media assets, secure content previews, and dynamically provisioned per-site databases.
 
-Built using **React, Material UI, Node.js, Express.js, and MySQL**.
+Built using **React 19, Vite, Material UI, Node.js, Express 5, and MySQL**.
 
 ---
 
@@ -12,13 +12,13 @@ Built using **React, Material UI, Node.js, Express.js, and MySQL**.
 - [Features](#-features)
 - [Technology Stack](#-technology-stack)
 - [Project Structure](#-project-structure)
+- [Architecture & Data Flow](#-architecture--data-flow)
 - [Prerequisites](#-prerequisites)
 - [Installation](#-installation)
 - [Environment Configuration](#-environment-configuration)
 - [Database Configuration](#-database-configuration)
 - [Running the Application](#-running-the-application)
-- [Available Libraries](#-available-libraries)
-- [API Configuration](#-api-configuration)
+- [API Reference](#-api-reference)
 - [Security](#-security)
 - [Troubleshooting](#-troubleshooting)
 - [Contributing](#-contributing)
@@ -28,68 +28,74 @@ Built using **React, Material UI, Node.js, Express.js, and MySQL**.
 
 ## 🚀 Project Overview
 
-Tenant Website Management System is a full-stack application with a separate frontend and backend.
+Tenant Website Management System is a full-stack application split into a separate frontend and backend. It supports a **multi-tenant architecture**: a master database stores tenant/site metadata, and each provisioned site gets its own isolated MySQL database (created dynamically at purchase time) populated from vertical-specific packs (e-commerce, school, medical, restaurant, hotel, etc.).
 
-The frontend provides a modern, responsive interface using React and Material UI, while the backend handles application logic, authentication, database communication, file uploads, email functionality, and document generation.
+The frontend provides a modern, responsive interface using React and Material UI, while the backend handles application logic, authentication, database communication, file uploads, email functionality, PDF generation, and per-site data provisioning.
 
 ### Architecture
 
 ```text
-             TENANT WEBSITE
-                   |
-          +--------+--------+
-          |                 |
-       FRONTEND           BACKEND
-          |                 |
-     React 19            Node.js
-       Vite              Express 5
-          |                 |
-     Material UI       REST APIs
-          |                 |
-       Axios                |
-          |                 |
-          +--------+--------+
-                   |
-                MySQL
+                       TENANT WEBSITE
+                             |
+              +--------------+--------------+
+              |                             |
+           FRONTEND                       BACKEND
+              |                             |
+         React 19 + Vite             Node.js + Express 5
+              |                             |
+         Material UI                   REST APIs
+              |                             |
+           Axios                          |
+              |                             |
+              +--------------+--------------+
+                             |
+                          MySQL
+                  (master + per-site DBs)
 ```
 
 ---
 
 ## ✨ Features
 
-The following features are documented in the existing project README:
+- **Multi-Tenant Site Provisioning**
+  - Dynamic per-site database creation at purchase time.
+  - Vertical-specific table packs (e-commerce, school, medical, restaurant, hotel, real estate, gym, blog, portfolio, events, NGO, salon, news, finance, agriculture, consulting, pet care, daycare, dental, mobile apps, interior design, and more).
+  - Site admin users provisioned alongside each site.
 
 - **Site Administration**
   - Administrator profile management.
-  - Secure password handling.
-  - Protected administrator routes.
+  - Secure password handling (bcryptjs).
+  - Protected administrator routes (JWT).
+  - Read-only / status-only table enforcement for site admins.
 
 - **Dynamic Content Management**
-  - Website content management.
-  - Dynamic content hydration.
-  - Content preview functionality.
+  - Website content management via CKEditor 4.
+  - Dynamic content hydration and sanitization.
+  - Iframe-based live website preview with automatic sizing.
+  - Pages stored per-site with source-page mapping.
 
-- **Secure Website Preview**
-  - Iframe-based website preview.
-  - Automatic preview sizing.
-  - Content sanitization.
+- **CKEditor Form Submissions**
+  - Forms embedded in CKEditor page content submit via `postMessage` to the React host.
+  - Public submissions routed to `/sites/:siteId/public/:resource`.
+  - Honeypot spam protection, rate limiting, and field validation.
 
 - **Media Management**
-  - Property asset management.
-  - File upload handling.
-  - Media storage support.
+  - File upload handling via Multer.
+  - CKEditor image upload endpoint.
+  - Static file serving from `/uploads`.
 
 - **Document Generation**
   - PDF generation using PDFKit.
 
 - **Email Functionality**
-  - Email integration using Nodemailer.
+  - Email integration using Nodemailer (SMTP).
+  - Admin ownership verification emails.
 
 - **Modern User Interface**
-  - React 19.
-  - Material UI components.
-  - Responsive layouts.
-  - Data visualization using MUI X Charts.
+  - React 19 + Vite.
+  - Material UI components + MUI Icons.
+  - MUI X Charts for data visualization.
+  - Emotion + Styled Components.
 
 ---
 
@@ -110,7 +116,7 @@ The following features are documented in the existing project README:
 | Axios | HTTP requests |
 | CKEditor 4 | Rich text editor |
 | CKEditor4 React | React integration for CKEditor |
-| Dotenv | Environment configuration package |
+| Dotenv | Environment configuration |
 
 ### Backend
 
@@ -131,17 +137,14 @@ The following features are documented in the existing project README:
 ### Development Tools
 
 - Visual Studio Code
-- Git
-- GitHub
+- Git / GitHub
 - npm
-- MySQL Server
-- MySQL Workbench
+- MySQL Server / MySQL Workbench
+- Jest (testing)
 
 ---
 
 ## 📂 Project Structure
-
-The repository separates frontend and backend code:
 
 ```text
 TenatWebsite/
@@ -149,34 +152,62 @@ TenatWebsite/
 ├── frontend/
 │   ├── public/
 │   ├── src/
+│   │   ├── Pages/          # Route-level pages (Client, Admin, Site)
+│   │   ├── Mycomponent/    # Reusable components (MySiteView, etc.)
+│   │   ├── utils/          # siteForms, helpers
+│   │   ├── App.jsx
+│   │   └── main.jsx
 │   ├── index.html
 │   ├── package.json
-│   ├── package-lock.json
 │   ├── vite.config.js
 │   └── .env
 │
 ├── backend/
-│   ├── config/
-│   ├── controllers/
-│   ├── middleware/
-│   ├── routes/
-│   ├── uploads/
+│   ├── config/             # db, packs, permissions, provisionSite, readOnlyTables
+│   ├── controller/         # Route controllers
+│   ├── middleware/         # auth, siteAccess, themeservice
+│   ├── route/              # Express route definitions
+│   ├── uploads/            # Uploaded media (sites/, ckeditor/)
+│   ├── utils/              # mailer, pricing, provision, migrate scripts
 │   ├── server.js
+│   ├── schema.sql
 │   ├── package.json
-│   ├── package-lock.json
 │   └── .env
 │
-├── .gitignore
+├── .claude/                # Claude Code skills & settings
+├── CLAUDE.md
 └── README.md
 ```
 
-*Note: This is an illustrative structure. Adjust directory names to match the actual files in your repository.*
+---
+
+## 🔄 Architecture & Data Flow
+
+### 1. Master Database (`tenant`)
+Stores global metadata: sites, site admins, templates, themes, headers, pages, categories, FAQs, stats, bug reports.
+
+### 2. Per-Site Databases (`site_<id>`)
+Created dynamically by `backend/config/provisionSite.js` when a site is purchased. Each database is seeded from a vertical pack defined in `backend/config/packs.js`.
+
+### 3. Request Flow (Site Data)
+```
+Browser (iframe) → React host (postMessage) → Axios → Express /sites/:siteId/public/:resource → MySQL (per-site DB)
+```
+
+### 4. Authentication Flows
+- **Super admin / site admin**: JWT via `/auth` routes, middleware in `backend/middleware/authenticate.js` and `authenticateSiteAdmin.js`.
+- **Public site visitors**: No auth; submissions go through `publicSubmit` with honeypot + rate limiting.
+
+### 5. Table Permissions
+`backend/config/readOnlyTables.js` defines per-vertical table modes:
+- `full` — admin can CRUD.
+- `status` — admin can only update the status field.
+- `view` — read-only in admin, but public form submissions allowed (except blocked tables).
+- `hidden` — never exposed.
 
 ---
 
 ## 📋 Prerequisites
-
-Install the following software before running the application.
 
 | Software | Purpose |
 |---|---|
@@ -203,11 +234,6 @@ git --version
 
 ```bash
 git clone https://github.com/AmanPatil2002/TenatWebsite.git
-```
-
-Navigate into the project:
-
-```bash
 cd TenatWebsite
 ```
 
@@ -220,262 +246,156 @@ npm install
 
 ### 3. Install Frontend Dependencies
 
-Open another terminal or navigate back to the frontend:
-
 ```bash
 cd ../frontend
 npm install --legacy-peer-deps
 ```
 
-The legacy peer dependency option is included because the existing project README specifies it. If a normal `npm install` works with your installed package versions, you can use that instead.
+The legacy peer dependency option is required because of CKEditor 4 / React 19 peer conflicts. If a normal `npm install` works with your installed versions, you can use that instead.
 
 ---
 
 ## 🔐 Environment Configuration
 
-Create environment files for the backend and frontend.
-
 ### Backend Environment
 
-Create:
-
-`backend/.env`
-
-Example configuration (adjust variable names to match your backend source code):
+Create `backend/.env`:
 
 ```env
+# Database (master)
+db_host=localhost
+db_user=root
+db_password=1234
+db_name=tenant
+
+# Auth
+SECRET_KEY=mysecretkey
+
+# SMTP (admin verification emails)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your_email@gmail.com
+SMTP_PASS=your_app_password
+MAIL_FROM="Multitenant <your_email@gmail.com>"
+
+# Frontend URL (for CORS + email links)
+FRONTEND_URL=http://localhost:5173
+CLIENT_URL=http://localhost:5173
+
+# Server
 PORT=5000
-
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=your_mysql_password
-DB_NAME=tenant_website
-
-JWT_SECRET=your_secure_random_secret
-
-EMAIL_USER=your_email@example.com
-EMAIL_PASS=your_email_app_password
 ```
 
 ### Frontend Environment
 
-Create:
-
-`frontend/.env`
-
-Example:
+Create `frontend/.env`:
 
 ```env
 VITE_API_URL=http://localhost:5000
 ```
 
-Use the API URL format expected by your Axios configuration.
-
 **Important:**
-- Never upload `.env` files containing real credentials to GitHub.
-- Keep JWT secrets and email credentials private.
-- Vite exposes variables prefixed with `VITE_` to frontend browser code. Never put private secrets in frontend environment variables.
+- Never commit `.env` files with real credentials.
+- Vite only exposes variables prefixed with `VITE_` to the browser. Never put private secrets in frontend env vars.
 
 ---
 
 ## 🗄 Database Configuration
 
-The project uses MySQL through the `mysql2` package.
-
-### Step 1: Install MySQL
-
-Install MySQL Server and optionally MySQL Workbench.
-
-### Step 2: Create a Database
-
-Open MySQL Workbench or the MySQL command line.
+### Step 1: Create the Master Database
 
 ```sql
-CREATE DATABASE tenant_website;
+CREATE DATABASE tenant;
 ```
 
-### Step 3: Configure Database Credentials
+### Step 2: Import the Schema
 
-Update the backend `.env` file with your MySQL host, username, password, and database name.
+```bash
+mysql -u root -p tenant < backend/schema.sql
+```
 
-### Step 4: Import Database Tables
+### Step 3: Verify Connection
 
-If the repository includes a SQL file, import it into the newly created database.
+Start the backend; you should see `Connection to Database Successful`.
 
-Otherwise, create the required tables according to the SQL queries used in the backend controllers.
+### Step 4: Per-Site Databases
 
-**Note:** The exact database schema and SQL import filename should be added here after verifying the backend source.
+These are created automatically by `backend/config/provisionSite.js` when a site is purchased. No manual setup required. Each gets a name like `site_<id>` and is seeded from the chosen vertical pack.
 
 ---
 
 ## ▶️ Running the Application
 
-The frontend and backend must run separately.
+The frontend and backend must run in separate terminals.
 
 ### 1. Start the Backend
 
-Open a terminal:
-
 ```bash
 cd backend
-```
-
-For development:
-
-```bash
-npx nodemon server.js
-```
-
-Alternatively, add these scripts to `backend/package.json`:
-
-```json
-"scripts": {
-  "start": "node server.js",
-  "dev": "nodemon server.js"
-}
-```
-
-Then run:
-
-```bash
 npm run dev
 ```
 
-For production:
-
-```bash
-npm start
-```
+Backend URL: `http://localhost:5000`
 
 ### 2. Start the Frontend
 
-Open another terminal:
-
 ```bash
 cd frontend
-```
-
-Start the Vite development server:
-
-```bash
 npm run dev
 ```
 
+Frontend URL (Vite default): `http://localhost:5173`
+
 ### 3. Open the Application
 
-Open the local URL displayed by Vite, usually:
-
-```text
-http://localhost:5173
-```
-
-Backend URL (if using the example configuration):
-
-```text
-http://localhost:5000
-```
+Navigate to `http://localhost:5173` in your browser.
 
 ---
 
-## 📚 Available Libraries
+## 🔌 API Reference
 
-The following are the dependencies declared in the project's package manifests.
+Base URL: `http://localhost:5000`
 
-### Frontend Libraries
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/auth/*` | Authentication (login, register, verify) |
+| GET/POST | `/categories/*` | Category management |
+| GET/POST | `/templates/*` | Template management |
+| GET/POST | `/payments/*` | Payment handling |
+| GET/POST | `/sites/*` | Site CRUD, purchase, provisioning |
+| GET/POST | `/sites/:siteId/public/:resource` | Public form submissions (CKEditor forms) |
+| GET/POST | `/sites/:siteId/...` | Site data, content, media |
+| GET/POST | `/pages/*` | Page management |
+| GET/POST | `/theme/*` | Theme management |
+| GET/POST | `/faq/*` | FAQ management |
+| GET/POST | `/contact/*` | Contact form submissions |
+| GET/POST | `/stats/*` | Statistics |
+| GET/POST | `/bugreports/*` | Bug report submissions |
+| POST | `/uploads` | File uploads (Multer + CKEditor) |
 
-Install all frontend dependencies:
-
-```bash
-cd frontend
-npm install
-```
-
-| Package | Installation Command |
-|---|---|
-| React | `npm install react react-dom` |
-| React Router | `npm install react-router-dom` |
-| Material UI | `npm install @mui/material` |
-| Material Icons | `npm install @mui/icons-material` |
-| Emotion | `npm install @emotion/react @emotion/styled` |
-| Styled Components | `npm install styled-components` |
-| MUI X Charts | `npm install @mui/x-charts` |
-| Axios | `npm install axios` |
-| CKEditor 4 | `npm install ckeditor4 ckeditor4-react` |
-| Dotenv | `npm install dotenv` |
-
-### Backend Libraries
-
-Install all backend dependencies:
-
-```bash
-cd backend
-npm install
-```
-
-| Package | Installation Command |
-|---|---|
-| Express | `npm install express` |
-| MySQL2 | `npm install mysql2` |
-| bcryptjs | `npm install bcryptjs` |
-| JWT | `npm install jsonwebtoken` |
-| CORS | `npm install cors` |
-| Multer | `npm install multer` |
-| Nodemailer | `npm install nodemailer` |
-| PDFKit | `npm install pdfkit` |
-| Dotenv | `npm install dotenv` |
-| Nodemon | `npm install -D nodemon` |
-
-### Frontend Development Dependencies
-
-```bash
-npm install -D vite @vitejs/plugin-react oxlint
-```
-
-**Important:** These commands show how to install individual packages. You do not need to run them all if you have already run `npm install`. The project manifests are the source of truth for the existing dependency versions.
-
----
-
-## 🔗 API Configuration
-
-The frontend communicates with the backend through HTTP requests.
-
-Example Axios configuration:
-
-```javascript
-import axios from "axios";
-
-const API = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
-});
-
-export default API;
-```
-
-Use this configuration if it matches the existing API implementation.
-
-For actual API endpoints, refer to the backend routes and controllers.
+For full endpoint details, refer to the route files in `backend/route/`.
 
 ---
 
 ## 🛡 Security
 
-The application includes security-related libraries and practices:
-
-- bcryptjs for password hashing.
-- JSON Web Tokens for authentication.
+- **bcryptjs** for password hashing.
+- **JWT** for authentication (super admin + site admin).
 - Protected routes and authentication middleware.
-- CORS configuration.
+- **CORS** configuration driven by `CLIENT_URL`.
 - Input sanitization for secure content previews.
 - Environment variables for sensitive configuration.
-- MySQL database indexing and InnoDB support.
+- MySQL connection pooling with `mysql2`.
+- Honeypot spam protection on public forms.
+- Rate limiting (`publicSubmissionLimit`) on public submissions.
+- Table-level permission enforcement (`readOnlyTables.js`).
 
-Additional recommendations:
-
+**Recommendations:**
 - Validate all incoming API data.
 - Never store plain-text passwords.
-- Avoid exposing JWT secrets.
+- Never commit `.env` files.
 - Validate uploaded file types and sizes.
-- Restrict access to administrative APIs.
 - Use HTTPS in production.
 - Review CKEditor 4 security and licensing requirements before production deployment.
 
@@ -484,14 +404,6 @@ Additional recommendations:
 ## 🐛 Troubleshooting
 
 ### 1. Vite Command Not Found
-
-Error:
-
-```text
-'vite' is not recognized as an internal or external command
-```
-
-Solution:
 
 ```bash
 cd frontend
@@ -502,25 +414,21 @@ npm run dev
 ### 2. MySQL Connection Error
 
 Check:
-
 - MySQL Server is running.
-- Database name is correct.
-- Username and password are correct.
-- Backend environment variables are configured correctly.
+- `db_host`, `db_user`, `db_password`, `db_name` in `backend/.env` are correct.
+- The `tenant` database exists.
 
 ### 3. CORS Error
 
-Ensure the backend CORS configuration allows requests from your frontend origin.
+Ensure `CLIENT_URL` in `backend/.env` matches your frontend origin (`http://localhost:5173`).
 
 ### 4. Module Not Found
-
-Install the dependencies again:
 
 ```bash
 npm install
 ```
 
-For frontend peer dependency conflicts, try:
+For frontend peer dependency conflicts:
 
 ```bash
 npm install --legacy-peer-deps
@@ -528,36 +436,39 @@ npm install --legacy-peer-deps
 
 ### 5. Backend Start Script Missing
 
-If `npm start` fails because the script is missing, add:
+`backend/package.json` already includes:
 
 ```json
 "scripts": {
   "start": "node server.js",
-  "dev": "nodemon server.js"
+  "dev": "nodemon server.js",
+  "test": "jest"
 }
 ```
+
+### 6. Per-Site Database Not Created
+
+Ensure the master DB is connected and `provisionSite.js` runs without errors. Check backend logs during site purchase.
 
 ---
 
 ## 🤝 Contributing
 
-Contributions and suggestions are welcome!
-
 1. Fork the repository.
-2. Create a feature branch.
+2. Create a feature branch:
 
 ```bash
 git checkout -b feature/new-feature
 ```
 
-3. Commit your changes.
+3. Commit your changes:
 
 ```bash
 git add .
 git commit -m "Add new feature"
 ```
 
-4. Push your branch.
+4. Push your branch:
 
 ```bash
 git push origin feature/new-feature
@@ -569,9 +480,7 @@ git push origin feature/new-feature
 
 ## 📄 License
 
-This project currently does not specify a confirmed open-source license.
-
-Add an appropriate `LICENSE` file before granting permissions for reuse or redistribution.
+This project currently does not specify a confirmed open-source license. Add an appropriate `LICENSE` file before granting permissions for reuse or redistribution.
 
 ---
 

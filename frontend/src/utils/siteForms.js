@@ -95,4 +95,21 @@ export const SITE_FORM_SCRIPT = `
           window.removeEventListener('message', onResult);
           form.__tenantSubmitting = false;
           if (button) button.disabled = false;
-          status.textConten
+          status.textContent = message.data.message;
+          if (message.data.success) form.reset();
+        };
+        window.addEventListener('message', onResult);
+      });
+    });
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', attach, { once: true });
+  } else {
+    attach();
+  }
+  // Re-attach if CKEditor injects forms after load
+  const observer = new MutationObserver(attach);
+  observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
+})();
+</script>`;

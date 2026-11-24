@@ -1851,9 +1851,10 @@ export default function Site() {
           >
             <Box
               component="iframe"
+              ref={iframeRef}
               key={`${activeId}-${dataVersion}`}
               title={activePage?.title || "Page preview"}
-              sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
+              sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms"
               srcDoc={srcDoc}
               onLoad={handleFrameLoad}
               sx={{
