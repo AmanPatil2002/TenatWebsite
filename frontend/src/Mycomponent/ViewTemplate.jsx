@@ -867,11 +867,19 @@ export default function ViewTemplate() {
     ]),
   );
   allPages.forEach((page) => pagesById.set(String(getId(page)), page));
-  const editPages = Array.from(pagesById.values()).filter(
-    (page) =>
-      selectedPageIds.has(String(getId(page))) ||
-      String(getPageCategoryId(page)) === String(form.categoryId),
-  );
+  const editPages = Array.from(pagesById.values())
+    .filter(
+      (page) =>
+        selectedPageIds.has(String(getId(page))) ||
+        String(getPageCategoryId(page)) === String(form.categoryId),
+    )
+    .sort((a, b) => {
+      const idA = String(getId(a));
+      const idB = String(getId(b));
+      const sortA = form.pages[idA]?.sortOrder ?? 0;
+      const sortB = form.pages[idB]?.sortOrder ?? 0;
+      return sortA - sortB;
+    });
   const pagesLoading =
     editOpen &&
     form.categoryId &&

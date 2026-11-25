@@ -86,20 +86,8 @@ const EMPTY_FORM = {
   imageUrl: "",
   content: "",
   status: "active",
-  publishedAt: "", // nullable: false, format: datetime-local
 };
 
-const formatDateInput = (value) => {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const pad = (part) => String(part).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-    date.getDate(),
-  )}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-};
-
-const toApiDateTime = (raw) => (raw ? raw.replace('T', ' ') : null);
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -180,7 +168,6 @@ export default function SiteAdminNews() {
       imageUrl: item.imageUrl || "",
       content: item.content || "",
       status: item.status || "active",
-      publishedAt: formatDateInput(item.publishedAt),
     });
     setError("");
     setNotice("");
@@ -242,7 +229,6 @@ export default function SiteAdminNews() {
       imageUrl: form.imageUrl || null,
       content: form.content.trim(),
       status: form.status || "active",
-      publishedAt: toApiDateTime(form.publishedAt),
     };
 
     try {
@@ -501,16 +487,6 @@ export default function SiteAdminNews() {
             />
 
             <TextField
-              label="Publish date"
-              type="datetime-local"
-              value={form.publishedAt}
-              onChange={updateField("publishedAt")}
-              fullWidth
-              size="small"
-              slotProps={{ inputLabel: { shrink: true } }}
-            />
-
-            <TextField
               select
               label="Status"
               value={form.status}
@@ -694,11 +670,9 @@ export default function SiteAdminNews() {
                       >
                         {item.content || "No additional details"}
                       </Typography>
-                      {(item.publishedAt || item.createdAt) && (
+                      {item.createdAt && (
                         <Typography variant="caption" color="text.secondary">
-                          {item.publishedAt
-                            ? `Published: ${formatDateInput(item.publishedAt).replace("T", " ")}`
-                            : `Created: ${formatDateInput(item.createdAt).replace("T", " ")}`}
+                          Created: {new Date(item.createdAt).toLocaleString()}
                         </Typography>
                       )}
                     </Box>

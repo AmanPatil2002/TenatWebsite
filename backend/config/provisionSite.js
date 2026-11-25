@@ -247,9 +247,15 @@ const qualifyDdl = (siteId, base, ddl, dbNameFromSite) => {
   );
 
   // 2) Replace foreign-key REFERENCES to other tables
+  // Handles: REFERENCES tableName (column), REFERENCES tableName(column),
+  // REFERENCES `tableName` (column), REFERENCES `tableName`(column)
+  // Also handles explicit column reference syntax: REFERENCES `tableName` (`columnName`)
   out = out.replace(
-    /\bREFERENCES\s+`?([a-zA-Z0-9_]+)`?\s*\(/gi,
-    (_m, refTable) => `REFERENCES ${tn(siteId, refTable, dbNameFromSite)} (`,
+    /\bREFERENCES\s+`?([a-zA-Z0-9_]+)`?\s*(\([`a-zA-Z0-9_]+\))?/gi,
+    (_m, refTable, refCol) => {
+      const colPart = refCol ? ` ${refCol}` : '';
+      return `REFERENCES ${tn(siteId, refTable, dbNameFromSite)}${colPart}`;
+    }
   );
 
   return out;

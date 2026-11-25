@@ -311,6 +311,11 @@ const PUBLIC_PRIVATE_RESOURCE_NAMES = new Set([
   'doctoravailability','petrecords','petpayments','dentalpatients',
   'treatmentplans','daycarepayments','memberpayments','transactions',
   'apppurchases','kycdocuments','casedocuments',
+  'cafeorderitems', 'farmorderitems', 'jewelryorderitems', 'furnitureorderitems', 'groceryorderitems',
+  'petpayments', 'dentalpayments', 'daycarepayments', 'memberpayments',
+  'downloads', 'tickets', 'donationreceipts', 'kycdocuments', 'casedocuments', 'transactions', 'apppurchases',
+  'attendance', 'examresults', 'feepayments', 'patients', 'prescriptions', 'doctoravailability', 'petrecords',
+  'dentalpatients', 'treatmentplans', 'sitevisits', 'enrollments', 'daycarepayments',
 ]);
 
 exports.publicSections = async (req, res) => {
@@ -374,6 +379,7 @@ const PUBLIC_BLOCKED_VIEW_TABLES = new Set([
   'dentalpayments','daycarepayments','memberpayments','downloads','tickets',
   'donationreceipts','kycdocuments','casedocuments','transactions','apppurchases',
   'sitetables','sitethemes','headers','pages',
+  'petrecords', 'dentalpatients', 'treatmentplans', 'sitevisits', 'enrollments', 'daycarepayments',
 ]);
 
 const PUBLIC_RESOURCE_NAMES = new Set([
@@ -385,6 +391,13 @@ const PUBLIC_RESOURCE_NAMES = new Set([
   'customorders','jewelryorders','furnitureorders','groceryorders',
   'cafeorders','donations','volunteers','subscribers','subscriptions',
   'reviews','hotelreviews','productreviews','appreviews','comments',
+  'farmproducts', 'consultingservices', 'consultants', 'petservices', 'veterinarians', 'daycareprograms',
+  'caregivers', 'dentalservices', 'dentists', 'appcategories', 'mobileapps', 'designservices',
+  'designprojects', 'moodboards', 'artists', 'albums', 'tracks', 'eventshows', 'genres', 'movies',
+  'subscriptionplans', 'episodes', 'gamecategories', 'games', 'teams', 'tournaments', 'players',
+  'teamrosters', 'matches', 'matchresults', 'jewelrycategories', 'jewelryproducts', 'goldrates',
+  'furniturecategories', 'furnitureproducts', 'grocerycategories', 'groceryproducts', 'deliveryslots',
+  'cafecategories', 'cafeitems',
 ]);
 
 const PUBLIC_PROTECTED_FIELDS = new Set([

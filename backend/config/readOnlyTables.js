@@ -46,6 +46,8 @@ const STATUS_FIELD_MAP = {
   appreviews: 'status',
   comments: 'status',
   payments: 'paymentStatus',
+  enrollment: 'status',
+  enrollments: 'status',
 };
 
 const STATUS_ONLY_TABLES_BY_NAME = new Set([
@@ -83,6 +85,30 @@ const STATUS_ONLY_TABLES_BY_NAME = new Set([
   'productreviews',
   'appreviews',
   'comments',
+  'propertyfavorites',
+  'watchlist',
+  'watchhistory',
+  'downloads',
+  'tickets',
+  'donationreceipts',
+  'kycdocuments',
+  'casedocuments',
+  'attendance',
+  'examresults',
+  'feepayments',
+  'patients',
+  'prescriptions',
+  'doctoravailability',
+  'petrecords',
+  'petpayments',
+  'dentalpayments',
+  'daycarepayments',
+  'memberpayments',
+  'treatmentplans',
+  'dentalpatients',
+  'sitevisits',
+  'transactions',
+  'apppurchases',
 ]);
 
 const VIEW_ONLY_TABLES_BY_NAME = new Set([
@@ -110,6 +136,18 @@ const VIEW_ONLY_TABLES_BY_NAME = new Set([
   'donationreceipts',
   'kycdocuments',
   'casedocuments',
+  'attendance',
+  'examresults',
+  'feepayments',
+  'patients',
+  'prescriptions',
+  'doctoravailability',
+  'petrecords',
+  'transactions',
+  'apppurchases',
+  'treatmentplans',
+  'dentalpatients',
+  'sitevisits',
 ]);
 
 const normalizeTableName = (table) =>

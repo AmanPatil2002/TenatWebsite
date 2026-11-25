@@ -52,6 +52,7 @@ const addCategory = (req, res) => {
   const tag = cleanOptional(req.body.tag);
 
   if (!name) return res.status(400).json({ message: "Name is required" });
+  if (!packKey) return res.status(400).json({ message: "Pack key is required" });
   if (name.length > NAME_MAX) {
     return res.status(400).json({ message: `Name must be ${NAME_MAX} characters or fewer` });
   }
@@ -66,7 +67,7 @@ const addCategory = (req, res) => {
 
   db.query(
     "INSERT INTO categories(name,packKey,tag,createdBy) VALUES(?,?,?,?)",
-    [name, packKey, tag, content.value, req.user.userId],
+    [name, packKey, tag, req.user.userId],
     (err, result) => {
       if (err?.code === "ER_DUP_ENTRY") {
         return res.status(409).json({ message: "A category with this name already exists" });

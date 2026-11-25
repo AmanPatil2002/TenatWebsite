@@ -43,7 +43,6 @@ CREATE TABLE IF NOT EXISTS categories (
   name        VARCHAR(190) NOT NULL,
   packKey     VARCHAR(30) NULL,
   tag         VARCHAR(500) NULL,
-  content     JSON NULL,
   createdBy   BIGINT UNSIGNED NOT NULL,
   createdAt   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uqCategoryName (name),

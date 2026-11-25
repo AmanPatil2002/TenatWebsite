@@ -8,24 +8,18 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   Divider,
   IconButton,
-  MenuItem,
   Paper,
   Stack,
-  TextField,
   Tooltip,
   Typography,
   alpha,
+  TextField,
   useTheme,
 } from "@mui/material";
 
-import { buildFormMarkup, buildPageBody, inferColumns } from "../utils/buildPageContent";
-import { getTablePermission } from "../config/readOnlyTables";
+import { buildPageBody } from "../utils/buildPageContent";
 
 /* ------------------------------------------------------------------ */
 /*  dehydrate                                                          */
@@ -177,13 +171,6 @@ export default function SiteAdminManagePages() {
   const [galleryItems, setGalleryItems] = useState([]);
   const [siteData, setSiteData] = useState({});
   const [resourcesReady, setResourcesReady] = useState(false);
-  const [formDialogOpen, setFormDialogOpen] = useState(false);
-  const [formResource, setFormResource] = useState("");
-  const [formFields, setFormFields] = useState("");
-  const [formSubmitText, setFormSubmitText] = useState("Submit");
-  const [formSuccessMessage, setFormSuccessMessage] = useState(
-    "Thank you. Your submission was received.",
-  );
   const editorRef = useRef(null);
   const dehydrateTimer = useRef(null);
   const pagesUrl = `${baseUrl}/pages`;
@@ -570,67 +557,6 @@ export default function SiteAdminManagePages() {
     }
   };
 
-  const insertForm = () => {
-    const resources = Object.keys(siteData).filter((resource) =>
-      getTablePermission(
-        site?.packKey || site?.vertical || site?.pack || "",
-        resource,
-      ) === "status"
-    );
-    if (!resources.length) {
-      setError("This site has no visitor-submission resources.");
-      return;
-    }
-    setFormResource(resources[0]);
-    setFormFields("");
-    setFormSubmitText("Submit");
-    setFormSuccessMessage("Thank you. Your submission was received.");
-    setFormDialogOpen(true);
-  };
-
-  const insertConfiguredForm = () => {
-    if (!formResource) return;
-    const inferred = inferColumns(siteData[formResource]);
-    const available = inferred
-      .filter((column) =>
-        !/(status|password|token|price|amount|total|id$)/i.test(column.key)
-      )
-      .map((column) => column.key);
-    const selected = formFields
-      .split(",")
-      .map((name) => name.trim())
-      .filter((name) => available.includes(name));
-    if (!selected.length) {
-      setError("Select at least one supported form field.");
-      return;
-    }
-    const fields = selected.map((name) => {
-      const column = inferred.find((item) => item.key === name);
-      return {
-        name,
-        label: column?.label || name,
-        type:
-          /email/i.test(name) ? "email" :
-          /phone|mobile/i.test(name) ? "phone" :
-          /date/i.test(name) ? "date" :
-          /time/i.test(name) ? "time" :
-          /message|description|comment|address|details/i.test(name) ? "textarea" :
-          "text",
-        required: true,
-      };
-    });
-    const markup = buildFormMarkup({
-      resource: formResource,
-      fields,
-      submitText: formSubmitText.trim() || "Submit",
-      successMessage:
-        formSuccessMessage.trim() || "Thank you. Your submission was received.",
-    });
-    editorRef.current?.insertHtml(markup);
-    setFormDialogOpen(false);
-    setSuccess("Submission form inserted.");
-  };
-
   const deletePage = async (page) => {
     if (!window.confirm(`Delete "${page.title}"? This cannot be undone.`)) {
       return;
@@ -674,19 +600,6 @@ export default function SiteAdminManagePages() {
   const currentTitle = creating
     ? "New custom page"
     : selectedPage?.title || "Page";
-  const formResources = Object.keys(siteData).filter((resource) =>
-    getTablePermission(
-      site?.packKey || site?.vertical || site?.pack || "",
-      resource,
-    ) === "status"
-  );
-  const formAvailableFields = formResource
-    ? inferColumns(siteData[formResource])
-        .filter((column) =>
-          !/(status|password|token|price|amount|total|id$)/i.test(column.key)
-        )
-        .map((column) => column.key)
-    : [];
 
   return (
     <Box sx={{ maxWidth: 1440, mx: "auto" }}>
@@ -1008,14 +921,6 @@ export default function SiteAdminManagePages() {
                 >
                   Page content
                 </Typography>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={insertForm}
-                  sx={{ mb: 1, textTransform: "none" }}
-                >
-                  Insert submission form
-                </Button>
                 <Box
                   sx={{
                     width: "100%",
@@ -1299,65 +1204,6 @@ export default function SiteAdminManagePages() {
           </Paper>
         </Box>
       )}
-      <Dialog
-        open={formDialogOpen}
-        onClose={() => setFormDialogOpen(false)}
-        fullWidth
-        maxWidth="sm"
-      >
-        <DialogTitle>Insert submission form</DialogTitle>
-        <DialogContent sx={{ display: "grid", gap: 2, pt: 2 }}>
-          <TextField
-            select
-            label="Submission resource"
-            value={formResource}
-            onChange={(event) => {
-              setFormResource(event.target.value);
-              setFormFields("");
-            }}
-            fullWidth
-          >
-            {formResources.map((resource) => (
-              <MenuItem key={resource} value={resource}>
-                {resource}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            label="Fields"
-            value={formFields}
-            onChange={(event) => setFormFields(event.target.value)}
-            helperText={
-              formAvailableFields.length
-                ? `Comma-separated. Available: ${formAvailableFields.join(", ")}`
-                : "No supported fields are available."
-            }
-            fullWidth
-          />
-          <TextField
-            label="Submit button text"
-            value={formSubmitText}
-            onChange={(event) => setFormSubmitText(event.target.value)}
-            fullWidth
-          />
-          <TextField
-            label="Success message"
-            value={formSuccessMessage}
-            onChange={(event) => setFormSuccessMessage(event.target.value)}
-            fullWidth
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setFormDialogOpen(false)}>Cancel</Button>
-          <Button
-            variant="contained"
-            onClick={insertConfiguredForm}
-            disabled={!formResource || !formFields.trim()}
-          >
-            Insert form
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 }
