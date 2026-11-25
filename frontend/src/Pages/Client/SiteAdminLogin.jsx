@@ -29,6 +29,8 @@ export default function SiteAdminLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({ email: false, password: false });
   const [loading, setLoading] = useState(false);
 
   const [showPassword, setShowPassword] = useState(false);
@@ -36,9 +38,33 @@ export default function SiteAdminLogin() {
   const primary = theme.palette.primary.main;
   const primaryDark = theme.palette.primary.dark;
 
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    if (name === "email") setEmail(value);
+    else if (name === "password") setPassword(value);
+    setErrors((prev) => ({ ...prev, [name]: "" }));
+    setError("");
+  };
+
+  const handleBlur = (e) => {
+    setTouched((prev) => ({ ...prev, [e.target.name]: true }));
+  };
+
+  const validate = () => {
+    const next = {};
+    if (!email.trim()) next.email = "Email is required";
+    else if (!/^\S+@\S+\.\S+$/.test(email.trim()))
+      next.email = "Enter a valid email";
+
+    if (!password) next.password = "Password is required";
+
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (loading) return;
+    if (loading || !validate()) return;
     setLoading(true);
     setError("");
 
@@ -121,25 +147,33 @@ export default function SiteAdminLogin() {
               <Stack spacing={2}>
                 <TextField
                   label="Email"
+                  name="email"
                   type="email"
                   value={email}
-                  onChange={(event) => setEmail(event.target.value)}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
                   autoComplete="username"
                   required
                   fullWidth
                   size="medium"
                   placeholder="you@example.com"
+                  error={Boolean(errors.email)}
+                  helperText={touched.email ? errors.email : undefined}
                 />
                 <TextField
                   label="Password"
+                  name="password"
                   type={showPassword ? "text" : "password"}
                   value={password}
-                  onChange={(event) => setPassword(event.target.value)}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
                   autoComplete="current-password"
                   required
                   fullWidth
                   size="medium"
                   placeholder="Enter your password"
+                  error={Boolean(errors.password)}
+                  helperText={touched.password ? errors.password : undefined}
                   slotProps={{
                     input: {
                       endAdornment: (

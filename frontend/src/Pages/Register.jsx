@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useMemo } from "react";
 import axios from "axios";
 import { useNavigate, Link as RouterLink } from "react-router-dom";
 import {
@@ -15,6 +15,7 @@ import {
   Stack,
   TextField,
   Typography,
+  LinearProgress,
 } from "@mui/material";
 import { createTheme, ThemeProvider, alpha } from "@mui/material/styles";
 import Visibility from "@mui/icons-material/Visibility";
@@ -38,6 +39,21 @@ const BRAND = {
   ink: "#0f172a",
   muted: "#64748b",
 };
+
+/** Password strength scoring (0-4) */
+const getPasswordStrength = (pwd) => {
+  if (!pwd) return 0;
+  let score = 0;
+  if (pwd.length >= 8) score++;
+  if (/[A-Z]/.test(pwd)) score++;
+  if (/[a-z]/.test(pwd)) score++;
+  if (/\d/.test(pwd)) score++;
+  if (/[^A-Za-z0-9]/.test(pwd)) score++;
+  return Math.min(score, 4);
+};
+
+const STRENGTH_LABELS = ["Very weak", "Weak", "Fair", "Strong", "Very strong"];
+const STRENGTH_COLORS = ["error.main", "warning.main", "info.main", "success.light", "success.main"];
 
 const theme = createTheme({
   palette: {
@@ -80,6 +96,7 @@ function Register() {
   const [serverError, setServerError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [touched, setTouched] = useState({ name: false, email: false, phone: false, password: false, address: false });
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -88,11 +105,16 @@ function Register() {
     setServerError("");
   };
 
+  const handleBlur = (e) => {
+    setTouched((prev) => ({ ...prev, [e.target.name]: true }));
+  };
+
   const validate = () => {
     const next = {};
     const name = form.name.trim();
     const email = form.email.trim();
     const phone = form.phone.trim();
+    const address = form.address.trim();
 
     if (!name) next.name = "Name is required";
     else if (name.length > NAME_MAX)
@@ -102,8 +124,13 @@ function Register() {
     else if (email.length > EMAIL_MAX || !EMAIL_RE.test(email))
       next.email = "Enter a valid email";
 
-    if (phone.length > PHONE_MAX)
-      next.phone = `Phone must be ${PHONE_MAX} characters or fewer`;
+    if (!phone) next.phone = "Phone is required";
+    else if (phone.length > PHONE_MAX)
+      next.phone = `Phone must be exactly ${PHONE_MAX} characters`;
+    else if (!/^\d+$/.test(phone))
+      next.phone = "Phone must contain only numbers";
+
+    if (!address) next.address = "Address is required";
 
     if (!form.password) next.password = "Password is required";
     else if (form.password.length < PASSWORD_MIN)
@@ -125,9 +152,9 @@ function Register() {
       const { data } = await axios.post(`${API_URL}/auth/register`, {
         name: form.name.trim(),
         email: form.email.trim(),
-        phone: form.phone.trim() || null,
+        phone: form.phone.trim(),
         password: form.password,
-        address: form.address.trim() || null,
+        address: form.address.trim(),
       });
 
       if (data.verificationRequired) {
@@ -165,6 +192,8 @@ function Register() {
       setLoading(false);
     }
   };
+
+  const strength = useMemo(() => getPasswordStrength(form.password), [form.password]);
 
   return (
     <ThemeProvider theme={theme}>
@@ -409,10 +438,11 @@ function Register() {
                       type="text"
                       value={form.name}
                       onChange={handleChange}
+                      onBlur={handleBlur}
                       placeholder="Enter name"
                       inputProps={{ maxLength: NAME_MAX }}
                       error={Boolean(errors.name)}
-                      helperText={errors.name}
+                      helperText={touched.name ? errors.name : undefined}
                       autoComplete="name"
                       autoFocus
                       required
@@ -425,40 +455,45 @@ function Register() {
                       type="email"
                       value={form.email}
                       onChange={handleChange}
+                      onBlur={handleBlur}
                       placeholder="you@example.com"
                       inputProps={{ maxLength: EMAIL_MAX, inputMode: "email" }}
                       error={Boolean(errors.email)}
-                      helperText={errors.email}
+                      helperText={touched.email ? errors.email : undefined}
                       autoComplete="email"
                       required
                       fullWidth
                     />
 
                     <TextField
-                      label="Phone (optional)"
+                      label="Phone"
                       name="phone"
                       type="tel"
                       value={form.phone}
                       onChange={handleChange}
+                      onBlur={handleBlur}
                       placeholder="Enter phone"
                       inputProps={{ maxLength: PHONE_MAX, inputMode: "tel" }}
                       error={Boolean(errors.phone)}
-                      helperText={errors.phone}
+                      helperText={touched.phone ? errors.phone : undefined}
                       autoComplete="tel"
+                      required
                       fullWidth
                     />
 
                     <TextField
-                      label="Address (optional)"
+                      label="Address"
                       name="address"
                       value={form.address}
                       onChange={handleChange}
+                      onBlur={handleBlur}
                       placeholder="Enter address"
                       error={Boolean(errors.address)}
-                      helperText={errors.address}
+                      helperText={touched.address ? errors.address : undefined}
                       autoComplete="street-address"
                       multiline
                       minRows={2}
+                      required
                       fullWidth
                     />
 
@@ -468,11 +503,14 @@ function Register() {
                       type={showPassword ? "text" : "password"}
                       value={form.password}
                       onChange={handleChange}
+                      onBlur={handleBlur}
                       placeholder="Enter password"
                       inputProps={{ maxLength: PASSWORD_MAX }}
                       error={Boolean(errors.password)}
                       helperText={
-                        errors.password || `At least ${PASSWORD_MIN} characters`
+                        touched.password
+                          ? errors.password
+                          : `At least ${PASSWORD_MIN} characters`
                       }
                       autoComplete="new-password"
                       required
@@ -508,6 +546,27 @@ function Register() {
                         },
                       }}
                     />
+
+                    {form.password && (
+                      <Box sx={{ mt: -1 }}>
+                        <Stack spacing={0.5} sx={{ mb: 1 }}>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                            <LinearProgress
+                              variant="determinate"
+                              value={(strength / 4) * 100}
+                              color={STRENGTH_COLORS[strength]}
+                              sx={{ flex: 1, height: 4, borderRadius: 2 }}
+                            />
+                            <Typography variant="caption" sx={{ color: STRENGTH_COLORS[strength], fontWeight: 600, minWidth: 90 }}>
+                              {STRENGTH_LABELS[strength]}
+                            </Typography>
+                          </Box>
+                          <Typography variant="caption" color="text.secondary">
+                            {strength < 3 && "Tip: Add uppercase, numbers, or symbols to strengthen"}
+                          </Typography>
+                        </Stack>
+                      </Box>
+                    )}
 
                     <Button
                       type="submit"

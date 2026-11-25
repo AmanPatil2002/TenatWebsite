@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useMemo } from "react";
 import axios from "axios";
 import { useNavigate, useLocation, Link as RouterLink } from "react-router-dom";
 import {
@@ -20,6 +20,7 @@ import {
   Stack,
   TextField,
   Typography,
+  LinearProgress,
 } from "@mui/material";
 import { createTheme, ThemeProvider, alpha } from "@mui/material/styles";
 import Visibility from "@mui/icons-material/Visibility";
@@ -29,10 +30,12 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 
 
 
+
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const EMAIL_MAX = 190;
 const PASSWORD_MAX = 72;
+const PASSWORD_MIN = 6;
 const EMAIL_RE = /^\S+@\S+\.\S+$/;
 
 const BRAND = {
@@ -41,6 +44,22 @@ const BRAND = {
   ink: "#0f172a",
   muted: "#64748b",
 };
+
+/** Password strength scoring (0-4) */
+const getPasswordStrength = (pwd) => {
+  if (!pwd) return 0;
+  let score = 0;
+  if (pwd.length >= 8) score++;
+  if (/[A-Z]/.test(pwd)) score++;
+  if (/[a-z]/.test(pwd)) score++;
+  if (/\d/.test(pwd)) score++;
+  if (/[^A-Za-z0-9]/.test(pwd)) score++;
+  return Math.min(score, 4);
+};
+
+const STRENGTH_LABELS = ["Very weak", "Weak", "Fair", "Strong", "Very strong"];
+const STRENGTH_COLORS = ["error.main", "warning.main", "info.main", "success.light", "success.main"];
+
 
 const theme = createTheme({
   palette: {
@@ -119,8 +138,8 @@ function ForgotPasswordDialog({ initialEmail, onClose, onDone }) {
       setError("Enter the 6-digit code from your email.");
       return;
     }
-    if (newPassword.length < 6) {
-      setError("Password must be at least 6 characters.");
+    if (newPassword.length < PASSWORD_MIN) {
+      setError(`Password must be at least ${PASSWORD_MIN} characters.`);
       return;
     }
     if (newPassword.length > PASSWORD_MAX) {
@@ -150,6 +169,8 @@ function ForgotPasswordDialog({ initialEmail, onClose, onDone }) {
       setLoading(false);
     }
   };
+
+  const strength = useMemo(() => getPasswordStrength(newPassword), [newPassword]);
 
   return (
     <Dialog
@@ -272,6 +293,26 @@ function ForgotPasswordDialog({ initialEmail, onClose, onDone }) {
                     ),
                   }}
                 />
+                {newPassword && (
+                  <Box sx={{ mt: -1 }}>
+                    <Stack spacing={0.5} sx={{ mb: 1 }}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <LinearProgress
+                          variant="determinate"
+                          value={(strength / 4) * 100}
+                          color={STRENGTH_COLORS[strength]}
+                          sx={{ flex: 1, height: 4, borderRadius: 2 }}
+                        />
+                        <Typography variant="caption" sx={{ color: STRENGTH_COLORS[strength], fontWeight: 600, minWidth: 90 }}>
+                          {STRENGTH_LABELS[strength]}
+                        </Typography>
+                      </Box>
+                      <Typography variant="caption" color="text.secondary">
+                        {strength < 3 && "Tip: Add uppercase, numbers, or symbols to strengthen"}
+                      </Typography>
+                    </Stack>
+                  </Box>
+                )}
                 <TextField
                   label="Confirm new password"
                   name="confirmPassword"
@@ -352,6 +393,7 @@ function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [forgotOpen, setForgotOpen] = useState(false);
+  const [touched, setTouched] = useState({ email: false, password: false });
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -359,6 +401,10 @@ function Login() {
     setErrors((prev) => ({ ...prev, [name]: "" }));
     setServerError("");
     setNotice("");
+  };
+
+  const handleBlur = (e) => {
+    setTouched((prev) => ({ ...prev, [e.target.name]: true }));
   };
 
   const handleForgotDone = (message) => {
@@ -638,10 +684,11 @@ function Login() {
                       type="email"
                       value={form.email}
                       onChange={handleChange}
+                      onBlur={handleBlur}
                       placeholder="you@example.com"
                       inputProps={{ maxLength: EMAIL_MAX, inputMode: "email" }}
                       error={Boolean(errors.email)}
-                      helperText={errors.email}
+                      helperText={touched.email ? errors.email : undefined}
                       autoComplete="email"
                       autoFocus
                       required
@@ -654,9 +701,10 @@ function Login() {
                       type={showPassword ? "text" : "password"}
                       value={form.password}
                       onChange={handleChange}
+                      onBlur={handleBlur}
                       placeholder="Enter password"
                       error={Boolean(errors.password)}
-                      helperText={errors.password}
+                      helperText={touched.password ? errors.password : undefined}
                       autoComplete="current-password"
                       required
                       fullWidth
