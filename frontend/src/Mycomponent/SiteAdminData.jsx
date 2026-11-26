@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useOutletContext, useParams } from "react-router-dom";
 import axios from "axios";
 import { useTablePermissions } from "../hooks/useTablePermissions";
@@ -14,6 +14,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormHelperText,
   IconButton,
   MenuItem,
   Paper,
@@ -41,6 +42,7 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import ViewListIcon from "@mui/icons-material/ViewList";
 import GridViewIcon from "@mui/icons-material/GridView";
 import ImageIcon from "@mui/icons-material/Image";
+import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 
 /* ------------------------------------------------------------------ */
 /*  Inline SVG icons for resource types                                 */
@@ -375,8 +377,10 @@ const status = field("Status", "select", {
   ],
   defaultValue: "active",
 });
-const text = (label, options = {}) => field(label, "text", { maxLength: 255, ...options });
-const number = (label, options = {}) => field(label, "number", { min: 0, ...options });
+const text = (label, options = {}) =>
+  field(label, "text", { maxLength: 255, ...options });
+const number = (label, options = {}) =>
+  field(label, "number", { min: 0, ...options });
 const idNumber = (label, options = {}) =>
   number(label, { integer: true, min: 1, ...options });
 const longText = (label, options = {}) =>
@@ -384,8 +388,10 @@ const longText = (label, options = {}) =>
 const date = (label, options = {}) => field(label, "date", options);
 const json = (label, options = {}) =>
   field(label, "json", { rows: 4, ...options });
-const email = (label, options = {}) => field(label, "email", { maxLength: 255, ...options });
-const phone = (label, options = {}) => field(label, "tel", { maxLength: 20, ...options });
+const email = (label, options = {}) =>
+  field(label, "email", { maxLength: 255, ...options });
+const phone = (label, options = {}) =>
+  field(label, "tel", { maxLength: 20, ...options });
 const image = (label, options = {}) => field(label, "image", options);
 
 const RESOURCE_CONFIG = {
@@ -464,8 +470,14 @@ const RESOURCE_CONFIG = {
       name: text("Name", { required: true, minLength: 2 }),
       qualification: text("Qualification"),
       specialization: text("Specialization"),
-      experienceYears: number("Experience in years", { integer: true, max: 60 }),
-      consultationFee: number("Consultation fee", { step: "0.01", max: 1000000 }),
+      experienceYears: number("Experience in years", {
+        integer: true,
+        max: 60,
+      }),
+      consultationFee: number("Consultation fee", {
+        step: "0.01",
+        max: 1000000,
+      }),
       bio: longText("Biography"),
       photoUrl: image("Photo"),
       status,
@@ -513,7 +525,11 @@ const RESOURCE_CONFIG = {
     fields: {
       name: text("Category name", { required: true, minLength: 2 }),
       description: longText("Description"),
-      sortOrder: number("Sort order", { integer: true, max: 9999, defaultValue: 0 }),
+      sortOrder: number("Sort order", {
+        integer: true,
+        max: 9999,
+        defaultValue: 0,
+      }),
       status,
     },
   },
@@ -551,8 +567,18 @@ const fieldFromSchema = (column) => {
   const lowerType = String(dataType).toLowerCase();
   const typeDefinition = String(columnType).toLowerCase();
   const varcharLength = typeDefinition.match(/^(?:var)?char\((\d+)\)/);
-  const integer = ["tinyint", "smallint", "mediumint", "int", "integer", "bigint", "year"].includes(lowerType);
-  const decimalScale = typeDefinition.match(/^(?:decimal|numeric)\(\d+,(\d+)\)/);
+  const integer = [
+    "tinyint",
+    "smallint",
+    "mediumint",
+    "int",
+    "integer",
+    "bigint",
+    "year",
+  ].includes(lowerType);
+  const decimalScale = typeDefinition.match(
+    /^(?:decimal|numeric)\(\d+,(\d+)\)/,
+  );
   const base = {
     label: humanize(name),
     required: Boolean(column.required),
@@ -594,7 +620,10 @@ const fieldFromSchema = (column) => {
       maxLength: varcharLength ? Number(varcharLength[1]) : undefined,
     };
   }
-  if (integer || ["decimal", "numeric", "float", "double", "real"].includes(lowerType)) {
+  if (
+    integer ||
+    ["decimal", "numeric", "float", "double", "real"].includes(lowerType)
+  ) {
     const scale = decimalScale ? Number(decimalScale[1]) : 0;
     return {
       ...base,
@@ -613,7 +642,7 @@ const fieldFromSchema = (column) => {
     return {
       ...base,
       type: "image",
-      maxLength: varcharLength ? Number(varcharLength[1]) : undefined,
+      maxLength: varcharLength ? Number(varcharLength[300]) : undefined,
     };
   }
   return {
@@ -692,13 +721,48 @@ const RESOURCE_ORDER = [
 ];
 
 /* ------------------------------------------------------------------ */
+/*  Image upload constants                                              */
+/* ------------------------------------------------------------------ */
+const ALLOWED_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+];
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
+const IMAGE_FIELD_NAME = "image";
+
+/* Resolve an image URL relative to the asset origin (backend upload prefix) */
+const resolveImage = (url, assetOrigin) => {
+  if (!url) return "";
+  if (/^(https?:|data:|blob:)/i.test(url)) return url;
+  const origin = String(assetOrigin || "").replace(/\/+$/, "");
+  const path = url.replace(/\\/g, "/");
+  return `${origin}${path.startsWith("/") ? "" : "/"}${path}`;
+};
+
+/* ------------------------------------------------------------------ */
 /*  Date / time helpers                                                 */
 /* ------------------------------------------------------------------ */
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const pad = (part) => String(part).padStart(2, "0");
 
-const toDateInput = (dt) => `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+const toDateInput = (dt) =>
+  `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
 const toDateTimeInput = (dt) =>
   `${toDateInput(dt)}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
 
@@ -709,7 +773,9 @@ const isRealDate = (str) => {
   if (!DATE_RE.test(str)) return false;
   const [y, m, d] = str.split("-").map(Number);
   const dt = new Date(y, m - 1, d);
-  return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
+  return (
+    dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d
+  );
 };
 
 /* 2026-11-13 -> 13 Nov 2026 (string based, so there is no timezone shift) */
@@ -821,16 +887,20 @@ const validateField = (spec, raw) => {
         : `${spec.label} must be a valid email address.`;
     case "tel": {
       const digits = value.replace(/\D/g, "");
-      return /^\+?[0-9\s\-().]+$/.test(value) && digits.length >= 7 && digits.length <= 15
-        ? ""
-        : `${spec.label} must be a valid phone number (7–15 digits).`;
+      // Only allow digits for phone numbers to prevent character input
+      if (!/^\d+$/.test(digits) || digits.length < 7 || digits.length > 15) {
+        return `${spec.label} must be a valid phone number (7–15 digits, numeric only).`;
+      }
+      return "";
     }
     case "date": {
       if (!isRealDate(value)) return `${spec.label} must be a valid date.`;
       const min = resolveBound(spec.min);
       const max = resolveBound(spec.max);
-      if (min && value < min) return `${spec.label} cannot be before ${formatDate(min)}.`;
-      if (max && value > max) return `${spec.label} cannot be after ${formatDate(max)}.`;
+      if (min && value < min)
+        return `${spec.label} cannot be before ${formatDate(min)}.`;
+      if (max && value > max)
+        return `${spec.label} cannot be after ${formatDate(max)}.`;
       return "";
     }
     case "datetime-local":
@@ -857,7 +927,9 @@ const validateField = (spec, raw) => {
         ? ""
         : `Please choose a valid ${spec.label.toLowerCase()}.`;
     case "boolean":
-      return value === "0" || value === "1" ? "" : `${spec.label} must be Yes or No.`;
+      return value === "0" || value === "1"
+        ? ""
+        : `${spec.label} must be Yes or No.`;
     default:
       return "";
   }
@@ -880,6 +952,28 @@ const validateForm = (form, config) => {
   ) {
     errors.salePrice = "Sale price cannot be higher than the price.";
   }
+  if (
+    config.fields.endDate &&
+    config.fields.startDate &&
+    !errors.endDate &&
+    !errors.startDate &&
+    form.endDate &&
+    form.startDate &&
+    form.endDate < form.startDate
+  ) {
+    errors.endDate = "End date cannot be before start date.";
+  }
+  if (
+    config.fields.toTime &&
+    config.fields.fromTime &&
+    !errors.toTime &&
+    !errors.fromTime &&
+    form.toTime &&
+    form.fromTime &&
+    form.toTime < form.fromTime
+  ) {
+    errors.toTime = "To time cannot be before from time.";
+  }
   return errors;
 };
 
@@ -895,11 +989,13 @@ const makePayload = (form, config) => {
       continue;
     }
     if (spec.type === "number") {
-      payload[name] = spec.bigint && spec.integer ? String(raw).trim() : Number(raw);
-    }
-    else if (spec.type === "boolean") payload[name] = Number(raw);
-    else if (spec.type === "json") payload[name] = JSON.stringify(JSON.parse(raw));
-    else if (spec.type === "datetime-local") payload[name] = `${raw.replace("T", " ")}:00`;
+      payload[name] =
+        spec.bigint && spec.integer ? String(raw).trim() : Number(raw);
+    } else if (spec.type === "boolean") payload[name] = Number(raw);
+    else if (spec.type === "json")
+      payload[name] = JSON.stringify(JSON.parse(raw));
+    else if (spec.type === "datetime-local")
+      payload[name] = `${raw.replace("T", " ")}:00`;
     else payload[name] = String(raw).trim();
   }
   return payload;
@@ -909,7 +1005,11 @@ const formatCell = (value, spec) => {
   if (value === null || value === undefined || value === "") return "—";
   if (spec?.type === "date") return formatDate(value);
   if (spec?.type === "datetime-local") return formatDateTime(value);
-  if (spec?.type === "number" && spec.step === "0.01" && Number.isFinite(Number(value))) {
+  if (
+    spec?.type === "number" &&
+    spec.step === "0.01" &&
+    Number.isFinite(Number(value))
+  ) {
     return Number(value).toLocaleString("en-IN", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
@@ -920,72 +1020,220 @@ const formatCell = (value, spec) => {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Image URL field (no upload, URL only with live preview)             */
+/*  Image upload field (file upload with preview + replace)             */
 /* ------------------------------------------------------------------ */
-function ImageUrlField({ spec, value, onChange, onBlur, error }) {
+function ImageUploadField({
+  spec,
+  value,
+  onChange,
+  error,
+  uploadUrl,
+  authConfig,
+  assetOrigin,
+  onUploadingChange,
+}) {
+  const theme = useTheme();
+  const fileInputRef = useRef(null);
+  const mountedRef = useRef(true);
+  const notifyRef = useRef(onUploadingChange);
+  notifyRef.current = onUploadingChange;
+
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const [broken, setBroken] = useState(false);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      notifyRef.current?.(false); // never leave the form stuck in "uploading"
+    };
+  }, []);
 
   useEffect(() => {
     setBroken(false);
   }, [value]);
 
+  const handleFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = ""; // lets the same file be picked again
+    if (!file) return;
+
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      setUploadError("Only JPG, PNG, WEBP or GIF images are allowed.");
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      setUploadError("Image must be 5 MB or smaller.");
+      return;
+    }
+
+    setUploadError("");
+    setUploading(true);
+    onUploadingChange?.(true);
+    try {
+      const body = new FormData();
+      body.append(IMAGE_FIELD_NAME, file);
+      const { data } = await axios.post(uploadUrl, body, {
+        ...authConfig,
+        headers: {
+          ...authConfig?.headers,
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      const url = data?.url || data?.imageUrl || data?.path;
+      if (!url)
+        throw new Error("Upload succeeded but no image URL was returned.");
+      if (mountedRef.current) onChange(url);
+    } catch (err) {
+      if (mountedRef.current) {
+        setUploadError(
+          err.response?.data?.message ||
+            err.message ||
+            "Could not upload the image.",
+        );
+      }
+    } finally {
+      if (mountedRef.current) setUploading(false);
+      onUploadingChange?.(false);
+    }
+  };
+
+  const message =
+    uploadError ||
+    error ||
+    (value && broken ? "This image could not be loaded." : "");
+
   return (
-    <Box
-      sx={{
-        gridColumn: { xs: "auto", sm: "1 / -1" },
-        display: "flex",
-        gap: 2,
-        alignItems: "flex-start",
-      }}
-    >
-      <Box
-        sx={{
-          width: 72,
-          height: 72,
-          borderRadius: 2,
-          border: "1px solid",
-          borderColor: "divider",
-          display: "grid",
-          placeItems: "center",
-          overflow: "hidden",
-          bgcolor: "action.hover",
-          flexShrink: 0,
-        }}
-      >
-        {value && !broken && !error ? (
-          <Box
-            component="img"
-            src={value}
-            alt={spec.label}
-            onError={() => setBroken(true)}
-            sx={{ width: "100%", height: "100%", objectFit: "cover" }}
-          />
-        ) : (
-          <ImageIcon sx={{ fontSize: 32, color: "text.disabled" }} />
-        )}
-      </Box>
-      <TextField
-        label={`${spec.label} URL`}
-        value={value.startsWith("data:") ? "(embedded image)" : value}
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={onBlur}
-        fullWidth
-        placeholder="https://example.com/image.jpg"
-        error={Boolean(error) || (Boolean(value) && broken)}
-        helperText={
-          error || (value && broken ? "This image could not be loaded." : undefined)
-        }
-        slotProps={{
-          htmlInput: { readOnly: value.startsWith("data:") },
-          input: {
-            endAdornment: value ? (
-              <Button size="small" onClick={() => onChange("")} sx={{ textTransform: "none" }}>
-                Clear
-              </Button>
-            ) : null,
-          },
-        }}
+    <Box sx={{ gridColumn: { xs: "auto", sm: "1 / -1" } }}>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 0.75 }}>
+        {spec.label}
+        {spec.required ? " *" : ""}
+      </Typography>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        hidden
+        accept={ALLOWED_IMAGE_TYPES.join(",")}
+        onChange={handleFileChange}
       />
+
+      {value ? (
+        <Box
+          sx={{
+            position: "relative",
+            borderRadius: 2,
+            overflow: "hidden",
+            border: `1px solid ${message ? theme.palette.error.main : theme.palette.divider}`,
+            bgcolor: "action.hover",
+            height: 200,
+            display: "grid",
+            placeItems: "center",
+          }}
+        >
+          {broken ? (
+            <ImageIcon sx={{ fontSize: 48, color: "text.disabled" }} />
+          ) : (
+            <Box
+              component="img"
+              src={resolveImage(value, assetOrigin)}
+              alt={`${spec.label} preview`}
+              onError={() => setBroken(true)}
+              sx={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                display: "block",
+              }}
+            />
+          )}
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{ position: "absolute", bottom: 8, right: 8 }}
+          >
+            <Button
+              size="small"
+              variant="contained"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              startIcon={
+                uploading ? (
+                  <CircularProgress size={14} color="inherit" />
+                ) : (
+                  <CloudUploadIcon sx={{ fontSize: 16 }} />
+                )
+              }
+              sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 600 }}
+            >
+              {uploading ? "Uploading…" : "Replace"}
+            </Button>
+            <Button
+              size="small"
+              variant="contained"
+              color="error"
+              onClick={() => {
+                setUploadError("");
+                onChange("");
+              }}
+              disabled={uploading}
+              startIcon={<DeleteIcon sx={{ fontSize: 16 }} />}
+              sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 600 }}
+            >
+              Remove
+            </Button>
+          </Stack>
+        </Box>
+      ) : (
+        <Button
+          fullWidth
+          variant="outlined"
+          color={message ? "error" : "primary"}
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          sx={{
+            py: 4,
+            borderRadius: 2,
+            borderStyle: "dashed",
+            flexDirection: "column",
+            gap: 0.75,
+            textTransform: "none",
+            fontWeight: 600,
+            color: "text.secondary",
+            "&:hover": {
+              borderStyle: "dashed",
+              bgcolor: alpha(theme.palette.primary.main, 0.04),
+            },
+          }}
+        >
+          <Box
+            sx={{
+              width: 44,
+              height: 44,
+              borderRadius: 2,
+              display: "grid",
+              placeItems: "center",
+              bgcolor: alpha(theme.palette.primary.main, 0.1),
+              color: "primary.main",
+            }}
+          >
+            {uploading ? <CircularProgress size={20} /> : <CloudUploadIcon />}
+          </Box>
+          <span>
+            {uploading ? "Uploading…" : `Upload ${spec.label.toLowerCase()}`}
+          </span>
+          <Typography variant="caption" color="text.secondary" fontWeight={400}>
+            JPG, PNG, WEBP or GIF · max 5 MB
+          </Typography>
+        </Button>
+      )}
+
+      {message && (
+        <FormHelperText error sx={{ mx: 1.75, mt: 0.5 }}>
+          {message}
+        </FormHelperText>
+      )}
     </Box>
   );
 }
@@ -999,7 +1247,8 @@ export default function SiteAdminData() {
   const { tableName } = useParams();
 
   // Support multiple possible property names for vertical/packKey
-  const vertical = site?.packKey || site?.vertical || site?.pack || site?.type || '';
+  const vertical =
+    site?.packKey || site?.vertical || site?.pack || site?.type || "";
 
   const [resources, setResources] = useState([]);
   const [resourceSchemas, setResourceSchemas] = useState({});
@@ -1042,7 +1291,14 @@ export default function SiteAdminData() {
   const config = resourceConfigs[selectedResource];
   const resourceColor = config?.color || theme.palette.primary.main;
   const resourceUrl = `${baseUrl}/data/${selectedResource}`;
-
+  const assetOrigin = useMemo(() => {
+    if (site?.assetOrigin) return site.assetOrigin;
+    try {
+      return new URL(baseUrl, window.location.origin).origin;
+    } catch {
+      return window.location.origin;
+    }
+  }, [site?.assetOrigin, baseUrl]);
   // Table permissions hook
   const tablePermissions = useTablePermissions(vertical, selectedResource);
 
@@ -1087,19 +1343,25 @@ export default function SiteAdminData() {
     const query = search.trim().toLowerCase();
     if (!query) return rows;
     return rows.filter((row) =>
-      Object.values(row).some((value) => formatCell(value).toLowerCase().includes(query)),
+      Object.values(row).some((value) =>
+        formatCell(value).toLowerCase().includes(query),
+      ),
     );
   }, [rows, search]);
 
   /* ---------------- Columns ---------------- */
   const selectedColumns = useMemo(() => {
     if (!config) return [];
-    return Object.keys(config.fields).filter((name) => !hiddenColumns.includes(name));
+    return Object.keys(config.fields).filter(
+      (name) => !hiddenColumns.includes(name),
+    );
   }, [config, hiddenColumns]);
 
   const toggleColumn = (name) => {
     setHiddenColumns((current) =>
-      current.includes(name) ? current.filter((c) => c !== name) : [...current, name],
+      current.includes(name)
+        ? current.filter((c) => c !== name)
+        : [...current, name],
     );
   };
 
@@ -1112,7 +1374,10 @@ export default function SiteAdminData() {
       const { data } = await axios.get(resourceUrl, authConfig);
       setRows(Array.isArray(data) ? data : []);
     } catch (requestError) {
-      setError(requestError.response?.data?.message || "Could not load this site's data.");
+      setError(
+        requestError.response?.data?.message ||
+          "Could not load this site's data.",
+      );
     } finally {
       setLoading(false);
     }
@@ -1132,7 +1397,11 @@ export default function SiteAdminData() {
         const knownResources = Object.entries(schemas)
           .filter(([name, schema]) => {
             if (getTablePermission(vertical, name) === "hidden") return false;
-            return !schema.isCommon && Array.isArray(schema.columns) && schema.columns.some((column) => column.editable);
+            return (
+              !schema.isCommon &&
+              Array.isArray(schema.columns) &&
+              schema.columns.some((column) => column.editable)
+            );
           })
           .map(([name]) => name);
         setResourceSchemas(schemas);
@@ -1185,7 +1454,9 @@ export default function SiteAdminData() {
       const statusField = tablePermissions.allowedStatusField;
       if (!statusField) return;
       setEditingRecord(record);
-      setForm({ [statusField]: formatInputValue(record[statusField], "select") });
+      setForm({
+        [statusField]: formatInputValue(record[statusField], "select"),
+      });
       setFieldErrors({});
       setError("");
       setNotice("");
@@ -1225,18 +1496,27 @@ export default function SiteAdminData() {
     setNotice("");
     try {
       const payload = tablePermissions.isStatusOnly
-        ? { [tablePermissions.allowedStatusField]: form[tablePermissions.allowedStatusField] }
+        ? {
+            [tablePermissions.allowedStatusField]:
+              form[tablePermissions.allowedStatusField],
+          }
         : makePayload(form, config);
 
       if (editingRecord) {
-        await axios.put(`${resourceUrl}/${editingRecord.id}`, payload, authConfig);
+        await axios.put(
+          `${resourceUrl}/${editingRecord.id}`,
+          payload,
+          authConfig,
+        );
       } else {
         await axios.post(resourceUrl, payload, authConfig);
       }
       await fetchRows();
       setDialogOpen(false);
       setNotice(
-        editingRecord ? `${config.label} record updated.` : `${config.label} record created.`,
+        editingRecord
+          ? `${config.label} record updated.`
+          : `${config.label} record created.`,
       );
     } catch (requestError) {
       const serverErrors = requestError.response?.data?.errors;
@@ -1259,7 +1539,9 @@ export default function SiteAdminData() {
 
   const deleteRecord = async (record) => {
     const label =
-      record.name || record.title || `${config?.label || "record"} #${record.id}`;
+      record.name ||
+      record.title ||
+      `${config?.label || "record"} #${record.id}`;
     if (!window.confirm(`Delete "${label}"? This cannot be undone.`)) return;
     setDeletingId(record.id);
     setError("");
@@ -1269,7 +1551,9 @@ export default function SiteAdminData() {
       setRows((current) => current.filter((row) => row.id !== record.id));
       setNotice("Record deleted.");
     } catch (requestError) {
-      setError(requestError.response?.data?.message || "Could not delete this record.");
+      setError(
+        requestError.response?.data?.message || "Could not delete this record.",
+      );
     } finally {
       setDeletingId(null);
     }
@@ -1305,20 +1589,24 @@ export default function SiteAdminData() {
 
     if (spec.type === "image") {
       return (
-        <ImageUrlField
+        <ImageUploadField
           key={name}
           spec={spec}
           value={form[name] ?? ""}
           onChange={(value) => updateForm(name, value)}
-          onBlur={() => validateOnBlur(name, spec)}
           error={errorText}
+          uploadUrl={`${baseUrl}/data/${selectedResource}/upload`}
+          authConfig={authConfig}
+          assetOrigin={assetOrigin}
         />
       );
     }
 
     const inputType = isSelect
       ? undefined
-      : ["date", "email", "tel", "number", "datetime-local", "time"].includes(spec.type)
+      : ["date", "email", "tel", "number", "datetime-local", "time"].includes(
+            spec.type,
+          )
         ? spec.type
         : "text";
 
@@ -1373,7 +1661,9 @@ export default function SiteAdminData() {
             : undefined,
           htmlInput,
         }}
-        sx={multiline ? { gridColumn: { xs: "auto", sm: "1 / -1" } } : undefined}
+        sx={
+          multiline ? { gridColumn: { xs: "auto", sm: "1 / -1" } } : undefined
+        }
       >
         {spec.type === "boolean" && [
           <MenuItem key="0" value="0">
@@ -1405,6 +1695,11 @@ export default function SiteAdminData() {
   };
 
   /* ---------------- Loading state ---------------- */
+  const displayColumns = useMemo(() => {
+    return selectedColumns;
+  }, [selectedColumns]);
+
+  /* ---------------- Loading/Unavailable states ---------------- */
   if (!site || !vertical) {
     return (
       <Box sx={{ display: "grid", placeItems: "center", minHeight: 320 }}>
@@ -1518,7 +1813,10 @@ export default function SiteAdminData() {
         </Alert>
       )}
 
-      <Paper variant="outlined" sx={{ borderRadius: 3, overflow: "hidden", mb: 2 }}>
+      <Paper
+        variant="outlined"
+        sx={{ borderRadius: 3, overflow: "hidden", mb: 2 }}
+      >
         {config && (
           <Box sx={{ p: 2 }}>
             <Stack
@@ -1551,14 +1849,20 @@ export default function SiteAdminData() {
                   onChange={(event) => setSearch(event.target.value)}
                   slotProps={{
                     input: {
-                      startAdornment: <SearchIcon color="action" sx={{ mr: 1 }} />,
+                      startAdornment: (
+                        <SearchIcon color="action" sx={{ mr: 1 }} />
+                      ),
                     },
                   }}
                   sx={{ minWidth: 240 }}
                 />
                 <Tooltip title="Toggle view">
                   <IconButton
-                    onClick={() => setViewMode((prev) => (prev === "table" ? "cards" : "table"))}
+                    onClick={() =>
+                      setViewMode((prev) =>
+                        prev === "table" ? "cards" : "table",
+                      )
+                    }
                     color="primary"
                     aria-label="Toggle view mode"
                   >
@@ -1581,11 +1885,7 @@ export default function SiteAdminData() {
               </Stack>
             </Stack>
             {/* Column visibility chips */}
-            <Stack
-              direction="row"
-              spacing={1}
-              sx={{ mb: 2, flexWrap: "wrap" }}
-            >
+            <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: "wrap" }}>
               {Object.entries(config.fields).map(([name, spec]) => {
                 const hidden = hiddenColumns.includes(name);
                 return (
@@ -1603,7 +1903,9 @@ export default function SiteAdminData() {
             </Stack>
 
             {loading ? (
-              <Box sx={{ display: "grid", placeItems: "center", minHeight: 240 }}>
+              <Box
+                sx={{ display: "grid", placeItems: "center", minHeight: 240 }}
+              >
                 <CircularProgress />
               </Box>
             ) : !visibleRows.length ? (
@@ -1624,7 +1926,9 @@ export default function SiteAdminData() {
                   <config.icon size={32} />
                 </Box>
                 <Typography variant="h6" fontWeight={600} sx={{ mb: 1 }}>
-                  {search ? "No matching records" : `No ${config.label.toLowerCase()} yet`}
+                  {search
+                    ? "No matching records"
+                    : `No ${config.label.toLowerCase()} yet`}
                 </Typography>
                 <Typography
                   color="text.secondary"
@@ -1648,22 +1952,37 @@ export default function SiteAdminData() {
               </Box>
             ) : viewMode === "table" ? (
               <TableContainer
-                sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 2 }}
+                sx={{
+                  border: `1px solid ${theme.palette.divider}`,
+                  borderRadius: 2,
+                  width: "100%",
+                }}
               >
-                <Table size="small" sx={{ minWidth: 600 }}>
+                <Table size="small" sx={{ minWidth: "100%" }}>
                   <TableHead>
                     <TableRow sx={{ bgcolor: alpha(resourceColor, 0.04) }}>
-                      {selectedColumns.map((column) => (
-                        <TableCell
-                          key={column}
-                          sx={{ fontWeight: 700, whiteSpace: "nowrap", maxWidth: 280 }}
-                        >
-                          {config?.fields[column]?.label || column}
-                        </TableCell>
-                      ))}
+                      {displayColumns.map((column) => {
+                        return (
+                          <TableCell
+                            key={column}
+                            sx={{
+                              fontWeight: 700,
+                              whiteSpace: "nowrap",
+                              px: 2,
+                            }}
+                          >
+                            {config?.fields[column]?.label || column}
+                          </TableCell>
+                        );
+                      })}
                       <TableCell
                         align="right"
-                        sx={{ fontWeight: 700, whiteSpace: "nowrap", width: 100 }}
+                        sx={{
+                          fontWeight: 700,
+                          whiteSpace: "nowrap",
+                          px: 2,
+                          width: 100,
+                        }}
                       >
                         Actions
                       </TableCell>
@@ -1676,16 +1995,16 @@ export default function SiteAdminData() {
                         hover
                         sx={{ "&:last-child td": { borderBottom: 0 } }}
                       >
-                        {selectedColumns.map((column) => {
+                        {displayColumns.map((column) => {
                           const spec = config.fields[column];
                           const value = row[column];
 
                           // Image thumbnails in table
                           if (spec?.type === "image" && value) {
                             return (
-                              <TableCell key={column} sx={{ maxWidth: 280 }}>
+                              <TableCell key={column} sx={{ px: 2 }}>
                                 <Avatar
-                                  src={value}
+                                  src={resolveImage(value, assetOrigin)}
                                   variant="rounded"
                                   sx={{ width: 40, height: 40 }}
                                 >
@@ -1696,15 +2015,18 @@ export default function SiteAdminData() {
                           }
 
                           return (
-                            <TableCell key={column} sx={{ maxWidth: 280 }}>
+                            <TableCell key={column} sx={{ px: 2 }}>
                               {column === "status" ? (
                                 <Chip
                                   size="small"
                                   label={formatCell(value, spec)}
-                                  color={value === "active" ? "success" : "default"}
+                                  color={
+                                    value === "active" ? "success" : "default"
+                                  }
                                   variant="outlined"
                                 />
-                              ) : column === "isVeg" || column === "isSpecial" ? (
+                              ) : column === "isVeg" ||
+                                column === "isSpecial" ? (
                                 <Chip
                                   size="small"
                                   label={value ? "Yes" : "No"}
@@ -1714,8 +2036,9 @@ export default function SiteAdminData() {
                               ) : (
                                 <Typography
                                   variant="body2"
-                                  noWrap
+                                  noWrap={spec?.type !== "longText"}
                                   title={formatCell(value, spec)}
+                                  sx={{ maxWidth: 200 }}
                                 >
                                   {formatCell(value, spec)}
                                 </Typography>
@@ -1723,7 +2046,7 @@ export default function SiteAdminData() {
                             </TableCell>
                           );
                         })}
-                        <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                        <TableCell align="right" sx={{ px: 2, whiteSpace: "nowrap" }}>
                           {config && tablePermissions.canUpdate && (
                             <Tooltip title="Edit">
                               <IconButton
@@ -1763,7 +2086,10 @@ export default function SiteAdminData() {
               <Grid container spacing={2}>
                 {visibleRows.map((row) => (
                   <Grid key={row.id} size={{ xs: 12, sm: 6, lg: 4 }}>
-                    <Card variant="outlined" sx={{ height: "100%", borderRadius: 2 }}>
+                    <Card
+                      variant="outlined"
+                      sx={{ height: "100%", borderRadius: 2 }}
+                    >
                       <CardContent sx={{ p: 2 }}>
                         <Stack
                           direction="row"
@@ -1779,24 +2105,34 @@ export default function SiteAdminData() {
                             sx={{ alignItems: "center" }}
                           >
                             {config.fields.photoUrl && row.photoUrl && (
-                              <Avatar src={row.photoUrl} sx={{ width: 40, height: 40 }} />
+                              <Avatar
+                                src={resolveImage(row.photoUrl, assetOrigin)}
+                                sx={{ width: 40, height: 40 }}
+                              />
                             )}
                             {config.fields.thumbnailUrl && row.thumbnailUrl && (
                               <Avatar
-                                src={row.thumbnailUrl}
+                                src={resolveImage(row.thumbnailUrl, assetOrigin)}
                                 variant="rounded"
                                 sx={{ width: 40, height: 40 }}
                               />
                             )}
                             {config.fields.imageUrl && row.imageUrl && (
                               <Avatar
-                                src={row.imageUrl}
+                                src={resolveImage(row.imageUrl, assetOrigin)}
                                 variant="rounded"
                                 sx={{ width: 40, height: 40 }}
                               />
                             )}
-                            <Typography variant="subtitle1" fontWeight={700} noWrap>
-                              {row.name || row.title || row.admissionNo || `#${row.id}`}
+                            <Typography
+                              variant="subtitle1"
+                              fontWeight={700}
+                              noWrap
+                            >
+                              {row.name ||
+                                row.title ||
+                                row.admissionNo ||
+                                `#${row.id}`}
                             </Typography>
                           </Stack>
                           <Stack direction="row" spacing={0.5}>
@@ -1833,7 +2169,8 @@ export default function SiteAdminData() {
                         {selectedColumns.map((column) => {
                           const spec = config.fields[column];
                           // Image fields are already shown as avatars
-                          if (spec?.type === "image" && row[column]) return null;
+                          if (spec?.type === "image" && row[column])
+                            return null;
                           return (
                             <Box component="div" key={column} sx={{ mb: 0.75 }}>
                               <Typography
@@ -1843,15 +2180,24 @@ export default function SiteAdminData() {
                               >
                                 {spec.label}
                               </Typography>
-                              <Typography variant="body2" fontWeight={500} component="div">
+                              <Typography
+                                variant="body2"
+                                fontWeight={500}
+                                component="div"
+                              >
                                 {column === "status" ? (
                                   <Chip
                                     size="small"
                                     label={formatCell(row[column], spec)}
-                                    color={row[column] === "active" ? "success" : "default"}
+                                    color={
+                                      row[column] === "active"
+                                        ? "success"
+                                        : "default"
+                                    }
                                     variant="outlined"
                                   />
-                                ) : column === "isVeg" || column === "isSpecial" ? (
+                                ) : column === "isVeg" ||
+                                  column === "isSpecial" ? (
                                   <Chip
                                     size="small"
                                     label={row[column] ? "Yes" : "No"}
@@ -1881,7 +2227,7 @@ export default function SiteAdminData() {
         onClose={() => !saving && setDialogOpen(false)}
         fullWidth
         maxWidth="md"
-        PaperProps={{ sx: { borderRadius: 3 } }}
+        slotProps={{ paper: { sx: { borderRadius: 3 } } }}
       >
         <Box component="form" onSubmit={saveRecord} noValidate>
           <DialogTitle fontWeight={800} sx={{ px: 3, py: 2 }}>
@@ -1896,26 +2242,37 @@ export default function SiteAdminData() {
             <Box
               sx={{
                 display: "grid",
-                gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" },
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  sm: "repeat(2, minmax(0, 1fr))",
+                },
                 gap: 2,
                 p: 3,
               }}
             >
-              {config && Object.entries(config.fields)
-                .filter(([name]) =>
-                  !tablePermissions.isStatusOnly ||
-                  name === tablePermissions.allowedStatusField
-                )
-                .map(renderFormField)}
+              {config &&
+                Object.entries(config.fields)
+                  .filter(
+                    ([name]) =>
+                      !tablePermissions.isStatusOnly ||
+                      name === tablePermissions.allowedStatusField,
+                  )
+                  .map(renderFormField)}
             </Box>
           </DialogContent>
-          <DialogActions sx={{ px: 3, py: 2, borderTop: 1, borderColor: "divider" }}>
+          <DialogActions
+            sx={{ px: 3, py: 2, borderTop: 1, borderColor: "divider" }}
+          >
             <Button onClick={() => setDialogOpen(false)} disabled={saving}>
               Cancel
             </Button>
             <Button type="submit" variant="contained" disabled={saving}>
               {saving ? (
-                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  sx={{ alignItems: "center" }}
+                >
                   <CircularProgress size={20} />
                   Saving...
                 </Stack>

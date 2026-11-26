@@ -73,8 +73,13 @@ const formatDate = (value) =>
       })
     : "—";
 
-const resolveImageUrl = (url) =>
-  url && url.startsWith("/") ? `${API_URL}${url}` : url;
+const resolveImage = (url, assetOrigin) => {
+  if (!url) return "";
+  if (/^(https?:|data:|blob:)/i.test(url)) return url;
+  const origin = String(assetOrigin || "").replace(/\/+$/, "");
+  const path = url.replace(/\\/g, "/");
+  return `${origin}${path.startsWith("/") ? "" : "/"}${path}`;
+};
 
 /* ------------------------------ Report card ------------------------------ */
 function ReportCard({ item }) {
@@ -87,7 +92,7 @@ function ReportCard({ item }) {
   const [expanded, setExpanded] = useState(false);
   const isLong =
     item.description.length > 220 || item.description.split("\n").length > 4;
-  const imageUrl = resolveImageUrl(item.screenshotUrl);
+  const imageUrl = resolveImage(item.screenshotUrl, API_URL);
 
   const severityTint = {
     low: alpha(theme.palette.success.main, 0.04),

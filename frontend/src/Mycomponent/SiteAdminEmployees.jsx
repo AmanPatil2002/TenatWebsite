@@ -169,14 +169,25 @@ export default function SiteAdminEmployees() {
 
   const saveEmployee = async (event) => {
     event.preventDefault();
+
+    // Phone validation
+    if (form.phone && !/^\d{7,15}$/.test(form.phone.replace(/\D/g, ""))) {
+      setError("Phone number must be valid (7-15 digits, numeric only).");
+      return;
+    }
+
     setSaving(true);
     setError("");
     setNotice("");
     try {
+      const payload = { ...form };
+      delete payload.id;
+      delete payload.createdAt;
+      delete payload.updatedAt;
       if (employeeId) {
-        await axios.put(`${baseUrl}/employees/${employeeId}`, form, authConfig);
+        await axios.put(`${baseUrl}/employees/${employeeId}`, payload, authConfig);
       } else {
-        await axios.post(`${baseUrl}/employees`, form, authConfig);
+        await axios.post(`${baseUrl}/employees`, payload, authConfig);
       }
       await loadEmployees();
       setDialogOpen(false);

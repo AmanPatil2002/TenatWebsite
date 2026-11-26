@@ -7,8 +7,43 @@ const {
   DERIVED_FIELDS,
   getTablePermission,
   getStatusField,
+  canPublicSubmit,
 } = require('../config/readOnlyTables');
 const SYSTEM_COLUMNS = new Set(['id', 'createdAt', 'updatedAt']);
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
+
+// Per-site uploads root: /backend/uploads/sites/ (matches express.static in server.js)
+const UPLOADS_ROOT = path.join(__dirname, '..', 'uploads', 'sites');
+
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 MB
+
+const imageStorage = multer.diskStorage({
+  destination: (req, _file, callback) => {
+    const siteId = req.params.siteId;
+    const siteDir = path.join(UPLOADS_ROOT, siteId);
+    if (!fs.existsSync(siteDir)) {
+      fs.mkdirSync(siteDir, { recursive: true });
+    }
+    callback(null, siteDir);
+  },
+  filename: (_req, file, callback) =>
+    callback(null, `${crypto.randomUUID()}${path.extname(file.originalname)}`),
+});
+
+const imageUpload = multer({
+  storage: imageStorage,
+  limits: { fileSize: MAX_IMAGE_SIZE, files: 1 },
+  fileFilter: (_req, file, callback) => {
+    if (!ALLOWED_IMAGE_TYPES.includes(file.mimetype)) {
+      return callback(new Error('Only JPG, PNG, WEBP or GIF images are allowed.'));
+    }
+    callback(null, true);
+  },
+});
 
 const ID_PATTERN = /^[1-9]\d{0,19}$/;
 const isId = (value) =>
@@ -166,10 +201,12 @@ exports.schema = async (req, res) => {
       resource.columns.push(toColumnMetadata(row));
     }
 
+    const backendOrigin = `http://localhost:${process.env.PORT || 5000}`;
     return res.json({
       resources,
       packKey: site.packKey,
-      vertical: site.packKey
+      vertical: site.packKey,
+      assetOrigin: backendOrigin
     });
   } catch (error) {
     return sendError(res, error);
@@ -178,12 +215,19 @@ exports.schema = async (req, res) => {
 
 exports.sections = async (req, res) => {
   try {
-    await requireManagedSite(req.params.siteId, req);
+    const site = await requireManagedSite(req.params.siteId, req);
     const [rows] = await db.query(
       'SELECT baseName FROM sitetables WHERE siteId = ? ORDER BY baseName',
       [req.params.siteId],
     );
-    return res.json(rows.map(({ baseName }) => baseName));
+    const backendOrigin = `http://localhost:${process.env.PORT || 5000}`;
+    const sections = rows.map(({ baseName }) => baseName);
+    // Return array for backward compatibility, but also include assetOrigin if requested
+    const acceptHeader = req.headers.accept || '';
+    if (acceptHeader.includes('application/json') && req.query.includeOrigin === 'true') {
+      return res.json({ sections, assetOrigin: backendOrigin });
+    }
+    return res.json(sections);
   } catch (error) {
     return sendError(res, error);
   }
@@ -292,6 +336,52 @@ exports.remove = async (req, res) => {
       return res.status(404).json({ message: 'Record not found' });
     }
     return res.json({ message: 'Deleted' });
+  } catch (error) {
+    if (error.message.includes('read-only') || error.message.includes('status-only') || error.message.includes('allows only')) {
+      return res.status(403).json({ message: error.message });
+    }
+    return sendError(res, error);
+  }
+};
+
+/**
+ * Upload an image for a resource.
+ * Returns a JSON response compatible with CKEditor and the frontend ImageUploadField:
+ * { uploaded: 1, fileName: string, url: string }
+ */
+exports.uploadImage = async (req, res) => {
+  const { siteId, resource } = req.params;
+  try {
+    const site = await requireManagedSite(siteId, req);
+    const vertical = site.packKey;
+    // Enforce write permissions for the resource
+    assertWritable(vertical, resource, 'create', {});
+
+    await requireResourceTable(siteId, resource, site.dbName);
+
+    imageUpload.single('image')(req, res, (error) => {
+      if (error) {
+        const message =
+          error.code === 'LIMIT_FILE_SIZE'
+            ? 'File is too large (max 5 MB).'
+            : error.message || 'Upload failed.';
+        return res.status(400).json({ uploaded: 0, error: { message } });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({
+          uploaded: 0,
+          error: { message: 'No file was uploaded.' },
+        });
+      }
+
+      const fileUrl = `/uploads/sites/${req.params.siteId}/${req.file.filename}`;
+      return res.json({
+        uploaded: 1,
+        fileName: req.file.originalname,
+        url: fileUrl,
+      });
+    });
   } catch (error) {
     if (error.message.includes('read-only') || error.message.includes('status-only') || error.message.includes('allows only')) {
       return res.status(403).json({ message: error.message });
@@ -414,15 +504,18 @@ exports.publicSubmit = async (req, res) => {
     const site = await getPublicSite(siteId);
     const permission = getTablePermission(site.packKey, resource);
 
-    // Allow public submissions to status tables (forms) AND to view-only
-    // (read-only in admin) tables so that site-side forms (e.g. customer
-    // forms built in CKEditor) can insert rows into them.
-    const isSubmittable =
-      PUBLIC_RESOURCE_NAMES.has(resource) ||
-      (permission === 'view' &&
-        !PUBLIC_BLOCKED_VIEW_TABLES.has(resource));
+    if (permission === 'hidden') {
+      return res.status(403).json({ message: 'This resource does not accept public submissions' });
+    }
 
-    if (!isSubmittable || (permission !== 'status' && permission !== 'view')) {
+    const publicRule = canPublicSubmit(site.packKey, resource);
+    const isSubmittable =
+      publicRule !== null
+        ? publicRule
+        : PUBLIC_RESOURCE_NAMES.has(resource) ||
+          (permission === 'view' && !PUBLIC_BLOCKED_VIEW_TABLES.has(resource));
+
+    if (!isSubmittable || (publicRule === null && permission !== 'status' && permission !== 'view')) {
       return res.status(403).json({ message: 'This resource does not accept public submissions' });
     }
 

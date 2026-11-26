@@ -88,7 +88,6 @@ const EMPTY_FORM = {
   status: "active",
 };
 
-
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
@@ -99,8 +98,12 @@ export default function SiteAdminNews() {
   const newsUrl = `${baseUrl}/data/news`;
   const uploadUrl = `${baseUrl}/media/upload`;
   const assetOrigin = new URL(baseUrl, window.location.origin).origin;
-  const resolveImage = (url) =>
-    url && url.startsWith("/uploads/") ? `${assetOrigin}${url}` : url;
+  const resolveImage = (url) => {
+    if (!url) return "";
+    if (/^(https?:|data:|blob:)/i.test(url)) return url;
+    const path = url.replace(/\\/g, "/");
+    return `${assetOrigin}${path.startsWith("/") ? "" : "/"}${path}`;
+  };
   const fileInputRef = useRef(null);
 
   const [items, setItems] = useState([]);
@@ -313,12 +316,20 @@ export default function SiteAdminNews() {
       </Stack>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError("")}>
+        <Alert
+          severity="error"
+          sx={{ mb: 2, borderRadius: 2 }}
+          onClose={() => setError("")}
+        >
           {error}
         </Alert>
       )}
       {notice && (
-        <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setNotice("")}>
+        <Alert
+          severity="success"
+          sx={{ mb: 2, borderRadius: 2 }}
+          onClose={() => setNotice("")}
+        >
           {notice}
         </Alert>
       )}
@@ -366,7 +377,11 @@ export default function SiteAdminNews() {
               {editingId ? <EditIcon size={18} /> : <AddIcon size={18} />}
             </Box>
             <Box>
-              <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2 }}>
+              <Typography
+                variant="h6"
+                fontWeight={700}
+                sx={{ lineHeight: 1.2 }}
+              >
                 {editingId ? "Edit article" : "Add article"}
               </Typography>
               <Typography variant="caption" color="text.secondary">
@@ -394,7 +409,12 @@ export default function SiteAdminNews() {
                 variant="caption"
                 color="text.secondary"
                 fontWeight={600}
-                sx={{ display: "block", mb: 1, textTransform: "uppercase", letterSpacing: ".06em" }}
+                sx={{
+                  display: "block",
+                  mb: 1,
+                  textTransform: "uppercase",
+                  letterSpacing: ".06em",
+                }}
               >
                 Cover image
               </Typography>
@@ -419,9 +439,18 @@ export default function SiteAdminNews() {
                     component="img"
                     src={resolveImage(form.imageUrl)}
                     alt="Selected preview"
-                    sx={{ width: "100%", height: 170, objectFit: "cover", display: "block" }}
+                    sx={{
+                      width: "100%",
+                      height: 170,
+                      objectFit: "cover",
+                      display: "block",
+                    }}
                   />
-                  <Stack direction="row" spacing={1} sx={{ position: "absolute", bottom: 8, right: 8 }}>
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{ position: "absolute", bottom: 8, right: 8 }}
+                  >
                     <Button
                       size="small"
                       variant="contained"
@@ -434,7 +463,11 @@ export default function SiteAdminNews() {
                           <UploadIcon size={14} />
                         )
                       }
-                      sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 600 }}
+                      sx={{
+                        borderRadius: 1.5,
+                        textTransform: "none",
+                        fontWeight: 600,
+                      }}
                     >
                       {uploading ? "Uploading…" : "Replace"}
                     </Button>
@@ -447,7 +480,11 @@ export default function SiteAdminNews() {
                   onClick={() => fileInputRef.current?.click()}
                   disabled={busy}
                   startIcon={
-                    uploading ? <CircularProgress size={16} /> : <ImageIcon size={18} />
+                    uploading ? (
+                      <CircularProgress size={16} />
+                    ) : (
+                      <ImageIcon size={18} />
+                    )
                   }
                   sx={{
                     py: 2.5,
@@ -464,11 +501,25 @@ export default function SiteAdminNews() {
                     },
                   }}
                 >
-                  <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                    {uploading ? <CircularProgress size={18} /> : <UploadIcon size={18} />}
-                    <span>{uploading ? "Uploading…" : "Upload cover image"}</span>
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{ alignItems: "center" }}
+                  >
+                    {uploading ? (
+                      <CircularProgress size={18} />
+                    ) : (
+                      <UploadIcon size={18} />
+                    )}
+                    <span>
+                      {uploading ? "Uploading…" : "Upload cover image"}
+                    </span>
                   </Stack>
-                  <Typography variant="caption" color="text.secondary" fontWeight={400}>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    fontWeight={400}
+                  >
                     JPG, PNG, WEBP or GIF · max 5 MB
                   </Typography>
                 </Button>
@@ -523,14 +574,22 @@ export default function SiteAdminNews() {
                   boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.25)}`,
                 }}
               >
-                {saving ? "Saving…" : editingId ? "Save changes" : "Publish article"}
+                {saving
+                  ? "Saving…"
+                  : editingId
+                    ? "Save changes"
+                    : "Publish article"}
               </Button>
               {editingId && (
                 <Button
                   variant="outlined"
                   disabled={busy}
                   onClick={startNew}
-                  sx={{ borderRadius: 2, textTransform: "none", fontWeight: 600 }}
+                  sx={{
+                    borderRadius: 2,
+                    textTransform: "none",
+                    fontWeight: 600,
+                  }}
                 >
                   Cancel
                 </Button>
@@ -540,7 +599,10 @@ export default function SiteAdminNews() {
         </Paper>
 
         {/* List */}
-        <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, minWidth: 0 }}>
+        <Paper
+          variant="outlined"
+          sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, minWidth: 0 }}
+        >
           <Stack
             direction="row"
             sx={{
@@ -634,10 +696,17 @@ export default function SiteAdminNews() {
                           component="img"
                           src={resolveImage(item.imageUrl)}
                           alt={item.title || ""}
-                          sx={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          sx={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                          }}
                         />
                       ) : (
-                        <NewsIcon size={24} color={theme.palette.text.secondary} />
+                        <NewsIcon
+                          size={24}
+                          color={theme.palette.text.secondary}
+                        />
                       )}
                     </Box>
 
@@ -647,13 +716,19 @@ export default function SiteAdminNews() {
                         spacing={1}
                         sx={{ alignItems: "center", mb: 0.5, flexWrap: "wrap" }}
                       >
-                        <Typography fontWeight={700} noWrap sx={{ minWidth: 0 }}>
+                        <Typography
+                          fontWeight={700}
+                          noWrap
+                          sx={{ minWidth: 0 }}
+                        >
                           {item.title || "Untitled"}
                         </Typography>
                         <Chip
                           size="small"
                           label={item.status}
-                          color={item.status === "active" ? "success" : "default"}
+                          color={
+                            item.status === "active" ? "success" : "default"
+                          }
                           sx={{ textTransform: "capitalize", fontWeight: 600 }}
                         />
                       </Stack>
@@ -677,7 +752,11 @@ export default function SiteAdminNews() {
                       )}
                     </Box>
 
-                    <Stack direction="row" spacing={0.5} sx={{ alignSelf: { xs: "flex-end", sm: "center" } }}>
+                    <Stack
+                      direction="row"
+                      spacing={0.5}
+                      sx={{ alignSelf: { xs: "flex-end", sm: "center" } }}
+                    >
                       <IconButton
                         aria-label={`Edit ${item.title || "news article"}`}
                         onClick={() => editNews(item)}

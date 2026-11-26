@@ -10,6 +10,17 @@ const TABLE_PERMISSIONS = {
   sitethemes: 'hidden',
 };
 
+// Only list tables that differ from the default (admin full, no public)
+const TABLE_ACCESS = {
+};
+
+const getAccess = (vertical, table) =>
+  TABLE_ACCESS[vertical]?.[String(table || '').toLowerCase()] || null;
+
+// true/false when configured, null = fall back to the old rules
+const canPublicSubmit = (vertical, table) =>
+  getAccess(vertical, table)?.public ?? null;
+
 const STATUS_FIELD_MAP = {
   appointments: 'status',
   reservations: 'status',
@@ -285,7 +296,6 @@ const DERIVED_FIELDS = {
 };
 
 const READ_ONLY_TABLES = {
-  // school: ['attendance', 'examresults', 'feepayments'],
   medical: ['appointments', 'patients', 'prescriptions', 'doctoravailability'],
   ecommerce: [
     'customers', 'addresses', 'carts', 'cartitems', 'orders',
@@ -476,4 +486,6 @@ module.exports = {
   hasDerivedFields,
   isDerivedField,
   assertWritable,
+  getAccess,
+  canPublicSubmit,
 };

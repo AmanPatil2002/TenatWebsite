@@ -896,7 +896,7 @@ const hotel = () => [
     ) ENGINE=InnoDB`,
   ],
   [
-    "reviews",
+    "hotelreviews",
     `CREATE TABLE hotelreviews (
       id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       bookingId BIGINT UNSIGNED NULL,
@@ -1310,6 +1310,43 @@ const portfolio = () => [
 
 const eventmanagement = () => [
   [
+    "eventtypes",
+    `CREATE TABLE eventtypes (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(150) NOT NULL,
+      description TEXT NULL,
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uqEventTypesName (name)
+    ) ENGINE=InnoDB`,
+  ],
+  [
+    "events",
+    `CREATE TABLE events (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      eventTypeId BIGINT UNSIGNED NULL,
+      title VARCHAR(190) NOT NULL,
+      description TEXT NULL,
+      venue VARCHAR(255) NOT NULL,
+      address TEXT NULL,
+      startDateTime DATETIME NOT NULL,
+      endDateTime DATETIME NOT NULL,
+      capacity INT UNSIGNED NULL,
+      ticketPrice DECIMAL(10,2) NULL,
+      imageUrl VARCHAR(500) NULL,
+      organizer VARCHAR(150) NULL,
+      contactEmail VARCHAR(190) NULL,
+      contactPhone VARCHAR(30) NULL,
+      status ENUM('upcoming','ongoing','completed','cancelled') NOT NULL DEFAULT 'upcoming',
+      featured TINYINT(1) NOT NULL DEFAULT 0,
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idxEventsTypeStatus (eventTypeId, status, startDateTime),
+      CONSTRAINT fkEventsType FOREIGN KEY (eventTypeId)
+        REFERENCES eventtypes(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB`,
+  ],
+  [
     "registrations",
     `CREATE TABLE registrations (
       id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -1378,43 +1415,6 @@ const eventmanagement = () => [
         REFERENCES registrations(id) ON DELETE CASCADE,
       CONSTRAINT fkTicketsType FOREIGN KEY (ticketTypeId)
         REFERENCES tickettypes(id) ON DELETE SET NULL
-    ) ENGINE=InnoDB`,
-  ],
-  [
-    "eventtypes",
-    `CREATE TABLE eventtypes (
-      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-      name VARCHAR(150) NOT NULL,
-      description TEXT NULL,
-      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      UNIQUE KEY uqEventTypesName (name)
-    ) ENGINE=InnoDB`,
-  ],
-  [
-    "events",
-    `CREATE TABLE events (
-      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-      eventTypeId BIGINT UNSIGNED NULL,
-      title VARCHAR(190) NOT NULL,
-      description TEXT NULL,
-      venue VARCHAR(255) NOT NULL,
-      address TEXT NULL,
-      startDateTime DATETIME NOT NULL,
-      endDateTime DATETIME NOT NULL,
-      capacity INT UNSIGNED NULL,
-      ticketPrice DECIMAL(10,2) NULL,
-      imageUrl VARCHAR(500) NULL,
-      organizer VARCHAR(150) NULL,
-      contactEmail VARCHAR(190) NULL,
-      contactPhone VARCHAR(30) NULL,
-      status ENUM('upcoming','ongoing','completed','cancelled') NOT NULL DEFAULT 'upcoming',
-      featured TINYINT(1) NOT NULL DEFAULT 0,
-      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      INDEX idxEventsTypeStatus (eventTypeId, status, startDateTime),
-      CONSTRAINT fkEventsType FOREIGN KEY (eventTypeId)
-        REFERENCES eventtypes(id) ON DELETE SET NULL
     ) ENGINE=InnoDB`,
   ],
 ];

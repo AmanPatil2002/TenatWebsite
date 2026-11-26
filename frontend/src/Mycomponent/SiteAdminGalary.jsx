@@ -105,8 +105,12 @@ export default function SiteAdminGalary() {
   const uploadUrl = `${baseUrl}/media/upload`;
 
   const assetOrigin = new URL(baseUrl, window.location.origin).origin;
-  const resolveImage = (url) =>
-    url && url.startsWith("/uploads/") ? `${assetOrigin}${url}` : url;
+  const resolveImage = (url) => {
+    if (!url) return "";
+    if (/^(https?:|data:|blob:)/i.test(url)) return url;
+    const path = url.replace(/\\/g, "/");
+    return `${assetOrigin}${path.startsWith("/") ? "" : "/"}${path}`;
+  };
 
   const fileInputRef = useRef(null);
 

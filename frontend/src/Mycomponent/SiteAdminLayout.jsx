@@ -274,6 +274,8 @@ export default function SiteAdminLayout() {
         schemaData.pack ||
         schemaData.type ||
         "";
+      // Extract assetOrigin from schema response for image uploads
+      const assetOrigin = schemaData.assetOrigin || "";
 
       const knownResources = Object.entries(schemas)
         .filter(([name, schema]) => {
@@ -308,6 +310,7 @@ export default function SiteAdminLayout() {
         pages: pageList,
         packKey: sitePackKey,
         vertical: sitePackKey,
+        assetOrigin,
       });
       setPages(pageList);
       setError("");

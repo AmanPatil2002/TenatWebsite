@@ -34,9 +34,15 @@ router.get("/client-admin/:siteId/data/:resource", authenticateSiteAdmin, siteDa
 router.post("/client-admin/:siteId/data/:resource", authenticateSiteAdmin, siteData.create);
 router.put("/client-admin/:siteId/data/:resource/:id", authenticateSiteAdmin, siteData.update);
 router.delete("/client-admin/:siteId/data/:resource/:id", authenticateSiteAdmin, siteData.remove);
+router.post("/client-admin/:siteId/data/:resource/upload", authenticateSiteAdmin, siteData.uploadImage);
 router.get("/:siteId/public/data", siteData.publicSections);
 router.get("/:siteId/public/data/:resource", siteData.publicList);
 router.post("/:siteId/public/:resource", publicSubmissionLimit, siteData.publicSubmit);
+router.get("/:siteId/data", authenticateToken, siteData.sections);
 router.get("/:siteId/data/schema", authenticateToken, siteData.schema);
 router.get("/:siteId/data/:resource", authenticateToken, siteData.list);
+router.post("/:siteId/data/:resource", authenticateToken, siteData.create);
+router.put("/:siteId/data/:resource/:id", authenticateToken, siteData.update);
+router.delete("/:siteId/data/:resource/:id", authenticateToken, siteData.remove);
+router.post("/:siteId/data/:resource/upload", authenticateToken, siteData.uploadImage);
 module.exports = router;
