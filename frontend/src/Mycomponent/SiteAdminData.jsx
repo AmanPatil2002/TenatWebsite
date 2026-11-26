@@ -562,6 +562,19 @@ const humanize = (value) =>
     .replace(/[_-]+/g, " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 
+/* MySQL integer ranges: [signedMin, signedMax, unsignedMax] */
+const INT_RANGES = {
+  tinyint: [-128, 127, 255],
+  smallint: [-32768, 32767, 65535],
+  mediumint: [-8388608, 8388607, 16777215],
+  int: [-2147483648, 2147483647, 4294967295],
+  integer: [-2147483648, 2147483647, 4294967295],
+};
+
+/* Numeric columns that should never be negative (extend as needed) */
+const NON_NEGATIVE_NAME =
+  /(price|amount|fee|cost|total|stock|quantity|qty|capacity|duration|discount|salary|seats)/i;
+
 const fieldFromSchema = (column) => {
   const { dataType, columnType, name } = column;
   const lowerType = String(dataType).toLowerCase();
@@ -624,18 +637,49 @@ const fieldFromSchema = (column) => {
     integer ||
     ["decimal", "numeric", "float", "double", "real"].includes(lowerType)
   ) {
-    const scale = decimalScale ? Number(decimalScale[1]) : 0;
+    const unsigned = typeDefinition.includes("unsigned");
+    const decimal = typeDefinition.match(
+      /^(?:decimal|numeric)\((\d+)(?:,(\d+))?\)/,
+    );
+    const scale = decimal ? Number(decimal[2] ?? 0) : undefined;
+    const whole = integer || scale === 0;
+
+    let min = unsigned ? 0 : undefined;
+    let max;
+
+    if (INT_RANGES[lowerType]) {
+      const [signedMin, signedMax, unsignedMax] = INT_RANGES[lowerType];
+      min = unsigned ? 0 : signedMin;
+      max = unsigned ? unsignedMax : signedMax;
+    } else if (lowerType === "year") {
+      min = 1901;
+      max = 2155;
+    } else if (decimal) {
+      const wholeDigits = Number(decimal[1]) - scale;
+      max = Number(
+        `${"9".repeat(wholeDigits) || "0"}${scale ? `.${"9".repeat(scale)}` : ""}`,
+      );
+      min = unsigned ? 0 : -max;
+    }
+    // bigint: no safe client-side range, only the unsigned min of 0 is kept
+
+    if (
+      (min === undefined || min < 0) &&
+      !/id$/i.test(name) &&
+      NON_NEGATIVE_NAME.test(name)
+    ) {
+      min = 0;
+    }
+
     return {
       ...base,
       type: "number",
-      integer,
+      integer: whole,
       bigint: lowerType === "bigint",
-      min: typeDefinition.includes("unsigned") ? 0 : undefined,
-      step: integer
-        ? "1"
-        : scale > 0
-          ? `0.${"0".repeat(Math.max(0, scale - 1))}1`
-          : "any",
+      scale,
+      min,
+      max,
+      step: whole ? "1" : scale > 0 ? `0.${"0".repeat(scale - 1)}1` : "any",
     };
   }
   if (/(image|photo|thumbnail|poster|banner|cover|logo|icon)url$/i.test(name)) {
@@ -656,7 +700,7 @@ const fieldFromSchema = (column) => {
     maxLength: varcharLength ? Number(varcharLength[1]) : undefined,
   };
 };
-
+const OPTIONAL_FIELDS = new Set([]);
 const buildResourceConfig = (resource, schema, primaryColor) => {
   if (!schema) return null;
   const existing = RESOURCE_CONFIG[resource];
@@ -676,12 +720,13 @@ const buildResourceConfig = (resource, schema, primaryColor) => {
             configuredField.options
               ? "select"
               : inferredField.type,
-          required: column.required || Boolean(configuredField?.required),
+          required: !OPTIONAL_FIELDS.has(column.name),
           nullable: column.nullable,
           defaultValue:
             column.defaultValue ?? configuredField?.defaultValue ?? null,
           references: column.references,
         };
+        const noPast = NO_PAST_FIELDS[resource]?.includes(column.name);
         if (inferredField.integer !== undefined) {
           spec.integer = inferredField.integer;
           spec.bigint = inferredField.bigint;
@@ -693,6 +738,12 @@ const buildResourceConfig = (resource, schema, primaryColor) => {
         if (column.dataType === "enum") {
           spec.type = "select";
           spec.options = inferredField.options;
+        }
+        if (
+          noPast &&
+          (spec.type === "date" || spec.type === "datetime-local")
+        ) {
+          spec.min = spec.type === "date" ? "today" : "now";
         }
         return [column.name, spec];
       }),
@@ -719,7 +770,63 @@ const RESOURCE_ORDER = [
   "menucategories",
   "menuitems",
 ];
+/* Scheduling columns that must not be set to a past date.
+   Keyed by table base name. Tables not listed here (attendance, payments,
+   dob, joinedOn, ...) keep accepting past dates. */
+const NO_PAST_FIELDS = {
+  exams: ["examDate"],
+  appointments: ["appointmentDate"],
+  petappointments: ["appointmentDate"],
+  dentalappointments: ["appointmentDate"],
+  reservations: ["reservationDate"],
+  tablebookings: ["bookingDate"],
+  salonbookings: ["bookingDate"],
+  classbookings: ["bookingDate"],
+  bookings: ["checkInDate", "checkOutDate"],
+  propertyviewings: ["viewingDate"],
+  consultations: ["consultationDate"],
+  consultationrequests: ["preferredDate"],
+  sitevisits: ["visitDate"],
+  deliveries: ["scheduledDate"],
+  tournaments: ["startDate"],
+  proposals: ["validUntil"],
+  events: ["startDateTime", "endDateTime"],
+  eventshows: ["showDateTime"],
+  matches: ["matchDate"],
+  coupons: ["expiresAt"],
+};
 
+/* [dateColumn, timeColumn]: if the date is today, the time can't be over already */
+const DATE_TIME_PAIRS = [
+  ["examDate", "startTime"],
+  ["appointmentDate", "appointmentTime"],
+  ["reservationDate", "reservationTime"],
+  ["bookingDate", "bookingTime"],
+  ["consultationDate", "consultationTime"],
+  ["viewingDate", "viewingTime"],
+  ["visitDate", "visitTime"],
+];
+/* Start/end pairs: end must come AFTER start (or on/after when allowEqual).
+   Applied automatically to any table that has both fields. */
+const RANGE_RULES = [
+  { start: "startTime", end: "endTime" }, // exams, availability, gymclasses, deliveryslots
+  { start: "startDateTime", end: "endDateTime" }, // events
+  { start: "startDate", end: "endDate", allowEqual: true }, // causes, tournaments, engagements, enrollments
+  { start: "checkInDate", end: "checkOutDate" }, // hotel bookings (checkout must be after check-in)
+  { start: "checkIn", end: "checkOut" }, // gym attendance
+  { start: "joinDate", end: "expiryDate" }, // members
+  { start: "periodStart", end: "periodEnd", allowEqual: true }, // member payments
+  { start: "saleStartsAt", end: "saleEndsAt" }, // ticket types
+  { start: "startsAt", end: "expiresAt" }, // coupons
+  { start: "shippedAt", end: "deliveredAt" }, // shipments
+];
+
+/* start/end partner lookup, used to clear stale errors and set input min */
+const RANGE_PARTNER = {};
+RANGE_RULES.forEach(({ start, end }) => {
+  RANGE_PARTNER[start] = end;
+  RANGE_PARTNER[end] = start;
+});
 /* ------------------------------------------------------------------ */
 /*  Image upload constants                                              */
 /* ------------------------------------------------------------------ */
@@ -852,8 +959,12 @@ const isValidImageUrl = (value) => {
 };
 
 /* Single source of truth: returns an error message, or "" when valid */
-const validateField = (spec, raw) => {
+const validateField = (spec, raw, original) => {
   const value = raw === undefined || raw === null ? "" : String(raw).trim();
+  const unchanged =
+    original !== undefined &&
+    original !== null &&
+    String(original).trim() === value;
   if (!value) return spec.required ? `${spec.label} is required.` : "";
 
   if (spec.minLength && value.length < spec.minLength) {
@@ -865,13 +976,17 @@ const validateField = (spec, raw) => {
 
   switch (spec.type) {
     case "number": {
-      const num = Number(value);
-      if (!Number.isFinite(num)) return `${spec.label} must be a number.`;
-      if (spec.integer && !Number.isInteger(num)) {
+      if (!/^-?\d+(\.\d+)?$/.test(value))
+        return `${spec.label} must be a number.`;
+      if (spec.integer && !/^-?\d+$/.test(value)) {
         return `${spec.label} must be a whole number.`;
       }
-      if (spec.step === "0.01" && !/^-?\d+(\.\d{1,2})?$/.test(value)) {
-        return `${spec.label} can have at most 2 decimal places.`;
+      const num = Number(value);
+      if (!Number.isFinite(num)) return `${spec.label} must be a number.`;
+
+      const scale = spec.scale ?? (spec.step === "0.01" ? 2 : undefined);
+      if (scale !== undefined && (value.split(".")[1] || "").length > scale) {
+        return `${spec.label} can have at most ${scale} decimal place${scale === 1 ? "" : "s"}.`;
       }
       if (spec.min !== undefined && num < spec.min) {
         return `${spec.label} must be at least ${spec.min}.`;
@@ -886,27 +1001,40 @@ const validateField = (spec, raw) => {
         ? ""
         : `${spec.label} must be a valid email address.`;
     case "tel": {
+      if (!/^\+?[\d\s\-()]+$/.test(value))
+        return `${spec.label} can only contain digits, spaces, +, - and brackets.`;
       const digits = value.replace(/\D/g, "");
-      // Only allow digits for phone numbers to prevent character input
-      if (!/^\d+$/.test(digits) || digits.length < 7 || digits.length > 15) {
-        return `${spec.label} must be a valid phone number (7–15 digits, numeric only).`;
-      }
-      return "";
+      return digits.length >= 7 && digits.length <= 15
+        ? ""
+        : `${spec.label} must be a valid phone number (7–15 digits).`;
     }
     case "date": {
       if (!isRealDate(value)) return `${spec.label} must be a valid date.`;
       const min = resolveBound(spec.min);
       const max = resolveBound(spec.max);
-      if (min && value < min)
-        return `${spec.label} cannot be before ${formatDate(min)}.`;
+      if (min && value < min) {
+        if (spec.min === "today") {
+          if (!unchanged) return `${spec.label} cannot be in the past.`;
+        } else {
+          return `${spec.label} cannot be before ${formatDate(min)}.`;
+        }
+      }
       if (max && value > max)
         return `${spec.label} cannot be after ${formatDate(max)}.`;
       return "";
     }
-    case "datetime-local":
-      return Number.isNaN(new Date(value).getTime())
-        ? `${spec.label} must be a valid date and time.`
-        : "";
+    case "datetime-local": {
+      if (Number.isNaN(new Date(value).getTime()))
+        return `${spec.label} must be a valid date and time.`;
+      if (
+        spec.min === "now" &&
+        !unchanged &&
+        value < toDateTimeInput(new Date())
+      ) {
+        return `${spec.label} cannot be in the past.`;
+      }
+      return "";
+    }
     case "time":
       return /^([01]\d|2[0-3]):[0-5]\d$/.test(value)
         ? ""
@@ -936,52 +1064,52 @@ const validateField = (spec, raw) => {
 };
 
 /* Field rules + cross-field rules */
-const validateForm = (form, config) => {
+const validateForm = (form, config, original) => {
   const errors = {};
   for (const [name, spec] of Object.entries(config.fields)) {
-    const message = validateField(spec, form[name]);
+    const message = validateField(spec, form[name], original?.[name]);
     if (message) errors[name] = message;
   }
-  if (
-    config.fields.salePrice &&
-    !errors.salePrice &&
-    !errors.price &&
-    form.salePrice !== "" &&
-    form.salePrice !== undefined &&
-    Number(form.salePrice) > Number(form.price)
-  ) {
-    errors.salePrice = "Sale price cannot be higher than the price.";
+  for (const { start, end, allowEqual } of RANGE_RULES) {
+    const startSpec = config.fields[start];
+    const endSpec = config.fields[end];
+    if (!startSpec || !endSpec) continue;
+    if (errors[start] || errors[end]) continue;
+    const s = form[start];
+    const e = form[end];
+    if (!s || !e) continue;
+
+    const bad = allowEqual ? e < s : e <= s;
+    if (bad) {
+      errors[end] = allowEqual
+        ? `${endSpec.label} cannot be before ${startSpec.label.toLowerCase()}.`
+        : `${endSpec.label} must be after ${startSpec.label.toLowerCase()}.`;
+    }
   }
-  if (
-    config.fields.endDate &&
-    config.fields.startDate &&
-    !errors.endDate &&
-    !errors.startDate &&
-    form.endDate &&
-    form.startDate &&
-    form.endDate < form.startDate
-  ) {
-    errors.endDate = "End date cannot be before start date.";
-  }
-  if (
-    config.fields.toTime &&
-    config.fields.fromTime &&
-    !errors.toTime &&
-    !errors.fromTime &&
-    form.toTime &&
-    form.fromTime &&
-    form.toTime < form.fromTime
-  ) {
-    errors.toTime = "To time cannot be before from time.";
+  const now = new Date();
+  const nowTime = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  for (const [dateKey, timeKey] of DATE_TIME_PAIRS) {
+    if (config.fields[dateKey]?.min !== "today" || !config.fields[timeKey])
+      continue;
+    if (errors[dateKey] || errors[timeKey]) continue;
+    if (form[dateKey] !== todayStr() || !form[timeKey]) continue;
+    const untouched =
+      original &&
+      form[dateKey] === original[dateKey] &&
+      form[timeKey] === original[timeKey];
+    if (!untouched && form[timeKey] < nowTime) {
+      errors[timeKey] =
+        `${config.fields[timeKey].label} has already passed for today.`;
+    }
   }
   return errors;
 };
 
-const makePayload = (form, config) => {
+const makePayload = (form, config, original) => {
   const payload = {};
   for (const [name, spec] of Object.entries(config.fields)) {
     const raw = form[name];
-    const message = validateField(spec, raw);
+    const message = validateField(spec, raw, original?.[name]);
     if (message) throw new Error(message);
 
     if (raw === "" || raw === undefined || raw === null) {
@@ -1301,7 +1429,13 @@ export default function SiteAdminData() {
   }, [site?.assetOrigin, baseUrl]);
   // Table permissions hook
   const tablePermissions = useTablePermissions(vertical, selectedResource);
-
+  const originalForm = useMemo(
+    () =>
+      editingRecord && config
+        ? formFromRecord(editingRecord, config)
+        : undefined,
+    [editingRecord, config],
+  );
   /* ---------------- FK options ---------------- */
   const fetchFkOptions = useCallback(async () => {
     if (!config) return;
@@ -1483,10 +1617,13 @@ export default function SiteAdminData() {
             : "This table has no permitted status field.";
           return message ? { [statusField || "status"]: message } : {};
         })()
-      : validateForm(form, config);
+      : validateForm(form, config, originalForm);
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      setError("Please fix the highlighted fields.");
+      const count = Object.keys(errors).length;
+      setError(
+        `Please complete ${count} highlighted field${count === 1 ? "" : "s"} before saving.`,
+      );
       return;
     }
 
@@ -1500,7 +1637,7 @@ export default function SiteAdminData() {
             [tablePermissions.allowedStatusField]:
               form[tablePermissions.allowedStatusField],
           }
-        : makePayload(form, config);
+        : makePayload(form, config, originalForm);
 
       if (editingRecord) {
         await axios.put(
@@ -1561,17 +1698,32 @@ export default function SiteAdminData() {
 
   const updateForm = (name, value) => {
     setForm((current) => ({ ...current, [name]: value }));
-    if (fieldErrors[name]) {
+    const partner = RANGE_PARTNER[name];
+    if (fieldErrors[name] || (partner && fieldErrors[partner])) {
       setFieldErrors((current) => {
         const next = { ...current };
         delete next[name];
+        if (partner) delete next[partner];
         return next;
       });
     }
   };
 
   const validateOnBlur = (name, spec) => {
-    const message = validateField(spec, form[name]);
+    let message = validateField(spec, form[name], originalForm?.[name]);
+
+    if (!message) {
+      const rule = RANGE_RULES.find((r) => r.end === name);
+      const startSpec = rule && config.fields[rule.start];
+      const s = rule && form[rule.start];
+      const e = form[name];
+      if (startSpec && s && e && (rule.allowEqual ? e < s : e <= s)) {
+        message = rule.allowEqual
+          ? `${spec.label} cannot be before ${startSpec.label.toLowerCase()}.`
+          : `${spec.label} must be after ${startSpec.label.toLowerCase()}.`;
+      }
+    }
+
     setFieldErrors((current) => {
       const next = { ...current };
       if (message) next[name] = message;
@@ -1621,7 +1773,15 @@ export default function SiteAdminData() {
       if (spec.min) htmlInput.min = resolveBound(spec.min);
       if (spec.max) htmlInput.max = resolveBound(spec.max);
     }
-
+    if (spec.type === "datetime-local" && spec.min === "now") {
+      htmlInput.min = toDateTimeInput(new Date());
+    }
+    const rangeRule = RANGE_RULES.find((r) => r.end === name);
+    if (rangeRule && form[rangeRule.start]) {
+      if (spec.type === "date" || spec.type === "datetime-local") {
+        htmlInput.min = form[rangeRule.start];
+      }
+    }
     const placeholder =
       spec.type === "email"
         ? "name@example.com"
@@ -1634,10 +1794,14 @@ export default function SiteAdminData() {
       (spec.type === "json"
         ? "Enter a valid JSON value."
         : spec.type === "date"
-          ? "Pick a date from the calendar."
-          : isFk
-            ? "Select a related record"
-            : undefined);
+          ? spec.min === "today"
+            ? "Past dates are not allowed."
+            : "Pick a date from the calendar."
+          : spec.type === "datetime-local" && spec.min === "now"
+            ? "Past dates are not allowed."
+            : isFk
+              ? "Select a related record"
+              : undefined);
 
     return (
       <TextField
@@ -2046,7 +2210,10 @@ export default function SiteAdminData() {
                             </TableCell>
                           );
                         })}
-                        <TableCell align="right" sx={{ px: 2, whiteSpace: "nowrap" }}>
+                        <TableCell
+                          align="right"
+                          sx={{ px: 2, whiteSpace: "nowrap" }}
+                        >
                           {config && tablePermissions.canUpdate && (
                             <Tooltip title="Edit">
                               <IconButton
@@ -2112,7 +2279,10 @@ export default function SiteAdminData() {
                             )}
                             {config.fields.thumbnailUrl && row.thumbnailUrl && (
                               <Avatar
-                                src={resolveImage(row.thumbnailUrl, assetOrigin)}
+                                src={resolveImage(
+                                  row.thumbnailUrl,
+                                  assetOrigin,
+                                )}
                                 variant="rounded"
                                 sx={{ width: 40, height: 40 }}
                               />
