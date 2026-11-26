@@ -230,8 +230,29 @@ export default function SiteHeader() {
     setLogoUrl("");
   };
 
+  const validateForm = () => {
+    if (form.footerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.footerEmail)) {
+      setError("Please enter a valid footer email address.");
+      return false;
+    }
+    if (form.footerPhone && !/^\d{10}$/.test(form.footerPhone.replace(/\D/g, ''))) {
+      setError("Phone number must be exactly 10 digits.");
+      return false;
+    }
+    for (const platform of SOCIALS) {
+      const url = social[platform]?.trim();
+      if (url && !/^https?:\/\/[^\s$.?#].[^\s]*$/.test(url)) {
+        setError(`Please enter a valid URL for ${LABELS[platform]}.`);
+        return false;
+      }
+    }
+    return true;
+  };
+
   const saveHeader = async (event) => {
     event.preventDefault();
+    if (!validateForm()) return;
+
     setSaving(true);
     setError("");
     setNotice("");
