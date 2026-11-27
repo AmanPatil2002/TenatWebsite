@@ -33,6 +33,7 @@ import {
   CardContent,
   alpha,
   useTheme,
+  TablePagination,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -403,7 +404,11 @@ const RESOURCE_CONFIG = {
     fields: {
       admissionNo: text("Admission number", { maxLength: 50 }),
       name: text("Student name", { required: true, minLength: 2 }),
-      classId: idNumber("Class ID"),
+      classId: idNumber("Class ID", { references: { table: "classes" } }),
+      subjectId: idNumber("Subject ID", {
+        references: { table: "subjects" },
+        dependsOn: "classId",
+      }),
       rollNo: text("Roll number", { maxLength: 50 }),
       gender: field("Gender", "select", {
         options: [
@@ -661,7 +666,6 @@ const fieldFromSchema = (column) => {
       );
       min = unsigned ? 0 : -max;
     }
-    // bigint: no safe client-side range, only the unsigned min of 0 is kept
 
     if (
       (min === undefined || min < 0) &&
@@ -1396,11 +1400,20 @@ export default function SiteAdminData() {
   const [viewMode, setViewMode] = useState("table"); // 'table' | 'cards'
   const [hiddenColumns, setHiddenColumns] = useState([]);
 
+  // New state for pagination
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
   useEffect(() => {
     if (tableName) {
       setSelectedResource(tableName);
     }
   }, [tableName]);
+
+  // Reset pagination when resource changes
+  useEffect(() => {
+    setPage(0);
+  }, [selectedResource]);
 
   const resourceConfigs = useMemo(
     () =>
@@ -1437,29 +1450,66 @@ export default function SiteAdminData() {
     [editingRecord, config],
   );
   /* ---------------- FK options ---------------- */
-  const fetchFkOptions = useCallback(async () => {
-    if (!config) return;
-    const newOptions = {};
-    for (const [name, spec] of Object.entries(config.fields)) {
-      const fk = spec.references?.table;
-      if (fk) {
-        try {
-          const { data } = await axios.get(`${baseUrl}/data/${fk}`, authConfig);
-          newOptions[name] = Array.isArray(data) ? data : [];
-        } catch (e) {
-          if (e.response?.status !== 404) {
-            console.error(`Failed to load FK options for ${name}`, e);
+  const fetchFkOptions = useCallback(
+    async (parentValues = {}) => {
+      if (!config) return;
+      const newOptions = {};
+      for (const [name, spec] of Object.entries(config.fields)) {
+        const fk = spec.references?.table;
+        if (fk) {
+          const dependsOn = spec.dependsOn;
+          const url =
+            dependsOn && parentValues[dependsOn] !== undefined
+              ? `${baseUrl}/data/${fk}?dependsOn=${dependsOn}&dependsOnValue=${encodeURIComponent(
+                  parentValues[dependsOn],
+                )}`
+              : `${baseUrl}/data/${fk}`;
+          try {
+            const { data } = await axios.get(url, authConfig);
+            newOptions[name] = Array.isArray(data) ? data : [];
+          } catch (e) {
+            if (e.response?.status !== 404) {
+              console.error(`Failed to load FK options for ${name}`, e);
+            }
+            newOptions[name] = [];
           }
-          newOptions[name] = [];
         }
       }
-    }
-    setFkOptions(newOptions);
-  }, [config, baseUrl, authConfig]);
+      setFkOptions(newOptions);
+    },
+    [config, baseUrl, authConfig],
+  );
 
   useEffect(() => {
     fetchFkOptions();
   }, [fetchFkOptions]);
+
+  /* Re-fetch FK options whose parent field changed.
+     Example: subjectId options depend on the selected classId. */
+  useEffect(() => {
+    if (!config) return;
+    const parentValues = {};
+    for (const [name, spec] of Object.entries(config.fields)) {
+      if (spec.dependsOn) {
+        parentValues[name] = form[spec.dependsOn] ?? '';
+      }
+    }
+    fetchFkOptions(parentValues);
+  }, [config, fetchFkOptions, form]);
+
+  /* Clear a dependent field when its parent value changes. */
+  useEffect(() => {
+    if (!config || !editingRecord) return;
+    for (const [name, spec] of Object.entries(config.fields)) {
+      if (
+        spec.dependsOn &&
+        form[name] &&
+        form[spec.dependsOn] !== editingRecord[spec.dependsOn]
+      ) {
+        setForm((current) => ({ ...current, [name]: '' }));
+      }
+    }
+  }, [form, config, editingRecord]);
 
   /* ---------------- Resources list ---------------- */
   const availableResources = useMemo(
@@ -1473,7 +1523,7 @@ export default function SiteAdminData() {
   );
 
   /* ---------------- Visible rows ---------------- */
-  const visibleRows = useMemo(() => {
+  const filteredRows = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return rows;
     return rows.filter((row) =>
@@ -1483,7 +1533,14 @@ export default function SiteAdminData() {
     );
   }, [rows, search]);
 
-  /* ---------------- Columns ---------------- */
+  // Paginated rows
+  const visibleRows = useMemo(() => {
+    return filteredRows.slice(
+      page * rowsPerPage,
+      page * rowsPerPage + rowsPerPage,
+    );
+  }, [filteredRows, page, rowsPerPage]);
+
   const selectedColumns = useMemo(() => {
     if (!config) return [];
     return Object.keys(config.fields).filter(
@@ -1706,6 +1763,21 @@ export default function SiteAdminData() {
         if (partner) delete next[partner];
         return next;
       });
+    }
+    // Clear dependent fields when their parent value changes.
+    if (config) {
+      const dependents = Object.entries(config.fields).filter(
+        ([, spec]) => spec.dependsOn === name,
+      );
+      if (dependents.length) {
+        setForm((current) => {
+          let next = { ...current };
+          for (const [depName] of dependents) {
+            next = { ...next, [depName]: '' };
+          }
+          return next;
+        });
+      }
     }
   };
 
@@ -1997,8 +2069,8 @@ export default function SiteAdminData() {
                   {config.label}
                 </Typography>
                 <Typography color="text.secondary" variant="body2">
-                  {visibleRows.length} of {rows.length} record
-                  {rows.length === 1 ? "" : "s"}
+                  {filteredRows.length} total record
+                  {filteredRows.length === 1 ? "" : "s"}
                 </Typography>
               </Box>
               <Stack
@@ -2010,7 +2082,10 @@ export default function SiteAdminData() {
                   size="small"
                   placeholder="Search records"
                   value={search}
-                  onChange={(event) => setSearch(event.target.value)}
+                  onChange={(event) => {
+                    setSearch(event.target.value);
+                    setPage(0);
+                  }}
                   slotProps={{
                     input: {
                       startAdornment: (
@@ -2072,7 +2147,7 @@ export default function SiteAdminData() {
               >
                 <CircularProgress />
               </Box>
-            ) : !visibleRows.length ? (
+            ) : !filteredRows.length ? (
               <Box sx={{ p: 5, textAlign: "center" }}>
                 <Box
                   sx={{
@@ -2115,139 +2190,167 @@ export default function SiteAdminData() {
                 )}
               </Box>
             ) : viewMode === "table" ? (
-              <TableContainer
-                sx={{
-                  border: `1px solid ${theme.palette.divider}`,
-                  borderRadius: 2,
-                  width: "100%",
-                }}
-              >
-                <Table size="small" sx={{ minWidth: "100%" }}>
-                  <TableHead>
-                    <TableRow sx={{ bgcolor: alpha(resourceColor, 0.04) }}>
-                      {displayColumns.map((column) => {
-                        return (
-                          <TableCell
-                            key={column}
-                            sx={{
-                              fontWeight: 700,
-                              whiteSpace: "nowrap",
-                              px: 2,
-                            }}
-                          >
-                            {config?.fields[column]?.label || column}
-                          </TableCell>
-                        );
-                      })}
-                      <TableCell
-                        align="right"
-                        sx={{
-                          fontWeight: 700,
-                          whiteSpace: "nowrap",
-                          px: 2,
-                          width: 100,
-                        }}
-                      >
-                        Actions
-                      </TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {visibleRows.map((row) => (
-                      <TableRow
-                        key={row.id}
-                        hover
-                        sx={{ "&:last-child td": { borderBottom: 0 } }}
-                      >
+              <Box>
+                <TableContainer
+                  sx={{
+                    border: `1px solid ${theme.palette.divider}`,
+                    borderRadius: 2,
+                    width: "100%",
+                    mb: 1,
+                  }}
+                >
+                  <Table size="small" sx={{ minWidth: "100%" }}>
+                    <TableHead>
+                      <TableRow sx={{ bgcolor: resourceColor }}>
                         {displayColumns.map((column) => {
-                          const spec = config.fields[column];
-                          const value = row[column];
-
-                          // Image thumbnails in table
-                          if (spec?.type === "image" && value) {
-                            return (
-                              <TableCell key={column} sx={{ px: 2 }}>
-                                <Avatar
-                                  src={resolveImage(value, assetOrigin)}
-                                  variant="rounded"
-                                  sx={{ width: 40, height: 40 }}
-                                >
-                                  <ImageIcon fontSize="small" />
-                                </Avatar>
-                              </TableCell>
-                            );
-                          }
-
                           return (
-                            <TableCell key={column} sx={{ px: 2 }}>
-                              {column === "status" ? (
-                                <Chip
-                                  size="small"
-                                  label={formatCell(value, spec)}
-                                  color={
-                                    value === "active" ? "success" : "default"
-                                  }
-                                  variant="outlined"
-                                />
-                              ) : column === "isVeg" ||
-                                column === "isSpecial" ? (
-                                <Chip
-                                  size="small"
-                                  label={value ? "Yes" : "No"}
-                                  color={value ? "success" : "default"}
-                                  variant="outlined"
-                                />
-                              ) : (
-                                <Typography
-                                  variant="body2"
-                                  noWrap={spec?.type !== "longText"}
-                                  title={formatCell(value, spec)}
-                                  sx={{ maxWidth: 200 }}
-                                >
-                                  {formatCell(value, spec)}
-                                </Typography>
-                              )}
+                            <TableCell
+                              key={column}
+                              sx={{
+                                fontWeight: 700,
+                                color: "#000000",
+                                whiteSpace: "nowrap",
+                                px: 2,
+                              }}
+                            >
+                              {config?.fields[column]?.label || column}
                             </TableCell>
                           );
                         })}
                         <TableCell
                           align="right"
-                          sx={{ px: 2, whiteSpace: "nowrap" }}
+                          sx={{
+                            fontWeight: 700,
+                            color: "#fff",
+                            whiteSpace: "nowrap",
+                            px: 2,
+                            width: 100,
+                            position: "sticky",
+                            right: 0,
+                            bgcolor: resourceColor,
+                            zIndex: 1,
+                          }}
                         >
-                          {config && tablePermissions.canUpdate && (
-                            <Tooltip title="Edit">
-                              <IconButton
-                                size="small"
-                                aria-label={`Edit record ${row.id}`}
-                                onClick={() => openEditRecord(row)}
-                              >
-                                <EditIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                          {config && tablePermissions.canDelete && (
-                            <Tooltip title="Delete">
-                              <IconButton
-                                size="small"
-                                color="error"
-                                aria-label={`Delete record ${row.id}`}
-                                disabled={deletingId === row.id}
-                                onClick={() => deleteRecord(row)}
-                              >
-                                {deletingId === row.id ? (
-                                  <CircularProgress size={18} />
-                                ) : (
-                                  <DeleteIcon fontSize="small" />
-                                )}
-                              </IconButton>
-                            </Tooltip>
-                          )}
+                          Actions
                         </TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+                    </TableHead>
+                    <TableBody>
+                      {visibleRows.map((row) => (
+                        <TableRow
+                          key={row.id}
+                          hover
+                          sx={{ "&:last-child td": { borderBottom: 0 } }}
+                        >
+                          {displayColumns.map((column) => {
+                            const spec = config.fields[column];
+                            const value = row[column];
+
+                            // Image thumbnails in table
+                            if (spec?.type === "image" && value) {
+                              return (
+                                <TableCell key={column} sx={{ px: 2 }}>
+                                  <Avatar
+                                    src={resolveImage(value, assetOrigin)}
+                                    variant="rounded"
+                                    sx={{ width: 40, height: 40 }}
+                                  >
+                                    <ImageIcon fontSize="small" />
+                                  </Avatar>
+                                </TableCell>
+                              );
+                            }
+
+                            return (
+                              <TableCell key={column} sx={{ px: 2 }}>
+                                {column === "status" ? (
+                                  <Chip
+                                    size="small"
+                                    label={formatCell(value, spec)}
+                                    color={
+                                      value === "active" ? "success" : "default"
+                                    }
+                                    variant="outlined"
+                                  />
+                                ) : column === "isVeg" ||
+                                  column === "isSpecial" ? (
+                                  <Chip
+                                    size="small"
+                                    label={value ? "Yes" : "No"}
+                                    color={value ? "success" : "default"}
+                                    variant="outlined"
+                                  />
+                                ) : (
+                                  <Typography
+                                    variant="body2"
+                                    noWrap={spec?.type !== "longText"}
+                                    title={formatCell(value, spec)}
+                                    sx={{ maxWidth: 200 }}
+                                  >
+                                    {formatCell(value, spec)}
+                                  </Typography>
+                                )}
+                              </TableCell>
+                            );
+                          })}
+                          <TableCell
+                            align="right"
+                            sx={{
+                              px: 2,
+                              whiteSpace: "nowrap",
+                              position: "sticky",
+                              right: 0,
+                              bgcolor: "background.paper",
+                              zIndex: 1,
+                            }}
+                          >
+                            {config && tablePermissions.canUpdate && (
+                              <Tooltip title="Edit">
+                                <IconButton
+                                  size="small"
+                                  aria-label={`Edit record ${row.id}`}
+                                  onClick={() => openEditRecord(row)}
+                                >
+                                  <EditIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                            {config && tablePermissions.canDelete && (
+                              <Tooltip title="Delete">
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  aria-label={`Delete record ${row.id}`}
+                                  disabled={deletingId === row.id}
+                                  onClick={() => deleteRecord(row)}
+                                >
+                                  {deletingId === row.id ? (
+                                    <CircularProgress size={18} />
+                                  ) : (
+                                    <DeleteIcon fontSize="small" />
+                                  )}
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+                <TablePagination
+                  rowsPerPageOptions={[5, 10, 25, 50]}
+                  component="div"
+                  count={filteredRows.length}
+                  rowsPerPage={rowsPerPage}
+                  page={page}
+                  onPageChange={(event, newPage) => setPage(newPage)}
+                  onRowsPerPageChange={(event) => {
+                    setRowsPerPage(parseInt(event.target.value, 10));
+                    setPage(0);
+                  }}
+                />
+              </Box>
             ) : (
               /* Card view */
               <Grid container spacing={2}>
@@ -2279,10 +2382,7 @@ export default function SiteAdminData() {
                             )}
                             {config.fields.thumbnailUrl && row.thumbnailUrl && (
                               <Avatar
-                                src={resolveImage(
-                                  row.thumbnailUrl,
-                                  assetOrigin,
-                                )}
+                                src={resolveImage(row.thumbnailUrl, assetOrigin)}
                                 variant="rounded"
                                 sx={{ width: 40, height: 40 }}
                               />

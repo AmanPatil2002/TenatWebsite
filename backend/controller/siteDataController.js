@@ -233,13 +233,30 @@ exports.sections = async (req, res) => {
   }
 };
 
+const SAFE_COLUMN = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+
 exports.list = async (req, res) => {
   const { siteId, resource } = req.params;
+  const { dependsOn, dependsOnValue } = req.query;
   try {
     const site = await requireManagedSite(siteId, req);
     await requireResourceTable(siteId, resource, site.dbName);
+
+    let whereClause = '';
+    const params = [];
+    if (
+      dependsOn &&
+      SAFE_COLUMN.test(dependsOn) &&
+      dependsOnValue !== undefined &&
+      dependsOnValue !== ''
+    ) {
+      whereClause = ` WHERE ${dependsOn} = ?`;
+      params.push(dependsOnValue);
+    }
+
     const [rows] = await db.query(
-      `SELECT * FROM ${tn(siteId, resource, site.dbName)} ORDER BY id DESC`,
+      `SELECT * FROM ${tn(siteId, resource, site.dbName)}${whereClause} ORDER BY id DESC`,
+      params,
     );
     return res.json(rows);
   } catch (error) {
