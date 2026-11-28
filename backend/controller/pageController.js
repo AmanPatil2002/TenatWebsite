@@ -1,4 +1,3 @@
-
 const db = require("../config/db");
 
 const isValidPrice = (value) => {
@@ -9,10 +8,8 @@ const isValidPrice = (value) => {
   ) {
     return false;
   }
-
   const priceString = String(value).trim();
   const price = Number(priceString);
-
   return (
     Number.isFinite(price) &&
     price >= 0 &&
@@ -29,7 +26,6 @@ const isValidId = (value) => {
   ) {
     return false;
   }
-
   try {
     return BigInt(value) <= 18446744073709551615n;
   } catch {
@@ -37,10 +33,11 @@ const isValidId = (value) => {
   }
 };
 
+// ---------------------------------------------------------------------------
 // POST /pages
-// Create a page containing CKEditor HTML.
+// ---------------------------------------------------------------------------
 const createPage = (req, res) => {
-  const { title, categoryId, page, pagePrice } = req.body;
+  const { title, categoryId, page, pagePrice, parentId } = req.body;
 
   if (
     typeof title !== "string" ||
@@ -65,53 +62,52 @@ const createPage = (req, res) => {
     });
   }
 
-  const sql = `
-    INSERT INTO pages
-      (title, categoryId, page, pagePrice, createdBy)
-    VALUES (?, ?, ?, ?, ?)
-  `;
+  const catId = String(categoryId);
 
-  db.query(
-    sql,
-    [
-      cleanTitle,
-      String(categoryId),
-      pageContent,
-      Number(pagePrice),
-      req.user.userId,
-    ],
-    (err, result) => {
-      if (err) {
-        if (err.code === "ER_NO_REFERENCED_ROW_2") {
-          return res.status(400).json({
-            message: "Invalid categoryId or user",
-          });
-        }
+  // Validate parentId if provided
+  let parentValue = null;
+  if (parentId !== undefined && parentId !== null && parentId !== "") {
+    if (!isValidId(parentId)) {
+      return res.status(400).json({ message: "Invalid parentId" });
+    }
+    parentValue = String(parentId);
+  }
 
-        console.error("Create page error:", err);
+  const insertSql = `INSERT INTO pages
+       (title, categoryId, page, pagePrice, createdBy, parentId)
+     VALUES (?, ?, ?, ?, ?, ?)`;
 
-        return res.status(500).json({
-          message: "Database error",
+  const params = [cleanTitle, catId, pageContent, Number(pagePrice), req.user.userId, parentValue];
+
+  db.query(insertSql, params, (err, result) => {
+    if (err) {
+      if (err.code === "ER_NO_REFERENCED_ROW_2") {
+        return res.status(400).json({ message: "Invalid categoryId, parentId, or user" });
+      }
+      if (err.code === "ER_DUP_ENTRY") {
+        return res.status(409).json({
+          message: "A page with this title already exists in this category",
         });
       }
-
-      return res.status(201).json({
-        message: "Page created successfully",
-        pagesId: result.insertId,
-      });
+      console.error("Create page error:", err);
+      return res.status(500).json({ message: "Database error" });
     }
-  );
+
+    return res.status(201).json({
+      message: "Page created successfully",
+      pagesId: result.insertId,
+    });
+  });
 };
 
+// ---------------------------------------------------------------------------
 // GET /pages?categoryId=1&search=home&page=1&limit=20
+// ---------------------------------------------------------------------------
 const getPages = (req, res) => {
   const { categoryId, search } = req.query;
 
   const pageNumber = Math.max(parseInt(req.query.page, 10) || 1, 1);
-  const limit = Math.min(
-    Math.max(parseInt(req.query.limit, 10) || 20, 1),
-    100
-  );
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
   const offset = (pageNumber - 1) * limit;
 
   const where = [];
@@ -119,11 +115,8 @@ const getPages = (req, res) => {
 
   if (categoryId !== undefined && categoryId !== "") {
     if (!isValidId(categoryId)) {
-      return res.status(400).json({
-        message: "Invalid categoryId",
-      });
+      return res.status(400).json({ message: "Invalid categoryId" });
     }
-
     where.push("categoryId = ?");
     params.push(String(categoryId));
   }
@@ -133,9 +126,7 @@ const getPages = (req, res) => {
     params.push(`%${search}%`);
   }
 
-  const whereSql = where.length
-    ? `WHERE ${where.join(" AND ")}`
-    : "";
+  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
   db.query(
     `SELECT COUNT(*) AS total FROM pages ${whereSql}`,
@@ -143,54 +134,44 @@ const getPages = (req, res) => {
     (err, countRows) => {
       if (err) {
         console.error("Get pages count error:", err);
-
-        return res.status(500).json({
-          message: "Database error",
-        });
+        return res.status(500).json({ message: "Database error" });
       }
 
       const columns =
         req.user?.role === "admin"
           ? "*"
           : "pagesId, title, categoryId, pagePrice, createdAt";
+
       const sql = `
         SELECT ${columns}
         FROM pages
         ${whereSql}
-        ORDER BY createdAt DESC
+        ORDER BY pagesId ASC
         LIMIT ? OFFSET ?
       `;
 
-      db.query(
-        sql,
-        [...params, limit, offset],
-        (err2, rows) => {
-          if (err2) {
-            console.error("Get pages error:", err2);
-
-            return res.status(500).json({
-              message: "Database error",
-            });
-          }
-
-          return res.json({
-            total: countRows[0].total,
-            page: pageNumber,
-            limit,
-            data: rows,
-          });
+      db.query(sql, [...params, limit, offset], (err2, rows) => {
+        if (err2) {
+          console.error("Get pages error:", err2);
+          return res.status(500).json({ message: "Database error" });
         }
-      );
+        return res.json({
+          total: countRows[0].total,
+          page: pageNumber,
+          limit,
+          data: rows,
+        });
+      });
     }
   );
 };
 
+// ---------------------------------------------------------------------------
 // GET /pages/:id
+// ---------------------------------------------------------------------------
 const getPageById = (req, res) => {
   if (!isValidId(req.params.id)) {
-    return res.status(400).json({
-      message: "Invalid page ID",
-    });
+    return res.status(400).json({ message: "Invalid page ID" });
   }
 
   db.query(
@@ -203,89 +184,76 @@ const getPageById = (req, res) => {
     (err, rows) => {
       if (err) {
         console.error("Get page by ID error:", err);
-
-        return res.status(500).json({
-          message: "Database error",
-        });
+        return res.status(500).json({ message: "Database error" });
       }
-
       if (!rows.length) {
-        return res.status(404).json({
-          message: "Page not found",
-        });
+        return res.status(404).json({ message: "Page not found" });
       }
-
       return res.json(rows[0]);
     }
   );
 };
 
+// ---------------------------------------------------------------------------
 // PUT /pages/:id
-// Update only the fields provided.
+// ---------------------------------------------------------------------------
 const updatePage = (req, res) => {
   if (!isValidId(req.params.id)) {
-    return res.status(400).json({
-      message: "Invalid page ID",
-    });
+    return res.status(400).json({ message: "Invalid page ID" });
   }
 
-  const { title, categoryId, page, pagePrice } = req.body;
-
+  const { title, categoryId, page, pagePrice, parentId } = req.body;
   const fields = [];
   const params = [];
 
   if (title !== undefined) {
-    if (
-      typeof title !== "string" ||
-      !title.trim() ||
-      title.trim().length > 150
-    ) {
+    if (typeof title !== "string" || !title.trim() || title.trim().length > 150) {
       return res.status(400).json({
         message: "Title must be nonempty and at most 150 characters",
       });
     }
-
     fields.push("title = ?");
     params.push(title.trim());
   }
 
   if (categoryId !== undefined) {
     if (!isValidId(categoryId)) {
-      return res.status(400).json({
-        message: "Invalid categoryId",
-      });
+      return res.status(400).json({ message: "Invalid categoryId" });
     }
-
     fields.push("categoryId = ?");
     params.push(String(categoryId));
   }
 
   if (page !== undefined) {
     if (typeof page !== "string" || !page.trim()) {
-      return res.status(400).json({
-        message: "Page HTML must be a nonempty string",
-      });
+      return res.status(400).json({ message: "Page HTML must be a nonempty string" });
     }
-
     fields.push("page = ?");
     params.push(page.trim());
   }
 
   if (pagePrice !== undefined) {
     if (!isValidPrice(pagePrice)) {
-      return res.status(400).json({
-        message: "Invalid pagePrice",
-      });
+      return res.status(400).json({ message: "Invalid pagePrice" });
     }
-
     fields.push("pagePrice = ?");
     params.push(Number(pagePrice));
   }
 
+  if (parentId !== undefined) {
+    if (parentId === null || parentId === "") {
+      fields.push("parentId = ?");
+      params.push(null);
+    } else if (isValidId(parentId)) {
+      fields.push("parentId = ?");
+      params.push(String(parentId));
+    } else {
+      return res.status(400).json({ message: "Invalid parentId" });
+    }
+  }
+
   if (fields.length === 0) {
-    return res.status(400).json({
-      message: "No valid fields provided for update",
-    });
+    return res.status(400).json({ message: "No valid fields provided for update" });
   }
 
   db.query(
@@ -294,37 +262,30 @@ const updatePage = (req, res) => {
     (err, result) => {
       if (err) {
         if (err.code === "ER_NO_REFERENCED_ROW_2") {
-          return res.status(400).json({
-            message: "Invalid categoryId",
+          return res.status(400).json({ message: "Invalid categoryId" });
+        }
+        if (err.code === "ER_DUP_ENTRY") {
+          return res.status(409).json({
+            message: "A page with this title already exists in this category",
           });
         }
-
         console.error("Update page error:", err);
-
-        return res.status(500).json({
-          message: "Database error",
-        });
+        return res.status(500).json({ message: "Database error" });
       }
-
       if (!result.affectedRows) {
-        return res.status(404).json({
-          message: "Page not found",
-        });
+        return res.status(404).json({ message: "Page not found" });
       }
-
-      return res.json({
-        message: "Page updated successfully",
-      });
+      return res.json({ message: "Page updated successfully" });
     }
   );
 };
 
+// ---------------------------------------------------------------------------
 // DELETE /pages/:id
+// ---------------------------------------------------------------------------
 const deletePage = (req, res) => {
   if (!isValidId(req.params.id)) {
-    return res.status(400).json({
-      message: "Invalid page ID",
-    });
+    return res.status(400).json({ message: "Invalid page ID" });
   }
 
   db.query(
@@ -337,23 +298,13 @@ const deletePage = (req, res) => {
             message: "Page is in use and cannot be deleted",
           });
         }
-
         console.error("Delete page error:", err);
-
-        return res.status(500).json({
-          message: "Database error",
-        });
+        return res.status(500).json({ message: "Database error" });
       }
-
       if (!result.affectedRows) {
-        return res.status(404).json({
-          message: "Page not found",
-        });
+        return res.status(404).json({ message: "Page not found" });
       }
-
-      return res.json({
-        message: "Page deleted successfully",
-      });
+      return res.json({ message: "Page deleted successfully" });
     }
   );
 };

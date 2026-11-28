@@ -253,9 +253,9 @@ const qualifyDdl = (siteId, base, ddl, dbNameFromSite) => {
   out = out.replace(
     /\bREFERENCES\s+`?([a-zA-Z0-9_]+)`?\s*(\([`a-zA-Z0-9_]+\))?/gi,
     (_m, refTable, refCol) => {
-      const colPart = refCol ? ` ${refCol}` : '';
+      const colPart = refCol ? ` ${refCol}` : "";
       return `REFERENCES ${tn(siteId, refTable, dbNameFromSite)}${colPart}`;
-    }
+    },
   );
 
   return out;
@@ -373,17 +373,18 @@ async function provisionSiteDatabase(siteId) {
 
     // Seed purchased pages (snapshot) — idempotent
     await q(
-      `INSERT IGNORE INTO ${tn(id, "pages", generatedDbName)}
-              (sourcePagesId, title, page, sortOrder)
-       SELECT p.pagesId, p.title, p.page, tp.sortOrder
-         FROM sites s
-         JOIN paymentpages pp  ON pp.paymentId  = s.paymentId
-         JOIN pages p          ON p.pagesId     = pp.pagesId
-         JOIN templatepages tp ON tp.templateId = pp.templateId
+      `INSERT INTO ${tn(id, "pages", generatedDbName)}
+        (sourcePagesId, title, page, sortOrder)
+      SELECT p.pagesId, p.title, p.page, tp.sortOrder
+        FROM sites s
+        JOIN paymentpages pp  ON pp.paymentId  = s.paymentId
+        JOIN pages p          ON p.pagesId     = pp.pagesId
+        JOIN templatepages tp ON tp.templateId = pp.templateId
                               AND tp.pagesId    = pp.pagesId
-        WHERE s.id = ?`,
+      WHERE s.id = ?`,
       [id],
     );
+
 
     // Seed default header row if the table is empty
     await q(

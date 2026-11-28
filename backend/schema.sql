@@ -1,12 +1,12 @@
 
-CREATE DATABASE IF NOT EXISTS tenant
-  CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+CREATE DATABASE tenant;
 USE tenant;
 
 -- ---------------------------------------------------------------------
 -- 1. users
 -- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE users (
   userId        BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name          VARCHAR(120) NOT NULL,
   email         VARCHAR(190) NOT NULL,
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- ---------------------------------------------------------------------
 -- 2. review
 -- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS review (
+CREATE TABLE review (
   reviewId     BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   reviewBy     BIGINT UNSIGNED NOT NULL,
   description  TEXT NOT NULL,
@@ -38,11 +38,12 @@ CREATE TABLE IF NOT EXISTS review (
 -- ---------------------------------------------------------------------
 -- 3. categories
 -- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS categories (
+CREATE TABLE categories (
   categoryId  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name        VARCHAR(190) NOT NULL,
   packKey     VARCHAR(30) NULL,
   tag         VARCHAR(500) NULL,
+  content     JSON NULL,
   createdBy   BIGINT UNSIGNED NOT NULL,
   createdAt   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uqCategoryName (name),
@@ -52,7 +53,7 @@ CREATE TABLE IF NOT EXISTS categories (
 -- ---------------------------------------------------------------------
 -- 4. theme  (admin-managed library)
 -- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS theme (
+CREATE TABLE theme (
   themeId     BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name        VARCHAR(190) NOT NULL,
   color       VARCHAR(100) NOT NULL,
@@ -67,7 +68,7 @@ CREATE TABLE IF NOT EXISTS theme (
 -- 5. pages  (admin-managed library; `page` content is only readable by
 --            clients who bought it, see sitepagesview)
 -- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS pages (
+CREATE TABLE pages (
   pagesId     BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   title       VARCHAR(150) NOT NULL,
   categoryId  BIGINT UNSIGNED NOT NULL,
@@ -81,10 +82,11 @@ CREATE TABLE IF NOT EXISTS pages (
   CONSTRAINT fkPagesCreator  FOREIGN KEY (createdBy)  REFERENCES users(userId)
 ) ENGINE=InnoDB;
 
+
 -- ---------------------------------------------------------------------
 -- 6. template
 -- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS template (
+CREATE TABLE template (
   templateId        BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   categoryId        BIGINT UNSIGNED NOT NULL,
   name              VARCHAR(150) NOT NULL,
@@ -109,8 +111,10 @@ CREATE TABLE IF NOT EXISTS template (
 
 -- ---------------------------------------------------------------------
 -- 7. templatepages : pages offered by a template
+--    isDefault = 1 -> included in template price
+--    isDefault = 0 -> ADDITIONAL, client may add it by paying pages.pagePrice
 -- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS templatepages (
+CREATE TABLE templatepages (
   templateId  BIGINT UNSIGNED NOT NULL,
   pagesId     BIGINT UNSIGNED NOT NULL,
   isDefault   TINYINT(1) NOT NULL DEFAULT 1,
@@ -124,7 +128,7 @@ CREATE TABLE IF NOT EXISTS templatepages (
 -- ---------------------------------------------------------------------
 -- 8. templatetheme : themes a client may choose from (exactly ONE default)
 -- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS templatetheme (
+CREATE TABLE templatetheme (
   templateId  BIGINT UNSIGNED NOT NULL,
   themeId     BIGINT UNSIGNED NOT NULL,
   isDefault   TINYINT(1) NOT NULL DEFAULT 0,
@@ -136,8 +140,10 @@ CREATE TABLE IF NOT EXISTS templatetheme (
 
 -- ---------------------------------------------------------------------
 -- 9. payments : the client's order. Stores the ONE chosen theme.
+--    FK (templateId, themeId) guarantees the theme belongs to the template.
+--    UNIQUE (id, templateId) lets paymentpages reference both together.
 -- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS payments (
+CREATE TABLE payments (
   id             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   transactionId  VARCHAR(64) NOT NULL,               -- Razorpay order id
   userId         BIGINT UNSIGNED NOT NULL,
@@ -159,11 +165,12 @@ CREATE TABLE IF NOT EXISTS payments (
   CONSTRAINT fkPayTemplateTheme FOREIGN KEY (templateId, themeId)
                                 REFERENCES templatetheme(templateId, themeId)
 ) ENGINE=InnoDB;
-
 -- ---------------------------------------------------------------------
 -- 10. paymentpages : pages in the order (default + chosen additional).
+--     FK (templateId, pagesId) guarantees each page belongs to the template.
+--     price is a snapshot: 0 for default pages, pagePrice for additional.
 -- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS paymentpages (
+CREATE TABLE paymentpages (
   paymentId   BIGINT UNSIGNED NOT NULL,
   pagesId     BIGINT UNSIGNED NOT NULL,
   templateId  BIGINT UNSIGNED NOT NULL,
@@ -180,7 +187,7 @@ CREATE TABLE IF NOT EXISTS paymentpages (
 -- ---------------------------------------------------------------------
 -- 11. invoices
 -- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS invoices (
+CREATE TABLE invoices (
   id             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   invoiceNumber  VARCHAR(30) NOT NULL,
   paymentId      BIGINT UNSIGNED NOT NULL,
@@ -198,7 +205,7 @@ CREATE TABLE IF NOT EXISTS invoices (
 -- ---------------------------------------------------------------------
 -- 12. sites : created when a payment is captured (one purchase = one site)
 -- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS sites (
+CREATE TABLE sites (
   id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   userId        BIGINT UNSIGNED NOT NULL,
   templateId    BIGINT UNSIGNED NOT NULL,
@@ -226,7 +233,8 @@ CREATE TABLE IF NOT EXISTS sites (
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
--- 13. sitepages : editable, site-specific copies of purchased pages.
+-- 13. site_pages : editable, site-specific copies of purchased pages.
+--     Custom pages have no sourcePagesId and never modify the shared library.
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS sitepages (
   id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -245,9 +253,9 @@ CREATE TABLE IF NOT EXISTS sitepages (
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
--- 14. faq
+-- 14. faq  (admin CRUD)
 -- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS faq (
+CREATE TABLE faq (
   faqId      BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   question   VARCHAR(500) NOT NULL,
   answer     TEXT NOT NULL,
@@ -257,9 +265,9 @@ CREATE TABLE IF NOT EXISTS faq (
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
--- 15. acontact
+-- 15. acontact  (admin CRUD)
 -- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS acontact (
+CREATE TABLE acontact (
   contactId  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   contact    CHAR(10)     NOT NULL,
   email      VARCHAR(190) NOT NULL,
@@ -273,9 +281,9 @@ CREATE TABLE IF NOT EXISTS acontact (
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
--- 16. passwordResets
+-- 16. passwordResets  
 -- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS passwordResets (
+CREATE TABLE passwordResets (
   id        BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   userId    BIGINT UNSIGNED NOT NULL,
   codeHash  VARCHAR(255) NOT NULL,
@@ -288,10 +296,13 @@ CREATE TABLE IF NOT EXISTS passwordResets (
     REFERENCES users(userId) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+
 -- ---------------------------------------------------------------------
--- 17. admin
+-- 17. admin  
+-- A separate page-manager login is granted by the platform admin per site.
+-- These credentials never provide access to purchased theme settings.
 -- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS `admin` (
+CREATE TABLE admin (
   id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   siteId        BIGINT UNSIGNED NOT NULL,
   userId        BIGINT UNSIGNED NOT NULL,
@@ -307,7 +318,7 @@ CREATE TABLE IF NOT EXISTS `admin` (
 -- ---------------------------------------------------------------------
 -- 18. sitetables
 -- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS sitetables (
+CREATE TABLE sitetables (
   id        BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   siteId    BIGINT UNSIGNED NOT NULL,
   baseName  VARCHAR(40) NOT NULL,
@@ -317,9 +328,12 @@ CREATE TABLE IF NOT EXISTS sitetables (
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
--- 19. bugreports
+-- 19. bugreports : users report errors/bugs; admin triages them.
+--   siteId is optional (a bug may be about the main platform, not a site).
+--   If siteId is set, the reporter must own that site (enforced in API:
+--   WHERE sites.id = ? AND sites.userId = <JWT user>).
 -- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS bugreports (
+CREATE TABLE bugreports (
   id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   reportedBy      BIGINT UNSIGNED NOT NULL,
   siteId          BIGINT UNSIGNED NULL,
@@ -342,24 +356,61 @@ CREATE TABLE IF NOT EXISTS bugreports (
   CONSTRAINT fkBugResolver FOREIGN KEY (resolvedBy) REFERENCES users(userId) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
--- ---------------------------------------------------------------------
--- 20. sitethemes : per-site theme customization
--- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS sitethemes (
-    siteId BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+
+-- Per-site default and custom theme configurations
+CREATE TABLE sitethemes (
+    siteId BIGINT UNSIGNED NOT NULL PRIMARY KEY,    -- Original theme selected during purchase
     defaultThemeId BIGINT UNSIGNED NOT NULL,
-    defaultTheme JSON NOT NULL,
-    customTheme JSON NULL,
-    activeTheme ENUM('default', 'custom') NOT NULL DEFAULT 'default',
-    updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fkSiteThemesSite FOREIGN KEY (siteId) REFERENCES sites(id) ON DELETE CASCADE,
-    CONSTRAINT fkSiteThemesDefault FOREIGN KEY (defaultThemeId) REFERENCES theme(themeId)
+    defaultTheme JSON NOT NULL,    -- Customer-specific customization
+    customTheme JSON NULL,    -- Which configuration the website currently uses
+    activeTheme ENUM('default', 'custom')
+        NOT NULL DEFAULT 'default',
+    updatedAt DATETIME NOT NULL
+        DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fkSiteThemesSite
+        FOREIGN KEY (siteId)
+        REFERENCES sites(id)
+        ON DELETE CASCADE,
+    CONSTRAINT fkSiteThemesDefault
+        FOREIGN KEY (defaultThemeId)
+        REFERENCES theme(themeId)
 ) ENGINE=InnoDB;
+INSERT INTO sitethemes (
+    siteId,
+    defaultThemeId,
+    defaultTheme,
+    customTheme,
+    activeTheme
+)
+SELECT
+    s.id,
+    th.themeId,
+    JSON_OBJECT(
+        'primaryColor', th.color,
+        'secondaryColor', th.color,
+        'backgroundColor', th.background,
+        'textColor', '#212121',
+        'headerBackground', th.background,
+        'footerBackground', th.background,
+        'buttonBackground', th.color,
+        'buttonTextColor', '#FFFFFF',
+        'fontFamily', 'Roboto',
+        'borderRadius', '8px'
+    ),
+    NULL,
+    'default'
+FROM sites s
+JOIN theme th ON th.themeId = s.themeId
+WHERE s.id = 1;
 
 -- =====================================================================
 -- VIEWS
 -- =====================================================================
 
+-- Public / pre-purchase: template + available themes + page NAMES ONLY.
+-- Page content (`page`) is deliberately NOT exposed here.
+-- Filter with WHERE status = 'published' for clients.
 CREATE OR REPLACE VIEW templatefull AS
 SELECT
   t.*,
@@ -387,6 +438,10 @@ SELECT
   ) AS pages
 FROM template t;
 
+-- Post-purchase: the ONLY place a client reads page content.
+-- Always query with  WHERE userId = <JWT user> AND siteId = ?
+-- Returns rows only for an active, unexpired site whose payment is captured,
+-- with the single theme chosen at purchase.
 CREATE OR REPLACE VIEW sitepagesview AS
 SELECT
   s.id          AS siteId,
@@ -411,6 +466,8 @@ JOIN templatepages tp  ON tp.templateId = pp.templateId AND tp.pagesId = pp.page
 JOIN theme         th  ON th.themeId = s.themeId
 WHERE s.status = 'active' AND s.expiresAt > NOW();
 
+
+
 -- =====================================================================
 -- SEED DATA
 -- =====================================================================
@@ -421,3 +478,47 @@ SELECT s.id, p.pagesId, p.title, p.page, tp.sortOrder
   JOIN paymentpages pp ON pp.paymentId = pay.id
   JOIN pages p ON p.pagesId = pp.pagesId
   JOIN templatepages tp ON tp.templateId = pp.templateId AND tp.pagesId = pp.pagesId;
+
+ALTER TABLE pages
+  ADD COLUMN parentId  BIGINT UNSIGNED NULL AFTER categoryId,
+  ADD COLUMN sortOrder INT NOT NULL DEFAULT 0 AFTER parentId,
+  ADD INDEX idxPagesParent (parentId, sortOrder),
+  ADD CONSTRAINT fkPagesParent
+      FOREIGN KEY (parentId) REFERENCES pages(pagesId)
+      ON DELETE SET NULL;
+
+-- 1. Seed the site pages (as you already do)
+-- INSERT IGNORE INTO sitepages (siteId, sourcePagesId, title, page, sortOrder) ...
+
+-- 2. Add parentId/sortOrder to the shared pages library
+ALTER TABLE pages
+  ADD COLUMN parentId  BIGINT UNSIGNED NULL AFTER categoryId,
+  ADD COLUMN sortOrder INT NOT NULL DEFAULT 0 AFTER parentId,
+  ADD INDEX idxPagesParent (parentId, sortOrder),
+  ADD CONSTRAINT fkPagesParent
+      FOREIGN KEY (parentId) REFERENCES pages(pagesId)
+      ON DELETE SET NULL;
+
+-- 3. Add parentId to sitepages (the missing piece)
+ALTER TABLE sitepages
+  ADD COLUMN parentId BIGINT UNSIGNED NULL AFTER sourcePagesId,
+  ADD INDEX idxSitePagesParent (siteId, parentId),
+  ADD CONSTRAINT fkSitePagesParent
+      FOREIGN KEY (parentId) REFERENCES sitepages(id)
+      ON DELETE SET NULL;
+
+-- 4. Backfill sitepages.parentId from the pages hierarchy
+SET SQL_SAFE_UPDATES = 0;
+
+UPDATE sitepages child
+   JOIN sitepages parent
+     ON parent.siteId      = child.siteId
+    AND parent.sourcePagesId = (
+          SELECT p.parentId
+            FROM pages p
+           WHERE p.pagesId = child.sourcePagesId
+        )
+    SET child.parentId = parent.id
+  WHERE child.sourcePagesId IS NOT NULL;
+
+SET SQL_SAFE_UPDATES = 1;

@@ -56,15 +56,33 @@ const provisionSite = async (connection, payment) => {
   if (!theme) throw new Error("Purchased theme is not available");
 
   await connection.query(
-    `INSERT INTO sitepages (siteId, sourcePagesId, title, page, sortOrder)
-     SELECT ?, p.pagesId, p.title, p.page, tp.sortOrder
-       FROM paymentpages pp
-       JOIN pages p ON p.pagesId = pp.pagesId
-       JOIN templatepages tp
-         ON tp.templateId = pp.templateId AND tp.pagesId = pp.pagesId
-      WHERE pp.paymentId = ?`,
-    [site.insertId, payment.id],
-  );
+  `INSERT INTO sitepages (siteId, sourcePagesId, title, page, sortOrder)
+   SELECT ?, p.pagesId, p.title, p.page, tp.sortOrder
+     FROM paymentpages pp
+     JOIN pages p ON p.pagesId = pp.pagesId
+     JOIN templatepages tp
+       ON tp.templateId = pp.templateId AND tp.pagesId = pp.pagesId
+    WHERE pp.paymentId = ?`,
+  [site.insertId, payment.id],
+);
+
+  // Map template-level parent grouping onto the copied per-site rows.
+  // Central pages.parentId references pages.pagesId; translate it to the
+  // per-site id via sourcePagesId.
+  // await connection.query(
+  //   `UPDATE sitepages child
+  //    JOIN (
+  //      SELECT p2.id AS newParentId, p1.id AS newChildId
+  //      FROM sitepages p1
+  //      JOIN pages p_central ON p1.sourcePagesId = p_central.pagesId
+  //      JOIN pages p_parent_central ON p_central.parentId = p_parent_central.pagesId
+  //      JOIN sitepages p2 ON p2.sourcePagesId = p_parent_central.pagesId AND p2.siteId = p1.siteId
+  //      WHERE p1.siteId = ?
+  //    ) mapping ON child.id = mapping.newChildId
+  //    SET child.parentId = mapping.newParentId
+  //    WHERE child.siteId = ?`,
+  //   [site.insertId, site.insertId],
+  // );
 
   await connection.query(
     `INSERT INTO sitethemes (siteId, defaultThemeId, defaultTheme)

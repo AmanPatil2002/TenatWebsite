@@ -71,9 +71,12 @@ const parseEnumValues = (columnType) =>
     value.replace(/\\'/g, "'").replace(/\\\\/g, "\\"),
   );
 
-const toColumnMetadata = (column) => {
+const toColumnMetadata = (column, tableName) => {
   const generated = /auto_increment|generated/i.test(column.extra || '');
   const systemColumn = SYSTEM_COLUMNS.has(column.name);
+  // parentId on the pages table is set during provisioning and must not be edited
+  const isLockedParentId =
+    tableName === 'pages' && column.name === 'parentId';
   const defaultIsExpression =
     typeof column.columnDefault === 'string' &&
     /^(CURRENT_TIMESTAMP|CURRENT_DATE|CURRENT_TIME)(\(\d+\))?$/i.test(
@@ -98,7 +101,7 @@ const toColumnMetadata = (column) => {
       column.dataType === 'enum'
         ? parseEnumValues(column.columnType)
         : [],
-    editable: !systemColumn && !generated,
+    editable: !systemColumn && !generated && !isLockedParentId,
     references: column.referencedTable
       ? {
           table: column.referencedTable,
@@ -147,7 +150,7 @@ const requireResourceTable = async (siteId, resource, dbName) => {
     throw error;
   }
 
-  return columns.map(toColumnMetadata);
+  return columns.map((column) => toColumnMetadata(column, resource));
 };
 
 const readInput = (body, columns) => {
@@ -198,7 +201,7 @@ exports.schema = async (req, res) => {
         isCommon: commonTables.has(row.baseName),
         columns: [],
       });
-      resource.columns.push(toColumnMetadata(row));
+      resource.columns.push(toColumnMetadata(row, row.baseName));
     }
 
     const backendOrigin = `http://localhost:${process.env.PORT || 5000}`;

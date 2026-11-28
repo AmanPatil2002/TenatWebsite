@@ -40,20 +40,24 @@ const common = () => [
       updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB`,
   ],
+
   [
     "pages",
     `CREATE TABLE pages (
-      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-      sourcePagesId BIGINT UNSIGNED NULL,
-      title VARCHAR(150) NOT NULL,
-      page LONGTEXT NOT NULL,
-      sortOrder INT UNSIGNED NOT NULL DEFAULT 0,
-      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      UNIQUE KEY uqPagesSource (sourcePagesId),
-      INDEX idxPagesOrder (sortOrder, id)
-    ) ENGINE=InnoDB`,
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    sourcePagesId BIGINT UNSIGNED NULL,
+    parentId BIGINT UNSIGNED NULL DEFAULT 0,
+    title VARCHAR(150) NOT NULL,
+    page LONGTEXT NOT NULL,
+    sortOrder INT UNSIGNED NULL DEFAULT 1,
+    createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uqPagesSource (sourcePagesId),
+    INDEX idxPagesOrder (sortOrder, id),
+    INDEX idxPagesParent (parentId, sortOrder)
+  ) ENGINE=InnoDB`,
   ],
+
   [
     "news",
     `CREATE TABLE news (

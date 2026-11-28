@@ -5,11 +5,14 @@ import {
   Alert,
   Box,
   Button,
+  ButtonBase,
   CircularProgress,
   Dialog,
   DialogContent,
   IconButton,
   Link,
+  Menu,
+  MenuItem,
   Stack,
   Tab,
   Tabs,
@@ -176,7 +179,9 @@ const pageHref = (id) => `#${pageAnchorId(id)}`;
 const pageIdFromHash = () => {
   if (!window.location.hash.startsWith(PAGE_HASH_PREFIX)) return "";
   try {
-    return decodeURIComponent(window.location.hash.slice(PAGE_HASH_PREFIX.length));
+    return decodeURIComponent(
+      window.location.hash.slice(PAGE_HASH_PREFIX.length),
+    );
   } catch {
     return "";
   }
@@ -777,7 +782,8 @@ const renderField = (element, item) => {
 
   if (attr === "src" && element.tagName === "IMG") {
     if (!element.hasAttribute("alt")) element.setAttribute("alt", "");
-    if (!element.hasAttribute("loading")) element.setAttribute("loading", "lazy");
+    if (!element.hasAttribute("loading"))
+      element.setAttribute("loading", "lazy");
     element.setAttribute("decoding", "async");
   }
 };
@@ -883,7 +889,9 @@ const buildSrcDoc = ({
   const isHome = /home/i.test(pageTitle);
   const isGallery = /gall[ae]ry/i.test(pageTitle);
 
-  const sliderHtml = isHome ? renderSlider(slides, resolveMediaImage, escapeHtml) : "";
+  const sliderHtml = isHome
+    ? renderSlider(slides, resolveMediaImage, escapeHtml)
+    : "";
 
   const pageHtml =
     hydrateSiteData(html, siteData) || "<p>This page has no content yet.</p>";
@@ -992,6 +1000,119 @@ const buildSrcDoc = ({
 /* ------------------------------------------------------------------ */
 /* Site Header                                                        */
 /* ------------------------------------------------------------------ */
+const getChildren = (pages, page) =>
+  pages.filter((c) => String(c.parentId) === String(page.sitePageId));
+
+// Page + all descendants, depth-first, each with its depth.
+// `trail` guards against bad data (a page that is its own ancestor).
+const flattenTree = (pages, page, depth = 0, trail = new Set()) => {
+  const id = pageKey(page);
+  if (trail.has(id)) return [];
+  const nextTrail = new Set(trail).add(id);
+
+  return [
+    { page, depth },
+    ...getChildren(pages, page).flatMap((child) =>
+      flattenTree(pages, child, depth + 1, nextTrail),
+    ),
+  ];
+};
+
+function NavItem({ p, pages, activeId, onNavigate, theme }) {
+  const id = pageKey(p);
+  const label = p.title || "Untitled page";
+  const hasChildren = getChildren(pages, p).length > 0;
+  const menuItems = hasChildren ? flattenTree(pages, p) : [];
+  const buttonRef = useRef(null);
+  const [anchorEl, setAnchorEl] = useState(null);
+  const open = Boolean(anchorEl);
+
+  const handleMenuClick = (event) => {
+    if (hasChildren) {
+      setAnchorEl(buttonRef.current);
+    } else {
+      setAnchorEl(null);
+      handlePageAnchorClick(event, id, onNavigate, { focus: true });
+    }
+  };
+
+  const closeMenu = () => setAnchorEl(null);
+
+  return (
+    <Box sx={{ display: "flex", alignItems: "center" }}>
+      <ButtonBase
+        ref={buttonRef}
+        component="button"
+        type="button"
+        onClick={handleMenuClick}
+        sx={{
+          minHeight: 48,
+          px: 2,
+          textTransform: "none",
+          fontWeight: 600,
+          fontSize: "0.95rem",
+          color: theme.textColor || theme.color,
+          opacity: id === activeId ? 1 : 0.7,
+          borderRadius: 1,
+          whiteSpace: "nowrap",
+          "&:hover": { opacity: 1, bgcolor: theme.hover },
+        }}
+      >
+        {label}
+        {hasChildren && (
+          <Typography
+            component="span"
+            sx={{ ml: 0.5, fontSize: "0.7rem", opacity: 0.6 }}
+          >
+            ▾
+          </Typography>
+        )}
+      </ButtonBase>
+
+      {hasChildren && (
+        <Menu
+          anchorEl={anchorEl}
+          open={open}
+          onClose={closeMenu}
+          anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+          transformOrigin={{ vertical: "top", horizontal: "left" }}
+          slotProps={{ paper: { sx: { minWidth: 200 } } }}
+        >
+          {menuItems.map(({ page, depth }) => {
+            const key = pageKey(page);
+            return (
+              <MenuItem
+                key={key}
+                selected={key === activeId}
+                onClick={() => {
+                  closeMenu();
+                  onNavigate(key, { focus: true });
+                }}
+                sx={{
+                  pl: 2 + depth * 2.5,
+                  fontWeight: depth === 0 ? 700 : 400,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {depth > 0 && (
+                  <Box
+                    component="span"
+                    aria-hidden="true"
+                    sx={{ mr: 0.75, opacity: 0.6 }}
+                  >
+                    ↳
+                  </Box>
+                )}
+                {page.title || "Untitled page"}
+              </MenuItem>
+            );
+          })}
+        </Menu>
+      )}
+    </Box>
+  );
+}
+
 function SiteHeader({
   header,
   siteName,
@@ -1037,12 +1158,9 @@ function SiteHeader({
             href={pages[0] ? pageHref(pageKey(pages[0])) : "#main-content"}
             onClick={(event) => {
               if (pages[0]) {
-                handlePageAnchorClick(
-                  event,
-                  pageKey(pages[0]),
-                  onNavigate,
-                  { focus: true },
-                );
+                handlePageAnchorClick(event, pageKey(pages[0]), onNavigate, {
+                  focus: true,
+                });
               }
             }}
             sx={{
@@ -1108,75 +1226,26 @@ function SiteHeader({
             borderTop: stacked ? `1px solid ${theme.border}` : "none",
           }}
         >
-          <Tabs
-            component="nav"
-            aria-label="Site navigation"
-            value={activeId}
-            onChange={(_, value) => onNavigate(value)}
-            variant="scrollable"
-            scrollButtons="auto"
-            allowScrollButtonsMobile
-            sx={{
-              minHeight: 48,
-              minWidth: 0,
-              color: theme.textColor || theme.color,
-              "& .MuiTabs-flexContainer": { gap: 0.5 },
-              "& .MuiTabs-indicator": {
-                backgroundColor: theme.primaryColor || theme.color,
-                height: 3,
-                borderRadius: "3px 3px 0 0",
-              },
-              "& .MuiTabScrollButton-root": {
-                color: theme.textColor || theme.color,
-                width: 32,
-              },
-              "& .MuiTab-root": {
-                minHeight: 48,
-                minWidth: "auto",
-                maxWidth: 220,
-                px: 2,
-                textTransform: "none",
-                fontWeight: 600,
-                fontSize: "0.95rem",
-                color: theme.textColor || theme.color,
-                opacity: 0.7,
-                borderRadius: 1,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                transition: "opacity .2s, background-color .2s",
-                "&:hover": { opacity: 1, bgcolor: theme.hover },
-                "&:focus-visible": {
-                  opacity: 1,
-                  outline: `3px solid ${theme.primaryColor || theme.color}`,
-                  outlineOffset: -3,
-                },
-              },
-              "& .MuiTab-root.Mui-selected": {
-                color: theme.textColor || theme.color,
-                opacity: 1,
-              },
-            }}
+          <Stack
+            direction="row"
+            spacing={0.5}
+            sx={{ flexWrap: "wrap", alignItems: "center" }}
           >
-            {pages.map((p) => {
-              const id = pageKey(p);
-              const label = p.title || "Untitled page";
-              return (
-                <Tab
-                  key={id}
-                  component="a"
-                  href={pageHref(id)}
-                  value={id}
-                  label={label}
-                  title={label}
-                  aria-current={id === activeId ? "page" : undefined}
-                  onClick={(event) =>
-                    handlePageAnchorClick(event, id, onNavigate, { focus: true })
-                  }
+            {pages
+              .filter(
+                (p) => !p.parentId || p.parentId === 0 || p.parentId === "0",
+              )
+              .map((p) => (
+                <NavItem
+                  key={pageKey(p)}
+                  p={p}
+                  pages={pages}
+                  activeId={activeId}
+                  onNavigate={onNavigate}
+                  theme={theme}
                 />
-              );
-            })}
-          </Tabs>
+              ))}
+          </Stack>
         </Box>
       </Box>
     </Box>
@@ -1241,11 +1310,14 @@ function SiteFooter({
     },
   ].filter(Boolean);
 
+  const topLevelPages = pages.filter(
+    (p) => !p.parentId || p.parentId === 0 || p.parentId === "0",
+  );
   const hasAbout = Boolean(header?.footerText || title);
-  const hasLinks = pages.length > 1;
+  const hasLinks = topLevelPages.length > 1;
   const copyright =
     header?.copyrightText ||
-    (title ? `© ${new Date().getFullYear()} ${title}` : "");
+    (title ? ` ${new Date().getFullYear()} ${title}` : "");
 
   const small = device === "phone";
   const columns =
@@ -1255,7 +1327,7 @@ function SiteFooter({
         ? "repeat(2, 1fr)"
         : "repeat(auto-fit, minmax(210px, 1fr))";
 
-  const linkCap = pages.length > 12;
+  const linkCap = topLevelPages.length > 12;
 
   const linkSx = {
     color: "inherit",
@@ -1350,7 +1422,7 @@ function SiteFooter({
                   pr: linkCap ? 1 : 0,
                 }}
               >
-                {pages.map((p) => {
+                {topLevelPages.map((p) => {
                   const isActive = pageKey(p) === activeId;
                   return (
                     <Link
@@ -1358,12 +1430,9 @@ function SiteFooter({
                       component="a"
                       href={pageHref(pageKey(p))}
                       onClick={(event) =>
-                        handlePageAnchorClick(
-                          event,
-                          pageKey(p),
-                          onNavigate,
-                          { focus: true },
-                        )
+                        handlePageAnchorClick(event, pageKey(p), onNavigate, {
+                          focus: true,
+                        })
                       }
                       aria-current={isActive ? "page" : undefined}
                       title={p.title || "Untitled page"}
@@ -1475,7 +1544,7 @@ function SiteFooter({
               color: theme.muted,
             }}
           >
-            {copyright}
+            © {copyright}
           </Typography>
         </Box>
       )}
@@ -1805,24 +1874,30 @@ export default function MySiteView() {
   // Force iframe remount when data set changes so tables re-hydrate
   const dataVersion = useMemo(() => Object.keys(siteData).length, [siteData]);
 
- const srcDoc = useMemo(
-  () =>
-    buildSrcDoc({
-      html: activePage?.page,
-      themeConfig: theme,
-      pageTitle: activePage?.title || "Site",
-      galleries: media.galleries,
-      slides: media.slider,
-      siteData: {
-        ...siteData,
-        headers:
-          Object.keys(resolvedHeader).length
+  const srcDoc = useMemo(
+    () =>
+      buildSrcDoc({
+        html: activePage?.page,
+        themeConfig: theme,
+        pageTitle: activePage?.title || "Site",
+        galleries: media.galleries,
+        slides: media.slider,
+        siteData: {
+          ...siteData,
+          headers: Object.keys(resolvedHeader).length
             ? [resolvedHeader]
             : siteData.headers || [],
-      },
-    }),
-  [activePage, theme, media.galleries, media.slider, siteData, resolvedHeader],
-);
+        },
+      }),
+    [
+      activePage,
+      theme,
+      media.galleries,
+      media.slider,
+      siteData,
+      resolvedHeader,
+    ],
+  );
 
   const handleNavigate = (id, { focus = false } = {}) => {
     const nextId = String(id);

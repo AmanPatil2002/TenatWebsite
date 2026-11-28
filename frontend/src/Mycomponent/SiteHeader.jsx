@@ -704,7 +704,7 @@ export default function SiteHeader() {
                     slotProps={{ htmlInput: { maxLength: 255 } }}
                     fullWidth
                     size="small"
-                    placeholder="© 2025 Your Company. All rights reserved."
+                    placeholder="2025 Your Company. All rights reserved."
                     helperText="Shown in the footer bottom bar."
                     sx={FIELD_SX}
                   />

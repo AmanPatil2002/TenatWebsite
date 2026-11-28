@@ -4,7 +4,7 @@ const authenticateSiteAdmin = require("../../middleware/authenticateSiteAdmin");
 const {
   getSitePages, getPublicSitePages, getSitePageOptions, createSitePage,
   updateSitePage, deleteSitePage, reorderSitePages,
-} = require("../../controller/site/pageController");
+} = require("../../controller/site/sitepageController");
 
 router.get("/:siteId/public/pages", getPublicSitePages);
 // Owner routes

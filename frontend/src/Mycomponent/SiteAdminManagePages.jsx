@@ -17,6 +17,10 @@ import {
   alpha,
   TextField,
   useTheme,
+  Select,
+  MenuItem,
+  InputLabel,
+  FormControl,
 } from "@mui/material";
 
 import { buildPageBody } from "../utils/buildPageContent";
@@ -164,6 +168,7 @@ export default function SiteAdminManagePages() {
   const [success, setSuccess] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [title, setTitle] = useState("");
+  const [parentId, setParentId] = useState("");
   // `content` always holds the STORED html (with placeholders).
   const [content, setContent] = useState("");
   const [creating, setCreating] = useState(false);
@@ -174,6 +179,19 @@ export default function SiteAdminManagePages() {
   const editorRef = useRef(null);
   const dehydrateTimer = useRef(null);
   const pagesUrl = `${baseUrl}/pages`;
+
+  const isRootPage = (page) => {
+    const id = Number(page?.parentId);
+    return !id || id === 0;
+  };
+  const parentPages = useMemo(
+    () => pages.filter(isRootPage),
+    [pages],
+  );
+  const childPages = useMemo(
+    () => pages.filter((page) => !isRootPage(page)),
+    [pages],
+  );
 
   const hiddenScrollSx = {
     overflowY: "auto",
@@ -263,6 +281,9 @@ export default function SiteAdminManagePages() {
       setSelectedId(selected ? String(selected.sitePageId) : "");
       setTitle(selected?.title || "");
       setContent(selected?.page || "");
+      setParentId(
+        selected && Number(selected.parentId) ? String(selected.parentId) : "0",
+      );
       setCreating(!selected);
       return list;
     },
@@ -465,6 +486,7 @@ export default function SiteAdminManagePages() {
     setSelectedId(String(page.sitePageId));
     setTitle(page.title);
     setContent(page.page);
+    setParentId(page.parentId ? String(page.parentId) : "0");
     setCreating(false);
     setError("");
     setSuccess("");
@@ -472,6 +494,14 @@ export default function SiteAdminManagePages() {
 
   // CKEditor 4 does not re-apply initData after mount, so push the new
   // page's hydrated markup into the live editor instance on selection change.
+  //
+  // NOTE: this must NOT depend on `content` / `editorInitData`. Both change on
+  // every keystroke via handleEditorChange (debounced setContent). Re-calling
+  // setData on every keystroke resets the editor caret to the top-left — the
+  // "cursor jumps to top-left" bug. Only reset the editor when the user picks a
+  // different page or starts a new one.
+  // editorInitData is intentionally read from the latest render scope here and
+  // is deliberately excluded from the deps array.
   useEffect(() => {
     if (!editorRef.current) return;
     const nextData = creating ? "" : editorInitData;
@@ -480,7 +510,7 @@ export default function SiteAdminManagePages() {
     } catch {
       // editor not ready yet; initData prop will handle initial load
     }
-  }, [selectedId, creating, editorInitData]);
+  }, [selectedId, creating]);
 
   const movePage = async (index, offset) => {
     const targetIndex = index + offset;
@@ -516,6 +546,7 @@ export default function SiteAdminManagePages() {
     setSelectedId("");
     setTitle("");
     setContent("");
+    setParentId("0");
     setCreating(true);
     setError("");
     setSuccess("");
@@ -534,7 +565,12 @@ export default function SiteAdminManagePages() {
       if (creating) {
         const { data } = await axios.post(
           pagesUrl,
-          { title, page: content, isFormSubmission: true },
+          {
+            title,
+            page: content,
+            isFormSubmission: true,
+            parentId: parentId && parentId !== "0" ? parentId : 0,
+          },
           authConfig,
         );
         await loadPages(data.sitePageId);
@@ -542,7 +578,12 @@ export default function SiteAdminManagePages() {
       } else {
         await axios.put(
           `${pagesUrl}/${selectedId}`,
-          { title, page: content, isFormSubmission: true },
+          {
+            title,
+            page: content,
+            isFormSubmission: true,
+            parentId: parentId && parentId !== "0" ? parentId : 0,
+          },
           authConfig,
         );
         await loadPages(selectedId);
@@ -595,6 +636,158 @@ export default function SiteAdminManagePages() {
     },
     [],
   );
+
+  const renderPageItem = (page) => {
+    const index = pages.findIndex(
+      (p) => String(p.sitePageId) === String(page.sitePageId),
+    );
+    const isActive = !creating && selectedId === String(page.sitePageId);
+    const parentPage = Number(page.parentId)
+      ? pages.find((p) => String(p.sitePageId) === String(page.parentId))
+      : null;
+
+    return (
+      <Stack
+        key={page.sitePageId}
+        direction="row"
+        gap={0.5}
+        sx={{
+          borderRadius: 2,
+          bgcolor: isActive
+            ? alpha(theme.palette.primary.main, 0.08)
+            : "transparent",
+          border: `1px solid ${
+            isActive
+              ? alpha(theme.palette.primary.main, 0.25)
+              : "transparent"
+          }`,
+          transition: "background-color .15s ease",
+          "&:hover": {
+            bgcolor: isActive
+              ? alpha(theme.palette.primary.main, 0.1)
+              : alpha(theme.palette.primary.main, 0.04),
+          },
+          alignItems: "center",
+        }}
+      >
+        <Button
+          fullWidth
+          onClick={() => selectPage(page)}
+          sx={{
+            textAlign: "left",
+            textTransform: "none",
+            fontWeight: isActive ? 700 : 500,
+            fontSize: 14,
+            color: isActive ? "primary.main" : "text.primary",
+            borderRadius: 2,
+            px: 1.5,
+            py: 0.75,
+            minWidth: 0,
+            "& .MuiButton-endIcon": { ml: "auto" },
+          }}
+          endIcon={
+            isActive ? (
+              <Chip
+                size="small"
+                label="Editing"
+                sx={{
+                  height: 20,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  bgcolor: alpha(
+                    theme.palette.primary.main,
+                    0.15,
+                  ),
+                  color: "primary.main",
+                  "& .MuiChip-label": { px: 0.75 },
+                }}
+              />
+            ) : null
+          }
+        >
+          <Box
+            component="span"
+            sx={{
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            
+            {parentPage && (
+              <Typography
+                component="span"
+                variant="caption"
+                sx={{
+                  display: "block",
+                  color: "text.secondary",
+                  fontSize: 11,
+                  fontWeight: 400,
+                }}
+              >
+                {parentPage.title}
+              </Typography>
+            )}
+             ↳ {page.title}
+          </Box>
+        </Button>
+
+        <Stack
+          direction="row"
+          spacing={0.25}
+          sx={{ flexShrink: 0, alignItems: "center" }}
+        >
+          <Stack sx={{ flexShrink: 0 }}>
+            <IconButton
+              type="button"
+              size="small"
+              aria-label={`Move ${page.title} up`}
+              disabled={reordering || !!deletingId || index === 0}
+              onClick={() => movePage(index, -1)}
+              sx={{ p: 0.25, borderRadius: 1 }}
+            >
+              <UpIcon size={14} />
+            </IconButton>
+            <IconButton
+              type="button"
+              size="small"
+              aria-label={`Move ${page.title} down`}
+              disabled={
+                reordering ||
+                !!deletingId ||
+                index === pages.length - 1
+              }
+              onClick={() => movePage(index, 1)}
+              sx={{ p: 0.25, borderRadius: 1 }}
+            >
+              <DownIcon size={14} />
+            </IconButton>
+          </Stack>
+          <Tooltip title={`Delete ${page.title}`}>
+            <span>
+              <IconButton
+                type="button"
+                size="small"
+                aria-label={`Delete ${page.title}`}
+                color="error"
+                disabled={
+                  reordering || !!deletingId || pages.length <= 1
+                }
+                onClick={() => deletePage(page)}
+                sx={{ p: 0.25, borderRadius: 1 }}
+              >
+                {deletingId === String(page.sitePageId) ? (
+                  <CircularProgress size={14} color="error" />
+                ) : (
+                  <DeleteIcon size={14} />
+                )}
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Stack>
+      </Stack>
+    );
+  };
 
   const selectedPage = pages.find((p) => String(p.sitePageId) === selectedId);
   const currentTitle = creating
@@ -666,7 +859,7 @@ export default function SiteAdminManagePages() {
           >
             <Paper
               variant="outlined"
-              sx={{ p: 2, borderRadius: 3, minWidth: 0 }}
+              sx={{ p: 2, borderRadius: 3, minWidth: 0, mb: 2, height: "calc(100vh - 250px)", display: "flex", flexDirection: "column" }}
             >
               <Stack
                 direction="row"
@@ -677,7 +870,7 @@ export default function SiteAdminManagePages() {
                 }}
               >
                 <Typography variant="h6" fontWeight={700}>
-                  Pages
+                  Parent Pages
                 </Typography>
                 <Button
                   type="button"
@@ -695,164 +888,31 @@ export default function SiteAdminManagePages() {
                   New
                 </Button>
               </Stack>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                display="block"
-                sx={{ mb: 1.5 }}
-              >
-                Use the arrows to reorder.
+              <Divider sx={{ mb: 1.5 }} />
+              <Stack spacing={0.75} sx={{ ...hiddenScrollSx, flexGrow: 1 }}>
+                {parentPages.map((page) => renderPageItem(page))}
+                {!parentPages.length && (
+                  <Typography variant="caption" color="text.secondary">
+                    No parent pages.
+                  </Typography>
+                )}
+              </Stack>
+            </Paper>
+
+            <Paper
+              variant="outlined"
+              sx={{ p: 2, borderRadius: 3, minWidth: 0, height: "calc(100vh - 250px)", display: "flex", flexDirection: "column" }}
+            >
+              <Typography variant="h6" fontWeight={700} sx={{ mb: 1 }}>
+                Child Pages
               </Typography>
               <Divider sx={{ mb: 1.5 }} />
-              <Stack spacing={0.75} sx={{ ...hiddenScrollSx, maxHeight: 320 }}>
-                {pages.map((page, index) => {
-                  const isActive =
-                    !creating && selectedId === String(page.sitePageId);
-                  return (
-                    <Stack
-                      key={page.sitePageId}
-                      direction="row"
-                      gap={0.5}
-                      sx={{
-                        borderRadius: 2,
-                        bgcolor: isActive
-                          ? alpha(theme.palette.primary.main, 0.08)
-                          : "transparent",
-                        border: `1px solid ${
-                          isActive
-                            ? alpha(theme.palette.primary.main, 0.25)
-                            : "transparent"
-                        }`,
-                        transition: "background-color .15s ease",
-                        "&:hover": {
-                          bgcolor: isActive
-                            ? alpha(theme.palette.primary.main, 0.1)
-                            : alpha(theme.palette.primary.main, 0.04),
-                        },
-                        alignItems: "center",
-                      }}
-                    >
-                      <Button
-                        fullWidth
-                        onClick={() => selectPage(page)}
-                        sx={{
-                          textAlign: "left",
-                          textTransform: "none",
-                          fontWeight: isActive ? 700 : 500,
-                          fontSize: 14,
-                          color: isActive ? "primary.main" : "text.primary",
-                          borderRadius: 2,
-                          px: 1.5,
-                          py: 0.75,
-                          minWidth: 0,
-                          "& .MuiButton-endIcon": { ml: "auto" },
-                        }}
-                        endIcon={
-                          isActive ? (
-                            <Chip
-                              size="small"
-                              label="Editing"
-                              sx={{
-                                height: 20,
-                                fontSize: 10,
-                                fontWeight: 700,
-                                bgcolor: alpha(
-                                  theme.palette.primary.main,
-                                  0.15,
-                                ),
-                                color: "primary.main",
-                                "& .MuiChip-label": { px: 0.75 },
-                              }}
-                            />
-                          ) : null
-                        }
-                      >
-                        <Box
-                          component="span"
-                          sx={{
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {page.title}
-                        </Box>
-                      </Button>
-
-                      <Stack
-                        direction="row"
-                        spacing={0.25}
-                        sx={{ flexShrink: 0, alignItems: "center" }}
-                      >
-                        <Stack sx={{ flexShrink: 0 }}>
-                          <IconButton
-                            type="button"
-                            size="small"
-                            aria-label={`Move ${page.title} up`}
-                            disabled={reordering || !!deletingId || index === 0}
-                            onClick={() => movePage(index, -1)}
-                            sx={{ p: 0.25, borderRadius: 1 }}
-                          >
-                            <UpIcon size={14} />
-                          </IconButton>
-                          <IconButton
-                            type="button"
-                            size="small"
-                            aria-label={`Move ${page.title} down`}
-                            disabled={
-                              reordering ||
-                              !!deletingId ||
-                              index === pages.length - 1
-                            }
-                            onClick={() => movePage(index, 1)}
-                            sx={{ p: 0.25, borderRadius: 1 }}
-                          >
-                            <DownIcon size={14} />
-                          </IconButton>
-                        </Stack>
-                        <Tooltip title={`Delete ${page.title}`}>
-                          <span>
-                            <IconButton
-                              type="button"
-                              size="small"
-                              aria-label={`Delete ${page.title}`}
-                              color="error"
-                              disabled={
-                                reordering || !!deletingId || pages.length <= 1
-                              }
-                              onClick={() => deletePage(page)}
-                              sx={{ p: 0.25, borderRadius: 1 }}
-                            >
-                              {deletingId === String(page.sitePageId) ? (
-                                <CircularProgress size={14} color="error" />
-                              ) : (
-                                <DeleteIcon size={14} />
-                              )}
-                            </IconButton>
-                          </span>
-                        </Tooltip>
-                      </Stack>
-                    </Stack>
-                  );
-                })}
-                {!pages.length && (
-                  <Box
-                    sx={{
-                      py: 3,
-                      px: 1.5,
-                      textAlign: "center",
-                      border: `1px dashed ${theme.palette.divider}`,
-                      borderRadius: 2,
-                      bgcolor: alpha(theme.palette.primary.main, 0.02),
-                    }}
-                  >
-                    <Typography fontWeight={600} variant="body2">
-                      No pages yet
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Click "New" to create your first page.
-                    </Typography>
-                  </Box>
+              <Stack spacing={0.75} sx={{ ...hiddenScrollSx, flexGrow: 1 }}>
+                {childPages.map((page) => renderPageItem(page))}
+                {!childPages.length && (
+                  <Typography variant="caption" color="text.secondary">
+                    No child pages.
+                  </Typography>
                 )}
               </Stack>
             </Paper>
@@ -907,6 +967,36 @@ export default function SiteAdminManagePages() {
                 helperText="Shown in the site navigation and browser tab."
               />
 
+              <FormControl fullWidth size="small">
+                <InputLabel id="parent-page-label">
+                  Parent Page (Cascading)
+                </InputLabel>
+                <Select
+                  labelId="parent-page-label"
+                  value={parentId === "" || parentId === "0" ? "0" : parentId}
+                  label="Parent Page (Cascading)"
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    // Ensure that if it's "0" (None), it stays "0".
+                    // Otherwise, ensure it's the valid ID string.
+                    setParentId(value === "0" ? "0" : String(value));
+                  }}
+                >
+                  <MenuItem value="0">None (Default Page)</MenuItem>
+                  {pages
+                    .filter(
+                      (p) =>
+                        String(p.sitePageId) !== selectedId &&
+                        (p.sourcePagesId == null || p.sourcePagesId === ""),
+                    )
+                    .map((p) => (
+                      <MenuItem key={p.sitePageId} value={String(p.sitePageId)}>
+                        {p.title}
+                      </MenuItem>
+                    ))}
+                </Select>
+              </FormControl>
+
               <Box>
                 <Typography
                   variant="caption"
@@ -944,211 +1034,214 @@ export default function SiteAdminManagePages() {
                   }}
                 >
                   {resourcesReady && (
-                  <CKEditor
-                    editorUrl="https://cdn.ckeditor.com/4.22.1/full-all/ckeditor.js"
-                    initData={editorInitData}
-                    onBeforeLoad={(CKEDITOR) => {
-                      if (CKEDITOR.plugins.get("localvideo")) return;
+                    <CKEditor
+                      editorUrl="https://cdn.ckeditor.com/4.22.1/full-all/ckeditor.js"
+                      initData={editorInitData}
+                      onBeforeLoad={(CKEDITOR) => {
+                        if (CKEDITOR.plugins.get("localvideo")) return;
 
-                      CKEDITOR.plugins.add("localvideo", {
-                        init(editor) {
-                          editor.addCommand("localvideoCmd", {
-                            exec() {
-                              const input = document.createElement("input");
-                              input.type = "file";
-                              input.accept = "video/mp4,video/webm,video/ogg";
+                        CKEDITOR.plugins.add("localvideo", {
+                          init(editor) {
+                            editor.addCommand("localvideoCmd", {
+                              exec() {
+                                const input = document.createElement("input");
+                                input.type = "file";
+                                input.accept = "video/mp4,video/webm,video/ogg";
 
-                              input.onchange = async () => {
-                                const file = input.files?.[0];
-                                if (!file) return;
+                                input.onchange = async () => {
+                                  const file = input.files?.[0];
+                                  if (!file) return;
 
-                                const body = new FormData();
-                                body.append("upload", file);
+                                  const body = new FormData();
+                                  body.append("upload", file);
 
-                                try {
-                                  const res = await fetch(
-                                    `${API_URL}/uploads/ckeditor-video`,
-                                    { method: "POST", body },
-                                  );
-                                  const data = await res.json();
-                                  if (!data.uploaded) {
-                                    throw new Error(
-                                      data.error?.message || "Upload failed",
+                                  try {
+                                    const res = await fetch(
+                                      `${API_URL}/uploads/ckeditor-video`,
+                                      { method: "POST", body },
                                     );
+                                    const data = await res.json();
+                                    if (!data.uploaded) {
+                                      throw new Error(
+                                        data.error?.message || "Upload failed",
+                                      );
+                                    }
+                                    editor.insertHtml(
+                                      `<video controls style="max-width:100%" src="${data.url}"></video><p></p>`,
+                                    );
+                                  } catch (err) {
+                                    alert(err.message);
                                   }
-                                  editor.insertHtml(
-                                    `<video controls style="max-width:100%" src="${data.url}"></video><p></p>`,
-                                  );
-                                } catch (err) {
-                                  alert(err.message);
-                                }
-                              };
+                                };
 
-                              input.click();
-                            },
-                          });
-                          editor.ui.addButton("LocalVideo", {
-                            label: "Insert video",
-                            command: "localvideoCmd",
-                            toolbar: "insert,10",
-                            icon: "/assets/icons/video.png",
-                          });
-                        },
-                      });
-                    }}
-                    config={{
-                      height: 420,
-                      language: "en",
-                      versionCheck: false,
-                      removePlugins: "exportpdf",
-                      // Preserve every attribute/class the generator relies on
-                      // so data-field / data-attr survive editor round-trips.
-                      allowedContent: true,
-                      extraAllowedContent:
-                        "div[*]{*}; section[*]{*}; p[*]{*}; a[*]{*}; img[*]{*}; figure; figcaption; table[*]{*}; thead; tbody; tr[*]{*}; td[*]{*}; th[*]{*}; span[*]{*}; video[*]{*}; source[*]; form[*]{*}; input[*]{*}; textarea[*]{*}; select[*]{*}; option[*]{*}; label[*]{*}; button[*]{*}",
+                                input.click();
+                              },
+                            });
+                            editor.ui.addButton("LocalVideo", {
+                              label: "Insert video",
+                              command: "localvideoCmd",
+                              toolbar: "insert,10",
+                              icon: "/assets/icons/video.png",
+                            });
+                          },
+                        });
+                      }}
+                      config={{
+                        height: 420,
+                        language: "en",
+                        versionCheck: false,
+                        removePlugins: "exportpdf",
+                        // Preserve every attribute/class the generator relies on
+                        // so data-field / data-attr survive editor round-trips.
+                        allowedContent: true,
+                        extraAllowedContent:
+                          "div[*]{*}; section[*]{*}; p[*]{*}; a[*]{*}; img[*]{*}; figure; figcaption; table[*]{*}; thead; tbody; tr[*]{*}; td[*]{*}; th[*]{*}; span[*]{*}; video[*]{*}; source[*]; form[*]{*}; input[*]{*}; textarea[*]{*}; select[*]{*}; option[*]{*}; label[*]{*}; button[*]{*}",
 
-                      extraPlugins:
-                        "uploadimage,localvideo,colorbutton,find,divarea,justify,showblocks,smiley,pagebreak,copyformatting",
+                        extraPlugins:
+                          "uploadimage,localvideo,colorbutton,find,divarea,justify,showblocks,smiley,pagebreak,copyformatting",
 
-                      clipboard_handleImages: false,
+                        clipboard_handleImages: false,
 
-                      toolbar: [
-                        {
-                          name: "document",
-                          items: [
-                            "Source",
-                            "-",
-                            "Preview",
-                            "-",
-                            "Print",
-                            "-",
-                            "Templates",
-                          ],
-                        },
-                        {
-                          name: "clipboard",
-                          items: [
-                            "Cut",
-                            "Copy",
-                            "Paste",
-                            "PasteText",
-                            "PasteFromWord",
-                            "-",
-                            "Undo",
-                            "Redo",
-                          ],
-                        },
-                        {
-                          name: "editing",
-                          items: [
-                            "Find",
-                            "Replace",
-                            "-",
-                            "SelectAll",
-                            "CopyFormatting",
-                          ],
-                        },
-                        { name: "tools", items: ["Maximize", "ShowBlocks"] },
+                        toolbar: [
+                          {
+                            name: "document",
+                            items: [
+                              "Source",
+                              "-",
+                              "Preview",
+                              "-",
+                              "Print",
+                              "-",
+                              "Templates",
+                            ],
+                          },
+                          {
+                            name: "clipboard",
+                            items: [
+                              "Cut",
+                              "Copy",
+                              "Paste",
+                              "PasteText",
+                              "PasteFromWord",
+                              "-",
+                              "Undo",
+                              "Redo",
+                            ],
+                          },
+                          {
+                            name: "editing",
+                            items: [
+                              "Find",
+                              "Replace",
+                              "-",
+                              "SelectAll",
+                              "CopyFormatting",
+                            ],
+                          },
+                          { name: "tools", items: ["Maximize", "ShowBlocks"] },
 
-                        "/",
+                          "/",
 
-                        {
-                          name: "basicstyles",
-                          items: [
-                            "Bold",
-                            "Italic",
-                            "Underline",
-                            "Strike",
-                            "Subscript",
-                            "Superscript",
-                            "-",
-                            "RemoveFormat",
-                          ],
-                        },
-                        { name: "colors", items: ["TextColor", "BGColor"] },
-                        {
-                          name: "styles",
-                          items: [
-                            "Styles",
-                            "-",
-                            "Format",
-                            "-",
-                            "Font",
-                            "FontSize",
-                          ],
-                        },
+                          {
+                            name: "basicstyles",
+                            items: [
+                              "Bold",
+                              "Italic",
+                              "Underline",
+                              "Strike",
+                              "Subscript",
+                              "Superscript",
+                              "-",
+                              "RemoveFormat",
+                            ],
+                          },
+                          { name: "colors", items: ["TextColor", "BGColor"] },
+                          {
+                            name: "styles",
+                            items: [
+                              "Styles",
+                              "-",
+                              "Format",
+                              "-",
+                              "Font",
+                              "FontSize",
+                            ],
+                          },
 
-                        "/",
+                          "/",
 
-                        {
-                          name: "paragraph",
-                          items: [
-                            "NumberedList",
-                            "BulletedList",
-                            "-",
-                            "Outdent",
-                            "Indent",
-                            "-",
-                            "Blockquote",
-                            "-",
-                            "JustifyLeft",
-                            "JustifyCenter",
-                            "JustifyRight",
-                            "JustifyBlock",
-                            "-",
-                            "BidiLtr",
-                            "BidiRtl",
-                          ],
-                        },
-                        { name: "links", items: ["Link", "Unlink", "Anchor"] },
+                          {
+                            name: "paragraph",
+                            items: [
+                              "NumberedList",
+                              "BulletedList",
+                              "-",
+                              "Outdent",
+                              "Indent",
+                              "-",
+                              "Blockquote",
+                              "-",
+                              "JustifyLeft",
+                              "JustifyCenter",
+                              "JustifyRight",
+                              "JustifyBlock",
+                              "-",
+                              "BidiLtr",
+                              "BidiRtl",
+                            ],
+                          },
+                          {
+                            name: "links",
+                            items: ["Link", "Unlink", "Anchor"],
+                          },
 
-                        "/",
+                          "/",
 
-                        {
-                          name: "insert",
-                          items: [
-                            "Image",
-                            "LocalVideo",
-                            "Table",
-                            "HorizontalRule",
-                            "-",
-                            "SpecialChar",
-                            "Smiley",
-                            "PageBreak",
-                            "Iframe",
-                          ],
-                        },
+                          {
+                            name: "insert",
+                            items: [
+                              "Image",
+                              "LocalVideo",
+                              "Table",
+                              "HorizontalRule",
+                              "-",
+                              "SpecialChar",
+                              "Smiley",
+                              "PageBreak",
+                              "Iframe",
+                            ],
+                          },
 
-                        "/",
+                          "/",
 
-                        {
-                          name: "forms",
-                          items: [
-                            "Form",
-                            "Checkbox",
-                            "Radio",
-                            "TextField",
-                            "Textarea",
-                            "Select",
-                            "Button",
-                            "ImageButton",
-                            "HiddenField",
-                          ],
-                        },
-                      ],
+                          {
+                            name: "forms",
+                            items: [
+                              "Form",
+                              "Checkbox",
+                              "Radio",
+                              "TextField",
+                              "Textarea",
+                              "Select",
+                              "Button",
+                              "ImageButton",
+                              "HiddenField",
+                            ],
+                          },
+                        ],
 
-                      removeButtons: "",
+                        removeButtons: "",
 
-                      uploadUrl: `${API_URL}/uploads/ckeditor`,
-                      imageUploadUrl: `${API_URL}/uploads/ckeditor`,
-                      filebrowserImageUploadUrl: `${API_URL}/uploads/ckeditor`,
-                    }}
-                    onInstanceReady={(event) => {
-                      editorRef.current = event.editor;
-                      applyTheme(event.editor);
-                    }}
-                    onChange={handleEditorChange}
-                  />
+                        uploadUrl: `${API_URL}/uploads/ckeditor`,
+                        imageUploadUrl: `${API_URL}/uploads/ckeditor`,
+                        filebrowserImageUploadUrl: `${API_URL}/uploads/ckeditor`,
+                      }}
+                      onInstanceReady={(event) => {
+                        editorRef.current = event.editor;
+                        applyTheme(event.editor);
+                      }}
+                      onChange={handleEditorChange}
+                    />
                   )}
                 </Box>
               </Box>

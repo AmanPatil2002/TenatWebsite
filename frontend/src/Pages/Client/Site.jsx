@@ -11,13 +11,20 @@ import {
   DialogContent,
   IconButton,
   Link,
+  Menu,
+  MenuItem,
+  Stack,
   Tab,
   Tabs,
   Typography,
+  ButtonBase,
 } from "@mui/material";
 import { createSiteSlug } from "../../utils/siteSlug";
 import { buildSiteTheme } from "../../utils/siteTheme";
-import { installSiteFormHandler, SITE_FORM_SCRIPT } from "../../utils/siteForms";
+import {
+  installSiteFormHandler,
+  SITE_FORM_SCRIPT,
+} from "../../utils/siteForms";
 import { renderSlider } from "../../utils/siteSlider";
 /* ------------------------------------------------------------------ */
 /* Inline SVG icons (no @mui/icons-material dependency)                */
@@ -132,6 +139,16 @@ const getToken = () =>
 
 const pageKey = (page) => String(page.sitePageId ?? page.pagesId);
 
+const buildChildrenMap = (pages) => {
+  const map = {};
+  pages.forEach((page) => {
+    const parentId = String(page.parentId ?? "0");
+    if (!map[parentId]) map[parentId] = [];
+    map[parentId].push(page);
+  });
+  return map;
+};
+
 const PAGE_HASH_PREFIX = "#tenant-page-";
 const pageAnchorId = (id) =>
   `${PAGE_HASH_PREFIX.slice(1)}${encodeURIComponent(String(id))}`;
@@ -139,7 +156,9 @@ const pageHref = (id) => `#${pageAnchorId(id)}`;
 const pageIdFromHash = () => {
   if (!window.location.hash.startsWith(PAGE_HASH_PREFIX)) return "";
   try {
-    return decodeURIComponent(window.location.hash.slice(PAGE_HASH_PREFIX.length));
+    return decodeURIComponent(
+      window.location.hash.slice(PAGE_HASH_PREFIX.length),
+    );
   } catch {
     return "";
   }
@@ -241,7 +260,6 @@ const renderGallery = (items) => {
 
 //   return `<section class="site-home-slider" aria-label="Featured images"><button class="site-slider-pause" type="button" aria-pressed="false"${hasMotion ? "" : " hidden"}>Pause slideshow</button><div class="site-slider-track"${animation ? ` style="${animation}"` : ""}>${slides.join("")}</div></section><style>${keyframes}</style>`;
 // };
-
 
 const SLIDER_MARKER = /<!--\s*SITE_SLIDER\s*-->/i;
 
@@ -619,9 +637,6 @@ const formatValue = (value, format, element) => {
   return value;
 };
 
-
-
-
 /* --------------------------------
    Relationship maps
 --------------------------------- */
@@ -770,7 +785,8 @@ const renderField = (element, item) => {
 
   if (attr === "src" && element.tagName === "IMG") {
     if (!element.hasAttribute("alt")) element.setAttribute("alt", "");
-    if (!element.hasAttribute("loading")) element.setAttribute("loading", "lazy");
+    if (!element.hasAttribute("loading"))
+      element.setAttribute("loading", "lazy");
     element.setAttribute("decoding", "async");
   }
 };
@@ -890,7 +906,9 @@ const buildSrcDoc = ({
   const isHome = /home/i.test(pageTitle);
   const isGallery = /gall[ae]ry/i.test(pageTitle);
 
-  const sliderHtml = isHome ? renderSlider(slides, resolveMediaImage, escapeHtml) : "";
+  const sliderHtml = isHome
+    ? renderSlider(slides, resolveMediaImage, escapeHtml)
+    : "";
   // Hydrate the page's [data-entity] tables BEFORE injecting into iframe
   const pageHtml =
     hydrateSiteData(html, siteData) || "<p>This page has no content yet.</p>";
@@ -999,7 +1017,127 @@ const buildSrcDoc = ({
 /* ------------------------------------------------------------------ */
 /* Site Header                                                         */
 /* ------------------------------------------------------------------ */
-function SiteHeader({ header, siteName, pages, activeId, onNavigate, theme }) {
+const getChildren = (pages, page) =>
+  pages.filter((c) => String(c.parentId) === String(page.sitePageId));
+
+// Page + all descendants, depth-first, each with its depth.
+// `trail` guards against bad data (a page that is its own ancestor).
+const flattenTree = (pages, page, depth = 0, trail = new Set()) => {
+  const id = pageKey(page);
+  if (trail.has(id)) return [];
+  const nextTrail = new Set(trail).add(id);
+
+  return [
+    { page, depth },
+    ...getChildren(pages, page).flatMap((child) =>
+      flattenTree(pages, child, depth + 1, nextTrail),
+    ),
+  ];
+};
+
+function NavItem({ p, pages, activeId, onNavigate, theme }) {
+  const id = pageKey(p);
+  const label = p.title || "Untitled page";
+  const hasChildren = getChildren(pages, p).length > 0;
+  const menuItems = hasChildren ? flattenTree(pages, p) : [];
+  const buttonRef = useRef(null);
+  const [anchorEl, setAnchorEl] = useState(null);
+  const open = Boolean(anchorEl);
+
+  const handleMenuClick = (event) => {
+    if (hasChildren) {
+      setAnchorEl(buttonRef.current);
+    } else {
+      setAnchorEl(null);
+      handlePageAnchorClick(event, id, onNavigate, { focus: true });
+    }
+  };
+
+  const closeMenu = () => setAnchorEl(null);
+
+  return (
+    <Box sx={{ display: "flex", alignItems: "center" }}>
+      <ButtonBase
+        ref={buttonRef}
+        component="button"
+        type="button"
+        onClick={handleMenuClick}
+        sx={{
+          minHeight: 48,
+          px: 2,
+          textTransform: "none",
+          fontWeight: 600,
+          fontSize: "0.95rem",
+          color: theme.textColor || theme.color,
+          opacity: id === activeId ? 1 : 0.7,
+          borderRadius: 1,
+          whiteSpace: "nowrap",
+          "&:hover": { opacity: 1, bgcolor: theme.hover },
+        }}
+      >
+        {label}
+        {hasChildren && (
+          <Typography
+            component="span"
+            sx={{ ml: 0.5, fontSize: "0.7rem", opacity: 0.6 }}
+          >
+            ▾
+          </Typography>
+        )}
+      </ButtonBase>
+
+      {hasChildren && (
+        <Menu
+          anchorEl={anchorEl}
+          open={open}
+          onClose={closeMenu}
+          anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+          transformOrigin={{ vertical: "top", horizontal: "left" }}
+          slotProps={{ paper: { sx: { minWidth: 200 } } }}
+        >
+          {menuItems.map(({ page, depth }) => {
+            const key = pageKey(page);
+            return (
+              <MenuItem
+                key={key}
+                selected={key === activeId}
+                onClick={() => {
+                  closeMenu();
+                  onNavigate(key, { focus: true });
+                }}
+                sx={{
+                  pl: 2 + depth * 2.5,
+                  fontWeight: depth === 0 ? 700 : 400,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {depth > 0 && (
+                  <Box
+                    component="span"
+                    aria-hidden="true"
+                    sx={{ mr: 0.75, opacity: 0.6 }}
+                  >
+                    ↳
+                  </Box>
+                )}
+                {page.title || "Untitled page"}
+              </MenuItem>
+            );
+          })}
+        </Menu>
+      )}
+    </Box>
+  );
+}
+
+function SiteHeader({
+  header,
+  siteName,
+  pages,
+  activeId,
+  onNavigate,
+  theme,
+}) {
   const logo = resolveMediaImage(header?.logoUrl);
   const title = header?.siteTitle || siteName;
 
@@ -1012,52 +1150,47 @@ function SiteHeader({ header, siteName, pages, activeId, onNavigate, theme }) {
         zIndex: 1100,
         color: theme.textColor || theme.color,
         borderBottom: `1px solid ${theme.border}`,
-        backgroundColor: theme.headerBackground || theme.headerBg || theme.background,
+        backgroundColor:
+          theme.headerBackground || theme.headerBg || theme.background,
+        py: 1,
       }}
     >
       <Box
         sx={{
           maxWidth: 1200,
           mx: "auto",
-          px: { xs: 2, md: 3 },
+          px: { xs: 2, sm: 3 },
           display: "flex",
-          flexDirection: { xs: "column", md: "row" },
-          alignItems: { xs: "stretch", md: "center" },
+          alignItems: "center",
           justifyContent: "space-between",
-          gap: { xs: 1, md: 4 },
+          gap: 3,
+          flexWrap: "wrap",
         }}
       >
-        {/* Logo + title */}
         {(logo || title) && (
           <Box
             component="a"
             href={pages[0] ? pageHref(pageKey(pages[0])) : "#main-content"}
             onClick={(event) => {
               if (pages[0]) {
-                handlePageAnchorClick(
-                  event,
-                  pageKey(pages[0]),
-                  onNavigate,
-                  { focus: true },
-                );
+                handlePageAnchorClick(event, pageKey(pages[0]), onNavigate, {
+                  focus: true,
+                });
               }
             }}
             sx={{
               display: "flex",
               alignItems: "center",
-              gap: 1.25,
+              gap: 1.5,
               borderRadius: 1,
               "&:focus-visible": {
                 outline: `3px solid ${theme.primaryColor || theme.color}`,
                 outlineOffset: 3,
               },
               py: 1,
-              minHeight: { xs: 56, md: 64 },
               color: "inherit",
               textDecoration: "none",
-              minWidth: 0,
               flexShrink: 0,
-              maxWidth: { xs: "100%", md: "40%" },
             }}
           >
             {logo && (
@@ -1070,8 +1203,8 @@ function SiteHeader({ header, siteName, pages, activeId, onNavigate, theme }) {
                 fetchPriority="high"
                 sx={{
                   display: "block",
-                  width: { xs: 36, md: 44 },
-                  height: { xs: 36, md: 44 },
+                  width: 44,
+                  height: 44,
                   borderRadius: "50%",
                   objectFit: "cover",
                   flexShrink: 0,
@@ -1083,13 +1216,10 @@ function SiteHeader({ header, siteName, pages, activeId, onNavigate, theme }) {
                 component="span"
                 noWrap
                 sx={{
-                  fontSize: { xs: "1.05rem", md: "1.3rem" },
+                  fontSize: "1.3rem",
                   fontWeight: 700,
                   lineHeight: 1.2,
                   letterSpacing: "-0.01em",
-                  minWidth: 0,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
                 }}
               >
                 {title}
@@ -1098,83 +1228,27 @@ function SiteHeader({ header, siteName, pages, activeId, onNavigate, theme }) {
           </Box>
         )}
 
-        {/* Navigation: scrollable so many pages stay usable */}
-        <Box
-          sx={{
-            minWidth: 0,
-            maxWidth: "100%",
-            borderTop: { xs: `1px solid ${theme.border}`, md: "none" },
-          }}
-        >
-          <Tabs
-            component="nav"
-            aria-label="Site navigation"
-            value={activeId}
-            onChange={(_, value) => onNavigate(value)}
-            variant="scrollable"
-            scrollButtons="auto"
-            allowScrollButtonsMobile
-            sx={{
-              minHeight: 48,
-              minWidth: 0,
-              color: theme.textColor || theme.color,
-              "& .MuiTabs-flexContainer": { gap: 0.5 },
-              "& .MuiTabs-indicator": {
-                backgroundColor: theme.primaryColor || theme.color,
-                height: 3,
-                borderRadius: "3px 3px 0 0",
-              },
-              "& .MuiTabScrollButton-root": {
-                color: theme.textColor || theme.color,
-                width: 32,
-              },
-              "& .MuiTab-root": {
-                minHeight: 48,
-                minWidth: "auto",
-                maxWidth: 220,
-                px: 2,
-                textTransform: "none",
-                fontWeight: 600,
-                fontSize: "0.95rem",
-                color: theme.textColor || theme.color,
-                opacity: 0.7,
-                borderRadius: 1,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                transition: "opacity .2s, background-color .2s",
-                "&:hover": { opacity: 1, bgcolor: theme.hover },
-                "&:focus-visible": {
-                  opacity: 1,
-                  outline: `3px solid ${theme.primaryColor || theme.color}`,
-                  outlineOffset: -3,
-                },
-              },
-              "& .MuiTab-root.Mui-selected": {
-                color: theme.textColor || theme.color,
-                opacity: 1,
-              },
-            }}
+        <Box sx={{ flexGrow: 1, display: "flex", justifyContent: "flex-end" }}>
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{ flexWrap: "wrap", alignItems: "center", justifyContent: "flex-end" }}
           >
-            {pages.map((p) => {
-              const id = pageKey(p);
-              const label = p.title || "Untitled page";
-              return (
-                <Tab
-                  key={id}
-                  component="a"
-                  href={pageHref(id)}
-                  value={id}
-                  label={label}
-                  title={label}
-                  aria-current={id === activeId ? "page" : undefined}
-                  onClick={(event) =>
-                    handlePageAnchorClick(event, id, onNavigate, { focus: true })
-                  }
+            {pages
+              .filter(
+                (p) => !p.parentId || p.parentId === 0 || p.parentId === "0",
+              )
+              .map((p) => (
+                <NavItem
+                  key={pageKey(p)}
+                  p={p}
+                  pages={pages}
+                  activeId={activeId}
+                  onNavigate={onNavigate}
+                  theme={theme}
                 />
-              );
-            })}
-          </Tabs>
+              ))}
+          </Stack>
         </Box>
       </Box>
     </Box>
@@ -1231,14 +1305,17 @@ function SiteFooter({ header, siteName, pages, activeId, onNavigate, theme }) {
     },
   ].filter(Boolean);
 
+  const topLevelPages = pages.filter(
+    (p) => !p.parentId || p.parentId === 0 || p.parentId === "0",
+  );
   const hasAbout = Boolean(header?.footerText || title);
-  const hasLinks = pages.length > 1;
+  const hasLinks = topLevelPages.length > 1;
   const copyright =
     header?.copyrightText ||
-    (title ? `© ${new Date().getFullYear()} ${title}` : "");
+    (title ? ` ${new Date().getFullYear()} ${title}` : "");
 
   // Cap the height of very long link lists so the footer stays balanced.
-  const linkCap = pages.length > 12;
+  const linkCap = topLevelPages.length > 12;
 
   const linkSx = {
     color: "inherit",
@@ -1267,7 +1344,8 @@ function SiteFooter({ header, siteName, pages, activeId, onNavigate, theme }) {
     <Box
       component="footer"
       sx={{
-        backgroundColor: theme.footerBackground || theme.footerBg || theme.background,
+        backgroundColor:
+          theme.footerBackground || theme.footerBg || theme.background,
         color: theme.textColor || theme.color,
         borderTop: `1px solid ${theme.border}`,
       }}
@@ -1333,7 +1411,7 @@ function SiteFooter({ header, siteName, pages, activeId, onNavigate, theme }) {
                   pr: linkCap ? 1 : 0,
                 }}
               >
-                {pages.map((p) => {
+                {topLevelPages.map((p) => {
                   const isActive = pageKey(p) === activeId;
                   return (
                     <Link
@@ -1341,12 +1419,9 @@ function SiteFooter({ header, siteName, pages, activeId, onNavigate, theme }) {
                       component="a"
                       href={pageHref(pageKey(p))}
                       onClick={(event) =>
-                        handlePageAnchorClick(
-                          event,
-                          pageKey(p),
-                          onNavigate,
-                          { focus: true },
-                        )
+                        handlePageAnchorClick(event, pageKey(p), onNavigate, {
+                          focus: true,
+                        })
                       }
                       aria-current={isActive ? "page" : undefined}
                       title={p.title || "Untitled page"}
@@ -1458,7 +1533,7 @@ function SiteFooter({ header, siteName, pages, activeId, onNavigate, theme }) {
               color: theme.muted,
             }}
           >
-            {copyright}
+            © {copyright}
           </Typography>
         </Box>
       )}
@@ -1481,9 +1556,9 @@ export default function Site() {
     background: "#ffffff",
   });
   const [pages, setPages] = useState([]);
-  const [media, setMedia] = useState({ news: [], galleries: [], slider: [] });
   const [siteData, setSiteData] = useState({});
   const [activeId, setActiveId] = useState("");
+  const [media, setMedia] = useState({ news: [], galleries: [], slider: [] });
   const [newsIndex, setNewsIndex] = useState(0);
   const [newsOpen, setNewsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -1660,19 +1735,14 @@ export default function Site() {
     return () => {
       cancelled = true;
     };
-  }, [routeSiteKey, siteSlug, navigate, siteAdminMode, publicMode, submissionVersion]);
-
-  useEffect(
-    () =>
-      installSiteFormHandler({
-        siteId: targetSiteId,
-        iframeRef,
-        onSubmitted: () => {
-          setSubmissionVersion((version) => version + 1);
-        },
-      }),
-    [targetSiteId],
-  );
+  }, [
+    routeSiteKey,
+    siteSlug,
+    navigate,
+    siteAdminMode,
+    publicMode,
+    submissionVersion,
+  ]);
 
   useEffect(() => {
     if (!media.news.length) return undefined;
@@ -1931,7 +2001,9 @@ export default function Site() {
               right: 12,
               color: muiTheme.palette.common.white,
               bgcolor: alpha(muiTheme.palette.common.black, 0.5),
-              "&:hover": { bgcolor: alpha(muiTheme.palette.common.black, 0.75) },
+              "&:hover": {
+                bgcolor: alpha(muiTheme.palette.common.black, 0.75),
+              },
             }}
           >
             <CloseIcon />

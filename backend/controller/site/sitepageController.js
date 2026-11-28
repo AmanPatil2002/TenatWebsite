@@ -13,6 +13,28 @@ const isValidPage = (value) =>
   value.trim().length > 0 &&
   Buffer.byteLength(value, "utf8") <= 60000;
 
+// parentId is optional. When present it must be a positive int id of an
+// existing page in the same site. Returns { error } or { parentId }.
+const resolveParentId = async (connection, pagesTable, rawParentId, selfId) => {
+  if (rawParentId === undefined) return { parentId: undefined };
+  if (rawParentId === null || rawParentId === "") return { parentId: null };
+  if (!isId(rawParentId)) {
+    return { error: "Parent page must be a valid page id" };
+  }
+  const parentId = String(rawParentId);
+  if (selfId !== undefined && String(selfId) === parentId) {
+    return { error: "A page cannot be its own parent" };
+  }
+  const [rows] = await connection.query(
+    `SELECT id FROM ${pagesTable} WHERE id = ?`,
+    [parentId],
+  );
+  if (!rows.length) {
+    return { error: "Parent page not found" };
+  }
+  return { parentId };
+};
+
 // Shared site-details query (LEFT JOINs so a missing paymentId/themeId
 // doesn't wipe out the whole response).
 const SITE_DETAILS_SQL = `
@@ -39,7 +61,7 @@ const getSitePages = async (req, res) => {
     const site = await getActiveManagedSite(siteId, req);
 
     const [pages] = await db.query(
-      `SELECT id AS sitePageId, title, page, sortOrder
+      `SELECT id AS sitePageId, title, page, sortOrder, parentId
          FROM ${tn(siteId, "pages", site.dbName)}
         ORDER BY sortOrder, id`,
     );
@@ -61,7 +83,7 @@ const getPublicSitePages = async (req, res) => {
     const site = await getPublicSite(siteId);
 
     const [pages] = await db.query(
-      `SELECT id AS sitePageId, title, page, sortOrder
+      `SELECT id AS sitePageId, title, page, sortOrder, parentId
          FROM ${tn(siteId, "pages", site.dbName)}
         ORDER BY sortOrder, id`,
     );
@@ -104,7 +126,7 @@ const getSitePageOptions = async (req, res) => {
 
 const createSitePage = async (req, res) => {
   const { siteId } = req.params;
-  const { title, page, sourcePagesId } = req.body ?? {};
+  const { title, page, sourcePagesId, parentId } = req.body ?? {};
   if (!isId(siteId)) return res.status(400).json({ message: "Invalid site id" });
 
   const isLibraryPage = sourcePagesId !== undefined;
@@ -126,18 +148,29 @@ const createSitePage = async (req, res) => {
     connection = await db.getConnection();
     await connection.beginTransaction();
 
+    const parent = await resolveParentId(connection, pagesTable, parentId);
+    if (parent.error) throw new HttpError(400, parent.error);
+
+    const resolvedParentId = parent.parentId ?? null;
+    // sortOrder only applies to root-level pages; child pages are ordered
+    // by their parent and must have a NULL sortOrder.
+    const isChild = resolvedParentId != null && resolvedParentId > 0;
+
     let insertId;
 
     if (isLibraryPage) {
+      const sortOrderSql = isChild
+        ? "NULL"
+        : `COALESCE((SELECT MAX(sortOrder) FROM ${pagesTable}), 0) + 1`;
+
       const [result] = await connection.query(
-        `INSERT INTO ${pagesTable} (sourcePagesId, title, page, sortOrder)
-         SELECT p.pagesId, p.title, p.page,
-                COALESCE((SELECT MAX(sortOrder) FROM ${pagesTable}), 0) + 1
+        `INSERT INTO ${pagesTable} (sourcePagesId, title, page, sortOrder, parentId)
+         SELECT p.pagesId, p.title, p.page, ${sortOrderSql}, ?
            FROM template t
            JOIN pages p ON p.categoryId = t.categoryId
           WHERE t.templateId = (SELECT templateId FROM sites WHERE id = ?)
             AND p.pagesId = ?`,
-        [siteId, sourcePagesId],
+        [resolvedParentId, siteId, sourcePagesId],
       );
 
       if (!result.affectedRows) {
@@ -154,13 +187,18 @@ const createSitePage = async (req, res) => {
       // VALUES-based insert guarantees exactly one row even when the
       // tenant pages table is currently empty. The old
       // INSERT..SELECT..FROM pages form inserted 0 rows on an empty table.
-      const [[{ maxSort }]] = await connection.query(
-        `SELECT COALESCE(MAX(sortOrder), 0) AS maxSort FROM ${pagesTable}`,
-      );
+      let sortOrder = null;
+      if (!isChild) {
+        const [[{ maxSort }]] = await connection.query(
+          `SELECT COALESCE(MAX(sortOrder), 0) AS maxSort FROM ${pagesTable}`,
+        );
+        sortOrder = Number(maxSort) + 1;
+      }
+
       const [result] = await connection.query(
-        `INSERT INTO ${pagesTable} (title, page, sortOrder)
-         VALUES (?, ?, ?)`,
-        [title.trim(), page, Number(maxSort) + 1],
+        `INSERT INTO ${pagesTable} (title, page, sortOrder, parentId)
+         VALUES (?, ?, ?, ?)`,
+        [title.trim(), page, sortOrder, resolvedParentId],
       );
 
       if (!result.affectedRows) {
@@ -200,7 +238,7 @@ const updateSitePage = async (req, res) => {
 
   const fields = [];
   const values = [];
-  const { title, page } = req.body ?? {};
+  const { title, page, parentId } = req.body ?? {};
 
   if (title !== undefined) {
     if (!isValidTitle(title)) {
@@ -220,24 +258,87 @@ const updateSitePage = async (req, res) => {
     fields.push("page = ?");
     values.push(page);
   }
-  if (!fields.length) {
-    return res
-      .status(400)
-      .json({ message: "Provide a title or page to update" });
-  }
 
+  let connection;
   try {
     const site = await getActiveManagedSite(siteId, req);
-    const [result] = await db.query(
-      `UPDATE ${tn(siteId, "pages", site.dbName)} SET ${fields.join(
-        ", ",
-      )} WHERE id = ?`,
-      [...values, pageId],
-    );
-    if (!result.affectedRows) throw new HttpError(404, "Page not found");
+    const pagesTable = tn(siteId, "pages", site.dbName);
+
+    if (parentId !== undefined) {
+      connection = await db.getConnection();
+      await connection.beginTransaction();
+
+      const parent = await resolveParentId(
+        connection,
+        pagesTable,
+        parentId,
+        pageId,
+      );
+      if (parent.error) throw new HttpError(400, parent.error);
+
+      // Walk up from the proposed parent; if we reach pageId the change
+      // would create a cycle, so reject it.
+      if (parent.parentId != null) {
+        const [chain] = await connection.query(
+          `WITH RECURSIVE ancestry AS (
+             SELECT id, parentId FROM ${pagesTable} WHERE id = ?
+             UNION ALL
+             SELECT p.id, p.parentId
+               FROM ${pagesTable} p
+               JOIN ancestry a ON p.id = a.parentId
+           )
+           SELECT id FROM ancestry`,
+          [parent.parentId],
+        );
+        if (chain.some((row) => String(row.id) === String(pageId))) {
+          throw new HttpError(400, "That parent would create a page loop");
+        }
+      }
+
+      fields.push("parentId = ?");
+      values.push(parent.parentId ?? null);
+    }
+
+    if (!fields.length) {
+      if (connection) {
+        await connection.rollback();
+        connection.release();
+        connection = null;
+      }
+      return res
+        .status(400)
+        .json({ message: "Provide a title, page, or parent to update" });
+    }
+
+    if (connection) {
+      const [result] = await connection.query(
+        `UPDATE ${pagesTable} SET ${fields.join(", ")} WHERE id = ?`,
+        [...values, pageId],
+      );
+      if (!result.affectedRows) throw new HttpError(404, "Page not found");
+      await connection.commit();
+    } else {
+      const [result] = await db.query(
+        `UPDATE ${pagesTable} SET ${fields.join(", ")} WHERE id = ?`,
+        [...values, pageId],
+      );
+      if (!result.affectedRows) throw new HttpError(404, "Page not found");
+    }
     return res.json({ message: "Page updated successfully" });
   } catch (error) {
+    if (connection) {
+      try {
+        await connection.rollback();
+      } catch (rollbackError) {
+        console.error(
+          "updateSitePage transaction rollback failed:",
+          rollbackError,
+        );
+      }
+    }
     return sendError(res, error);
+  } finally {
+    if (connection) connection.release();
   }
 };
 

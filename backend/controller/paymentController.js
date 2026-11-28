@@ -16,7 +16,7 @@ const isId = (value) => {
   return BigInt(value) <= 18446744073709551615n;
 };
 
-const isAdmin = (req) => ["admin", "superadmin"].includes(req.user?.role);
+const isAdmin = (req) => ["admin"].includes(req.user?.role);
 
 // mysql2 already parses JSON columns into objects; handle the string case too.
 const parsePages = (row) => {
@@ -188,19 +188,6 @@ const createPayment = async (req, res) => {
 
     const { _mail, ...payload } = result;
 
-    try {
-      await provisionSiteDatabase(payload.siteId);
-      payload.siteProvisionStatus = "ready";
-    } catch (provisionError) {
-      console.error(
-        `Database provisioning failed for purchased site ${payload.siteId}:`,
-        provisionError,
-      );
-      payload.siteProvisionStatus = "failed";
-      payload.siteProvisionMessage =
-        "Your purchase completed, but site database setup needs attention.";
-    }
-
     // fire-and-forget: an email failure must not fail an already committed payment
     if (_mail?.to) {
       sendPaymentEmail({
@@ -210,6 +197,9 @@ const createPayment = async (req, res) => {
         currency: payload.currency,
       }).catch((err) => console.error("Payment email failed:", err));
     }
+
+    await provisionSiteDatabase(payload.siteId);
+    payload.siteProvisionStatus = "ready";
 
     return res.status(201).json({ message: "Payment saved", ...payload });
   } catch (error) {
